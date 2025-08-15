@@ -2,4 +2,13 @@ Shit Script (SiS)
 <!-- (/.__.)/ \(.__.\) -->
 
 This project uses the following dependencies:
-[Google Test](https://github.com/google/googletest), which is licensed under the BSD 3-Clause. See [external/LICENSES/googletest.BSD-3-Clause.txt](external/LICENSES/googletest.BSD-3-Clause.txt) for license details.
+
+- **MIT License**:
+  - [nlohmann/json](https://github.com/nlohmann/json)
+  - [cxxopts](https://github.com/jarro2783/cxxopts)
+  - [spdlog](https://github.com/gabime/spdlog)
+
+- **BSD 3-Clause**:
+  - [Google Test](https://github.com/google/googletest)
+
+See [external/LICENSES/](external/LICENSES/) for license details.
