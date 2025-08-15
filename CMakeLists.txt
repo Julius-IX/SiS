@@ -24,6 +24,11 @@ list(FILTER SOURCES EXCLUDE REGEX ".*/main\\.cpp$")
 
 add_library(SiSlib STATIC ${SOURCES})
 target_include_directories(SiSlib PUBLIC ${PROJECT_SOURCE_DIR}/include)
+target_link_libraries(SiSlib PUBLIC
+        nlohmann_json::nlohmann_json
+        cxxopts
+        spdlog
+)
 
 add_executable(SiS src/main.cpp)
 
