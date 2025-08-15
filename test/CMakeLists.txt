@@ -16,6 +16,7 @@ target_link_libraries(run_tests PRIVATE
         gtest_main
         nlohmann_json::nlohmann_json
         cxxopts
+        spdlog
 )
 
 include(GoogleTest)
