@@ -21,3 +21,11 @@ FetchContent_Declare(
         GIT_TAG 55f9368 # v3.12.0
 )
 FetchContent_MakeAvailable(nloh_json)
+
+# cxxopts
+FetchContent_Declare(
+        cxxopts
+        GIT_REPOSITORY https://github.com/jarro2783/cxxopts.git
+        GIT_TAG 44380e5 # v3.3.1 
+)
+FetchContent_MakeAvailable(cxxopts)

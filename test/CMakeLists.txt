@@ -7,6 +7,7 @@ add_executable(run_tests ${TEST_SOURCES})
 target_include_directories(run_tests PRIVATE 
         ${PROJECT_SOURCE_DIR}/include
         ${nloh_json_SOURCE_DIR}/single_include
+        ${cxxopts_SOURCE_DIR}/include
 )
 
 target_link_libraries(run_tests PRIVATE
@@ -14,6 +15,7 @@ target_link_libraries(run_tests PRIVATE
         gtest
         gtest_main
         nlohmann_json::nlohmann_json
+        cxxopts
 )
 
 include(GoogleTest)
