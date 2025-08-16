@@ -4,9 +4,10 @@
 #include <unordered_map>
 #include <string>
 #include <variant>
+#include <cstdint>
 
 namespace lex {
-    typedef enum TokenTypes {
+    typedef enum TokenType: std::uint8_t {
         SIS_EOF = 0,
         ILLEGAL,
         IDENT,
@@ -58,7 +59,7 @@ namespace lex {
         TokenType type;
         std::variant<int, double, bool, std::string> value;
         size_t line;
-        size_t colmn;
+        size_t column;
         size_t len;
     } Token;
 
@@ -87,16 +88,15 @@ namespace lex {
         auto keyword_it = keywords.find(identifier);
         if (keyword_it != keywords.end()) {
             return keyword_it->second;
-        } else {
-            return IDENT;
         }
+        return IDENT;
     }
 
-    inline std::string tokenToString(Token token) {
-        auto t_val = token.value;
+    inline std::string tokenToString(const Token& token) {
+        const auto& t_val = token.value;
 
         switch (token.type) {
-        case SIS_EOF: return "\0"; 
+        case SIS_EOF: return ""; 
         case ILLEGAL: return "ILLEGAL_SIS_TOKEN"; 
         case IDENT: return std::get<std::string>(t_val);
 
@@ -104,7 +104,6 @@ namespace lex {
                       std::holds_alternative<int>(t_val) 
                       ? std::get<int>(t_val) 
                       : std::get<double>(t_val)));
-
 
         case STRING: return std::get<std::string>(t_val);
         case TRUE: return "true";
@@ -166,11 +165,11 @@ namespace lex {
         case HASH: return "#";
         case ARROW: return "->";
 
-        case COMMENT_LINE: return std::get<std::string>(t_val); 
+        case COMMENT_LINE:
         case COMMENT_BLOCK: return std::get<std::string>(t_val);
         default: return "";
         }
     }
-}
+} // namespace lex
 
 #endif // SIS_TOKEN_H
