@@ -14,14 +14,6 @@ set(gtest_force_shared_crt OFF)
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE) 
 FetchContent_MakeAvailable(googletest)
 
-# nlohmann json
-FetchContent_Declare(
-        nloh_json
-        GIT_REPOSITORY https://github.com/nlohmann/json.git
-        GIT_TAG 55f9368 # v3.12.0
-)
-FetchContent_MakeAvailable(nloh_json)
-
 # cxxopts
 FetchContent_Declare(
         cxxopts
@@ -29,11 +21,3 @@ FetchContent_Declare(
         GIT_TAG 44380e5 # v3.3.1 
 )
 FetchContent_MakeAvailable(cxxopts)
-
-# spdlog
-FetchContent_Declare(
-        spdlog
-        GIT_REPOSITORY http://github.com/gabime/spdlog.git
-        GIT_TAG 6fa3601 # 1.15.3
-)
-FetchContent_MakeAvailable(spdlog)
