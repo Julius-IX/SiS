@@ -3,12 +3,10 @@ Shit Script (SiS)
 
 ## Dependencies
 
-The following libraries are used in this project:
+#### Runtime Dependencies  
+- **[cxxopts](https://github.com/jarro2783/cxxopts)** (MIT License)
 
-### Runtime Dependencies (MIT Licensed)
-- [cxxopts](https://github.com/jarro2783/cxxopts)
+#### Development / Test Dependencies  
+- **[Google Test](https://github.com/google/googletest)** (BSD-3-Clause License)
 
-### Development / Test Dependencies
-- [Google Test (BSD-3-Clause)](https://github.com/google/googletest)
-
-See `[external/LICENSES/](external/LICENSES)` for full license texts.
+See [external/LICENSES](external/LICENSES) for full license texts.
