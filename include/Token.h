@@ -92,6 +92,7 @@ namespace lex {
         return IDENT;
     }
 
+
     inline std::string tokenToString(const Token& token) {
         const auto& t_val = token.value;
 
@@ -168,6 +169,19 @@ namespace lex {
         case COMMENT_LINE:
         case COMMENT_BLOCK: return std::get<std::string>(t_val);
         default: return "";
+        }
+    }
+
+    inline std::string literalTokenToString(const Token& token) {
+        switch (token.type) {
+        case SIS_EOF: return "SIS_EOF";
+        case ILLEGAL: return "ILLEGAL";
+        case IDENT: return "IDENT";
+        case NUM: return "NUM";
+        case STRING: return "STRING";
+        case COMMENT_LINE: return "COMMENT_LINE";
+        case COMMENT_BLOCK: return "COMMENT_BLOCK";
+        default: return tokenToString(token);
         }
     }
 } // namespace lex
