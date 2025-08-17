@@ -42,7 +42,6 @@ namespace lex {
         L_PAREN, R_PAREN,
         L_BRACK, R_BRACK,
         L_BRACE, R_BRACE,
-        L_ANGLE, R_ANGLE,
 
         COMMA,
         DOT,
@@ -54,6 +53,9 @@ namespace lex {
 
         COMMENT_LINE, COMMENT_BLOCK,
     } TokenType;
+
+    // Against accidental mangling of variants types order
+    typedef std::variant<int, double, bool, std::string> TokenVariant;
 
     typedef struct Token {
         TokenType type;
@@ -154,8 +156,6 @@ namespace lex {
         case R_BRACK: return "]";
         case L_BRACE: return "{"; 
         case R_BRACE: return "}";
-        case L_ANGLE: return "<"; 
-        case R_ANGLE: return ">";
 
         case COMMA: return ",";
         case DOT: return ".";
