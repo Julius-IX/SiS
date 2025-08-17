@@ -32,7 +32,7 @@ namespace lex {
         STAR,
         SLASH,
         PERCENT,
-        ASSIGN, PLUS_ASSIGN, MINUS_ASSIGN, STAR_ASSIGN, SLASH_ASSIGN,
+        ASSIGN, PLUS_ASSIGN, MINUS_ASSIGN, STAR_ASSIGN, SLASH_ASSIGN, PERCENT_ASSIGN,
 
         EQUALS, NOT_EQUALS,
         LESS_THAN, LESS_THAN_EQUALS,
@@ -139,6 +139,7 @@ namespace lex {
         case MINUS_ASSIGN: return "-="; 
         case STAR_ASSIGN: return "*="; 
         case SLASH_ASSIGN: return "/=";
+        case PERCENT_ASSIGN: return "%=";
 
         case EQUALS: return "=="; 
         case NOT_EQUALS: return "!=";

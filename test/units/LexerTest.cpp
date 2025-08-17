@@ -28,7 +28,7 @@ TEST(Lexer, CorrectTokenSplits) {
     #include "this is a string literal"
     num++ ++num --num num--
     * / %
-    = += -= *= /=
+    = += -= *= /= %=
     == != < <= > >= && || !
     () {} [] <>
     , . : :: ; ->
@@ -141,6 +141,7 @@ TEST(Lexer, CorrectTokenSplits) {
         {.type = lex::MINUS_ASSIGN  , .value = {}              , .line = 21 , .column = 6  , .len = 2  },
         {.type = lex::STAR_ASSIGN   , .value = {}              , .line = 21 , .column = 9  , .len = 2  },
         {.type = lex::SLASH_ASSIGN  , .value = {}              , .line = 21 , .column = 12 , .len = 2  },
+        {.type = lex::PERCENT_ASSIGN, .value = {}              , .line = 21 , .column = 15 , .len = 2  }, 
 
         {.type = lex::EQUALS        , .value = {}              , .line = 22 , .column = 1  , .len = 2  },
         {.type = lex::NOT_EQUALS    , .value = {}              , .line = 22 , .column = 4  , .len = 2  },
