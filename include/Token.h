@@ -92,7 +92,6 @@ namespace lex {
         return IDENT;
     }
 
-
     inline std::string tokenToString(const Token& token) {
         const auto& t_val = token.value;
 

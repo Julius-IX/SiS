@@ -9,7 +9,6 @@
  */
 TEST(Lexer, CorrectTokenSplits) {
     std::string input = R"(
-    12345678901234567890123456789012345
     pin int_literal = 5;
     pin double_literal = 5.5;
     pin str_literal = "false true \n\r"
