@@ -183,6 +183,10 @@ namespace lex {
         default: return tokenToString(token);
         }
     }
+
+    inline std::string literalTokenToString(const TokenType& token_type) {
+        return literalTokenToString(Token{.type = token_type, .value = "", .line = 0, .column = 0});
+    }
 } // namespace lex
 
 #endif // SIS_TOKEN_H
