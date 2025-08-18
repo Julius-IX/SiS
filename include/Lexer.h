@@ -16,6 +16,7 @@ namespace lex {
 
         size_t cursor_pos{0};
         size_t next_pos{0};
+        bool eof_reached{false};
     } Lexer;
 
     inline Lexer* newLexer(std::string input) {
