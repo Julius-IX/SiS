@@ -55,11 +55,11 @@ namespace lex {
     } TokenType;
 
     // Against accidental mangling of variants types order
-    typedef std::variant<int, double, bool, std::string> TokenVariant;
+    typedef std::variant<std::monostate, int, double, bool, std::string> TokenVariant;
 
     typedef struct Token {
         TokenType type;
-        std::variant<int, double, bool, std::string> value;
+        TokenVariant value;
         size_t line;
         size_t column;
         size_t len;

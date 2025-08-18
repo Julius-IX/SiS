@@ -8,7 +8,7 @@
 namespace lex {
     typedef struct Lexer {
         std::string input;
-        std::string* current_file;
+        std::string current_file;
         std::string current_char;
 
         size_t line{0};

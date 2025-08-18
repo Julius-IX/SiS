@@ -38,7 +38,6 @@ TEST(Lexer, CorrectTokenSplits) {
      */
     )";
 
-    // TODO: maybe initialize the rest of values
     static const std::vector<lex::Token> expected_tokens = {
         {.type = lex::PIN           , .value = {}              , .line = 2  , .column = 1  , .len = 3  },
         {.type = lex::IDENT         , .value = "int_literal"   , .line = 2  , .column = 5  , .len = 11 },
