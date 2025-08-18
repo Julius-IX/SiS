@@ -28,34 +28,34 @@ static std::string tokenVariantToString(const lex::Token token) {
  */
 TEST(Lexer, CorrectTokenSplits) {
     const std::string input = R"(
-    pin int_literal = 5;
-    pin double_literal = 5.5;
-    pin str_literal = "false true \n\r"
-    {true, false, null}
-    else for while switch case
+pin int_literal = 5;
+pin double_literal = 5.5;
+pin str_literal = "false true \n\r"
+{true, false, null}
+else for while switch case
 
-    if (true) {
-        funcCall();
-        wait();
-    } else {
-        otherFuncCall();
-    }
+if (true) {
+    funcCall();
+    wait();
+} else {
+    otherFuncCall();
+}
 
-    return break continue
-    fn name(par1, par2) {};
-    class ClassName {};
-    #include "this is a string literal"
-    num++ ++num --num num--
-    * / %
-    = += -= *= /= %=
-    == != < <= > >= && || !
-    () {} [] <>
-    , . : :: ; ->
-    // comment line
-    /* comment block
-     * comment block
-     */
-    )";
+return break continue
+fn name(par1, par2) {};
+class ClassName {};
+#include "this is a string literal"
+num++ ++num --num num--
+* / %
+= += -= *= /= %=
+== != < <= > >= && || !
+() {} [] <>
+, . : :: ; ->
+// comment line
+/* comment block
+ * comment block
+ */
+)";
 
     static const std::vector<lex::Token> expected_tokens = {
         {.type = lex::PIN           , .value = {}              , .line = 2  , .column = 1  },
