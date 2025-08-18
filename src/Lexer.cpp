@@ -166,6 +166,41 @@ namespace lex {
             return token;
         }
 
+        // \b \t \n \r \" \' \? \\ \0
+        Token parseStringLiteral(Lexer& lexer) {
+            size_t line = lexer.line;
+            size_t column = lexer.cursor_pos - lexer.begin_of_line;
+            readChar(lexer);
+            size_t start_index = lexer.cursor_pos;
+
+            static const std::unordered_set<char> escaped_chars {
+                'b', 't', 'n', 'r', '"', '\'', '?', '\\', '0'
+            };
+
+            std::string cc = lexer.current_char;
+            while (!cc.empty() && cc != "\"") {
+                if (cc == "\\") {
+                    char next = peekChar(lexer)[0];
+                    if (!escaped_chars.contains(next)) {
+                        return newToken(
+                                ILLEGAL,
+                                lexer.input.substr(start_index, lexer.cursor_pos - start_index),
+                                line,
+                                column
+                                );
+                    }
+                    readChar(lexer);
+                }
+                readChar(lexer);
+                cc = lexer.current_char;
+            }
+
+            std::string final_string = lexer.input.substr(start_index, lexer.cursor_pos - start_index);
+            if (cc.empty()) return newToken(ILLEGAL, final_string, line, column);
+
+            readChar(lexer);
+            return newToken(STRING, final_string, line, column);
+        }
     } // namespace ''
 
     /* I wish c++ switch statements accepted more complex types ;-;
@@ -192,6 +227,7 @@ namespace lex {
         else if (cc == ",") token = readNewToken(lexer, COMMA    , {}, line, col);
         else if (cc == ".") token = readNewToken(lexer, DOT      , {}, line, col);
         else if (cc == ";") token = readNewToken(lexer, SEMICOLON, {}, line, col);
+        else if (cc == "#") token = readNewToken(lexer, HASH     , {}, line, col);
         
         // Possible double char tokens
         else if (cc == "+") token = parseDoubleCharToken(lexer, PLUS, {{"+", PLUS_PLUS} , {"=", PLUS_ASSIGN}});
@@ -201,10 +237,12 @@ namespace lex {
         else if (cc == "=") token = parseDoubleCharToken(lexer, ASSIGN, {{"=", EQUALS}});
         else if (cc == "<") token = parseDoubleCharToken(lexer, LESS_THAN, {{"=", LESS_THAN_EQUALS}});
         else if (cc == ">") token = parseDoubleCharToken(lexer, GREATER_THAN, {{"=", GREATER_THAN_EQUALS}});
+        else if (cc == "|") token = parseDoubleCharToken(lexer, ILLEGAL, {{"|", OR}});
         else if (cc == "&") token = parseDoubleCharToken(lexer, ILLEGAL, {{"&", AND}});
         else if (cc == "!") token = parseDoubleCharToken(lexer, NOT, {{"=", NOT_EQUALS}});
         else if (cc == ":") token = parseDoubleCharToken(lexer, COLON, {{":", SCOPE_RES}});
         else if (cc == "/") token = parseSlashToken(lexer);
+        else if (cc == "\"") token = parseStringLiteral(lexer);
 
         // Multi char tokens
         else {
