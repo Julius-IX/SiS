@@ -62,7 +62,6 @@ namespace lex {
         TokenVariant value;
         size_t line;
         size_t column;
-        size_t len;
     } Token;
 
     inline TokenType lookupIdentifier(const std::string& identifier) {
