@@ -1,6 +1,28 @@
 #include <gtest/gtest.h>
 
 #include "Lexer.h"
+#include "Token.h"
+
+static std::string tokenVariantToString(const lex::Token token) {
+    lex::TokenVariant tok_var = token.value;
+    if (std::holds_alternative<std::monostate>(tok_var)) {
+        return "std::monostate";
+
+    } else if (std::holds_alternative<int>(tok_var)) {
+        return std::to_string(std::get<int>(tok_var));
+
+    } else if (std::holds_alternative<double>(tok_var)) {
+        return std::to_string(std::get<double>(tok_var));
+
+    } else if (std::holds_alternative<bool>(tok_var)) {
+        return std::to_string(std::get<bool>(tok_var));
+        
+    } else if (std::holds_alternative<std::string>(tok_var)) {
+        return std::get<std::string>(tok_var);
+    }
+
+    return "ERROR: could not parse TokenVariant value to std::string";
+} 
 
 /* For a string apparently the first column is the first character after a new line
  * So in this string "this is a string \nStart of new line"
@@ -176,11 +198,14 @@ TEST(Lexer, CorrectTokenSplits) {
     lex::Lexer* lexer = lex::newLexer(input);
     int index{0};
     while (lexer->cursor_pos != lex::SIS_EOF) {
-        lex::Token actual = lex::nextToken(*lexer);
+        const lex::Token actual = lex::nextToken(*lexer);
         const lex::Token& expected = expected_tokens.at(index);
 
+        std::string actual_val_str = tokenVariantToString(actual);
+        std::string expected_val_str = tokenVariantToString(expected);
+
         ASSERT_EQ(actual.type, expected.type) << "Expected token type: " << lex::literalTokenToString(expected) << "\nGot: " << lex::literalTokenToString(actual) << '\n';
-        ASSERT_EQ(actual.value, expected.value) << "Expected token value: " << expected.value << "\nGot: " << actual.value << '\n'; 
+        ASSERT_EQ(actual.value, expected.value) << "Expected token value: " << expected_val_str << "\nGot: " << actual_val_str << '\n'; 
         ASSERT_EQ(actual.line, expected.line) << "Expected token line: " << expected.line << "\nGot: " << actual.line << '\n';
         ASSERT_EQ(actual.len, expected.len) << "Expected token length: " << expected.len << "\nGot: " << actual.len << '\n';
         ++index;
