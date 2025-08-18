@@ -97,8 +97,8 @@ namespace lex {
         const auto& t_val = token.value;
 
         switch (token.type) {
-        case SIS_EOF: return ""; 
-        case ILLEGAL: return "ILLEGAL_SIS_TOKEN"; 
+        case SIS_EOF: return "SIS_EOF"; 
+        case ILLEGAL: return "ILLEGAL"; 
         case IDENT: return std::get<std::string>(t_val);
 
         case NUM: return std::to_string(( // Why not just double? idk either
@@ -107,63 +107,63 @@ namespace lex {
                       : std::get<double>(t_val)));
 
         case STRING: return std::get<std::string>(t_val);
-        case TRUE: return "true";
-        case FALSE: return "false";
-        case SIS_NULL: return "null";
+        case TRUE: return "TRUE";
+        case FALSE: return "FALSE";
+        case SIS_NULL: return "SIS_NULL";
 
-        case IF: return "if"; 
-        case ELSE: return "else";
-        case FOR: return "for"; 
-        case WHILE: return "while";
-        case SWITCH: return "switch"; 
-        case CASE: return "case"; 
-        case RETURN: return "return"; 
-        case BREAK: return "break"; 
-        case CONTINUE: return "continue";
+        case IF: return "IF"; 
+        case ELSE: return "ELSE";
+        case FOR: return "FOR"; 
+        case WHILE: return "WHILE";
+        case SWITCH: return "SWITCH"; 
+        case CASE: return "CASE"; 
+        case RETURN: return "RETURN"; 
+        case BREAK: return "BREAK"; 
+        case CONTINUE: return "CONTINUE";
 
-        case FN: return "fn";
-        case PIN: return "pin";
-        case CLASS: return "class";
-        case INCLUDE: return "include";
+        case FN: return "FN";
+        case PIN: return "PIN";
+        case CLASS: return "CLASS";
+        case INCLUDE: return "INCLUDE";
 
-        case PLUS: return "+";
-        case PLUS_PLUS: return "++";
-        case MINUS: return "-"; 
-        case MINUS_MINUS: return "--";
-        case STAR: return "*";
-        case SLASH: return "/";
-        case PERCENT: return "%";
-        case ASSIGN: return "="; 
-        case PLUS_ASSIGN: return "+="; 
-        case MINUS_ASSIGN: return "-="; 
-        case STAR_ASSIGN: return "*="; 
-        case SLASH_ASSIGN: return "/=";
-        case PERCENT_ASSIGN: return "%=";
+        case PLUS: return "PLUS";
+        case PLUS_PLUS: return "PLUS_PLUS";
+        case MINUS: return "MINUS"; 
+        case MINUS_MINUS: return "MINUS_MINUS";
+        case STAR: return "STAR";
+        case SLASH: return "SLASH";
+        case PERCENT: return "PERCENT";
+        case ASSIGN: return "ASSIGN"; 
+        case PLUS_ASSIGN: return "PLUS_ASSIGN"; 
+        case MINUS_ASSIGN: return "MINUS_ASSIGN"; 
+        case STAR_ASSIGN: return "STAR_ASSIGN"; 
+        case SLASH_ASSIGN: return "SLASH_ASSIGN";
+        case PERCENT_ASSIGN: return "PERCENT_ASSIGN";
 
-        case EQUALS: return "=="; 
-        case NOT_EQUALS: return "!=";
-        case LESS_THAN: return "<"; 
-        case LESS_THAN_EQUALS: return "<=";
-        case GREATER_THAN: return ">"; 
-        case GREATER_THAN_EQUALS: return ">=";
-        case AND: return "&&"; 
-        case OR: return "||"; 
-        case NOT: return "!";
+        case EQUALS: return "EQUALS"; 
+        case NOT_EQUALS: return "NOT_EQUALS";
+        case LESS_THAN: return "LESS_THAN"; 
+        case LESS_THAN_EQUALS: return "LESS_THAN_EQUALS";
+        case GREATER_THAN: return "GREATER_THAN"; 
+        case GREATER_THAN_EQUALS: return "GREATER_THAN_EQUALS";
+        case AND: return "AND"; 
+        case OR: return "OR"; 
+        case NOT: return "NOT";
 
-        case L_PAREN: return "("; 
-        case R_PAREN: return ")";
-        case L_BRACK: return "["; 
-        case R_BRACK: return "]";
-        case L_BRACE: return "{"; 
-        case R_BRACE: return "}";
+        case L_PAREN: return "L_PAREN"; 
+        case R_PAREN: return "R_PAREN";
+        case L_BRACK: return "L_BRACK"; 
+        case R_BRACK: return "R_BRACK";
+        case L_BRACE: return "L_BRACE"; 
+        case R_BRACE: return "R_BRACE";
 
-        case COMMA: return ",";
-        case DOT: return ".";
-        case COLON: return ":";
-        case SCOPE_RES: return "::";
-        case SEMICOLON: return ";";
-        case HASH: return "#";
-        case ARROW: return "->";
+        case COMMA: return "COMMA";
+        case DOT: return "DOT";
+        case COLON: return "COLON";
+        case SCOPE_RES: return "SCOPE_RES";
+        case SEMICOLON: return "SEMICOLON";
+        case HASH: return "HASH";
+        case ARROW: return "ARROW";
 
         case COMMENT_LINE:
         case COMMENT_BLOCK: return std::get<std::string>(t_val);
@@ -173,8 +173,6 @@ namespace lex {
 
     inline std::string literalTokenToString(const Token& token) {
         switch (token.type) {
-        case SIS_EOF: return "SIS_EOF";
-        case ILLEGAL: return "ILLEGAL";
         case IDENT: return "IDENT";
         case NUM: return "NUM";
         case STRING: return "STRING";
