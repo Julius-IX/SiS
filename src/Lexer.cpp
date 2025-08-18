@@ -1,6 +1,8 @@
 #include "Lexer.h"
 #include "Token.h"
 
+#include <unordered_set>
+
 namespace lex {
     namespace {
         void readChar(Lexer& lexer) {
@@ -33,7 +35,7 @@ namespace lex {
 
         void consumeSpace(Lexer& lexer) { 
             std::string& cc = lexer.current_char;
-            while ((cc = lexer.current_char).empty() || cc == " " || cc ==  "\t" || cc == "\r" || cc == "\n") {
+            while ((cc = lexer.current_char) == " " || cc ==  "\t" || cc == "\r" || cc == "\n") {
                 if (cc == "\n") {
                     ++lexer.line;
                     lexer.begin_of_line = lexer.cursor_pos;
@@ -54,7 +56,8 @@ namespace lex {
             auto it = possible_pairs.find(next_char);
             if (it != possible_pairs.end()) {
                 readChar(lexer);
-                return newToken(it->second, tok_val, line, column); 
+                readChar(lexer);
+                return newToken(it->second, {}, line, column); 
             }
 
             readChar(lexer);
@@ -63,18 +66,21 @@ namespace lex {
 
         std::string readTill(Lexer& lexer,  const std::string& terminator) {
             std::string buffer;
-            buffer += lexer.current_char;
 
             while (!lexer.current_char.empty()) {
-                readChar(lexer);
                 buffer += lexer.current_char;
-
+                if (lexer.current_char == "\n") {
+                    ++lexer.line;
+                    lexer.begin_of_line = lexer.cursor_pos;
+                }
                 if (buffer.size() >= terminator.size() &&
                         buffer.compare(buffer.size() - terminator.size(), terminator.size(), terminator) == 0) {
                     break;
                 }
+                readChar(lexer);
             }
 
+            readChar(lexer);
             return buffer;
         }
 
@@ -83,21 +89,21 @@ namespace lex {
             size_t column = lexer.cursor_pos - lexer.begin_of_line;
             std::string peeked_char = peekChar(lexer);
 
-            Token token = parseDoubleCharToken(lexer, SLASH, {{"=", SLASH_ASSIGN}});
-
-            if (peeked_char == "/") {
-                std::string line_comment = lexer.current_char + peeked_char; 
+            Token token = newToken(SLASH, {}, line, column);
+            std::string buffer;
+            
+            if (peeked_char == "=") {
                 readChar(lexer);
-                line_comment += readTill(lexer, "\n");
-                token = newToken(COMMENT_LINE, line_comment, line, column);
-
+                token = newToken(SLASH_ASSIGN, {}, line, column);
+            } else if (peeked_char == "/") {
+                buffer = readTill(lexer, "\n");
+                return newToken(COMMENT_LINE, buffer, line, column);
             } else if (peeked_char == "*") {
-                std::string block_comment = lexer.current_char + peeked_char; 
-                readChar(lexer);
-                block_comment += readTill(lexer, "*/");
-                if (block_comment.back() == '/' && (block_comment.back() -1) == '*') {
-                    token = newToken(COMMENT_BLOCK, block_comment, line, column);
-                } else token = newToken(ILLEGAL, block_comment, line, column);
+                buffer = readTill(lexer, "*/");
+                size_t buf_size = buffer.size();
+                if (buffer[buf_size-1] == '/' && buffer[buf_size-2] == '*') {
+                    return newToken(COMMENT_BLOCK, buffer, line, column);
+                } else token = newToken(ILLEGAL, buffer, line, column);
             }
 
             readChar(lexer);
@@ -250,6 +256,12 @@ namespace lex {
             if (isAlpha(cc)) token = parseWord(lexer);
         }
         return token;
+    }
+
+    Lexer* newLexer(std::string input) {
+        Lexer* lexer = new Lexer{std::move(input)};
+        readChar(*lexer);
+        return lexer;
     }
 
 } // namespace lex

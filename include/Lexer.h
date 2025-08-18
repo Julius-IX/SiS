@@ -18,9 +18,7 @@ namespace lex {
         size_t next_pos{0};
     } Lexer;
 
-    inline Lexer* newLexer(std::string input) {
-        return new Lexer{std::move(input)};
-    }
+    Lexer* newLexer(std::string input);
     Token nextToken(Lexer& lexer);
 } // namespace lex
 
