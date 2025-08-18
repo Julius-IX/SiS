@@ -62,7 +62,7 @@ num++ ++num --num num--
 /* comment block
  * comment block
  */
-)";
+// TODO: suffer)";
 
     static const std::vector<lex::Token> expected_tokens = {
         {.type = lex::PIN           , .value = {}              , .line = 2  , .column = 1  },
@@ -80,7 +80,7 @@ num++ ++num --num num--
         {.type = lex::PIN           , .value = {}              , .line = 4  , .column = 1  },
         {.type = lex::IDENT         , .value = "str_literal"   , .line = 4  , .column = 5  },
         {.type = lex::ASSIGN        , .value = {}              , .line = 4  , .column = 17 },
-        {.type = lex::STRING        , .value = "\"false true \n\r\"", .line = 4  , .column = 19 },
+        {.type = lex::STRING        , .value = "false true \\n\\r", .line = 4  , .column = 19 },
 
         {.type = lex::L_BRACE       , .value = {}              , .line = 5  , .column = 1  },
         {.type = lex::TRUE          , .value = {}              , .line = 5  , .column = 2  },
@@ -131,8 +131,8 @@ num++ ++num --num num--
         {.type = lex::IDENT         , .value = "name"          , .line = 16 , .column = 4  },
         {.type = lex::L_PAREN       , .value = {}              , .line = 16 , .column = 8  },
         {.type = lex::IDENT         , .value = "par1"          , .line = 16 , .column = 9  },
-        {.type = lex::COMMA         , .value = {}              , .line = 16 , .column = 10 },
-        {.type = lex::IDENT         , .value = "par2"          , .line = 16 , .column = 11 },
+        {.type = lex::COMMA         , .value = {}              , .line = 16 , .column = 13 },
+        {.type = lex::IDENT         , .value = "par2"          , .line = 16 , .column = 15 },
         {.type = lex::R_PAREN       , .value = {}              , .line = 16 , .column = 19 },
         {.type = lex::L_BRACE       , .value = {}              , .line = 16 , .column = 21 },
         {.type = lex::R_BRACE       , .value = {}              , .line = 16 , .column = 22 },
@@ -146,7 +146,7 @@ num++ ++num --num num--
 
         {.type = lex::HASH          , .value = {}              , .line = 18 , .column = 1  },
         {.type = lex::INCLUDE       , .value = {}              , .line = 18 , .column = 2  },
-        {.type = lex::STRING        , .value = "\"this is a string literal\"", .line = 18 , .column = 10 },
+        {.type = lex::STRING        , .value = "this is a string literal", .line = 18 , .column = 10 },
 
         {.type = lex::IDENT         , .value = "num"           , .line = 19 , .column = 1  },
         {.type = lex::PLUS_PLUS     , .value = {}              , .line = 19 , .column = 4  },
@@ -159,7 +159,7 @@ num++ ++num --num num--
 
         {.type = lex::STAR          , .value = {}              , .line = 20 , .column = 1  },
         {.type = lex::SLASH         , .value = {}              , .line = 20 , .column = 3  },
-        {.type = lex::PERCENT       , .value = {}              , .line = 20 , .column = 4  },
+        {.type = lex::PERCENT       , .value = {}              , .line = 20 , .column = 5  },
 
         {.type = lex::ASSIGN        , .value = {}              , .line = 21 , .column = 1  },
         {.type = lex::PLUS_ASSIGN   , .value = {}              , .line = 21 , .column = 3  },
@@ -192,12 +192,14 @@ num++ ++num --num num--
         {.type = lex::COLON         , .value = {}              , .line = 24 , .column = 5  },
         {.type = lex::SCOPE_RES     , .value = {}              , .line = 24 , .column = 7  },
         {.type = lex::SEMICOLON     , .value = {}              , .line = 24 , .column = 10 },
-        {.type = lex::ARROW         , .value = {}              , .line = 25 , .column = 12 },
+        {.type = lex::ARROW         , .value = {}              , .line = 24 , .column = 12 },
 
-        {.type = lex::COMMENT_LINE  , .value = "// comment line", .line = 26 , .column = 1 },
+        {.type = lex::COMMENT_LINE  , .value = "// comment line\n", .line = 25 , .column = 1 },
 
-        {.type = lex::COMMENT_BLOCK , .value = "/* comment block\n* comment block\n*/", .line = 27, .column = 1 },
-        {.type = lex::SIS_EOF       , .value = {}              ,  .line = 28, .column = 1 } 
+        {.type = lex::COMMENT_BLOCK , .value = "/* comment block\n * comment block\n */", .line = 26, .column = 1 },
+        
+        {.type = lex::COMMENT_LINE  , .value = "// TODO: suffer", .line = 29, .column = 1},
+        {.type = lex::SIS_EOF       , .value = {}              ,  .line = 29, .column = 17 } 
     };
 
     lex::Lexer* lexer = lex::newLexer(input);
@@ -205,8 +207,6 @@ num++ ++num --num num--
     while (true) {
         const lex::Token actual = lex::nextToken(*lexer);
         const lex::Token& expected = expected_tokens.at(index);
-
-        if (actual.type == lex::SIS_EOF) break;
  
         std::string actual_val_str = tokenVariantToString(actual);
         std::string expected_val_str = tokenVariantToString(expected);
@@ -215,6 +215,8 @@ num++ ++num --num num--
         ASSERT_EQ(actual_val_str, expected_val_str) << "\nExpected:\n" << getFullTokenStat(expected) << "\nGot:\n" << getFullTokenStat(actual);
         ASSERT_EQ(actual.line, expected.line) << "\nExpected:\n" << getFullTokenStat(expected) << "\nGot:\n" << getFullTokenStat(actual);
         ASSERT_EQ(actual.column, expected.column) << "\nExpected:\n" << getFullTokenStat(expected) << "\nGot:\n" << getFullTokenStat(actual);
+
+        if (actual.type == lex::SIS_EOF) break;
 
         index++;
     }
