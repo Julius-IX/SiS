@@ -3,7 +3,9 @@
 #include "Lexer.h"
 #include "Token.h"
 
-static std::string tokenVariantToString(const lex::Token token) {
+#include <format>
+
+static std::string tokenVariantToString(const lex::Token& token) {
     lex::TokenVariant tok_var = token.value;
     if (std::holds_alternative<std::monostate>(tok_var)) {
         return "std::monostate";
@@ -20,6 +22,11 @@ static std::string tokenVariantToString(const lex::Token token) {
 
     return "ERROR: could not parse TokenVariant value to std::string";
 } 
+
+std::string getFullTokenStat(const lex::Token token) {
+    return std::format("Type: {}\nValue: {}\nLine: {}\nColumn: {}\n",
+            lex::literalTokenToString(token.type), tokenVariantToString(token), token.line, token.column) ;
+}
 
 /* For a string apparently the first column is the first character after a new line
  * So in this string "this is a string \nStart of new line"
@@ -61,7 +68,7 @@ num++ ++num --num num--
         {.type = lex::PIN           , .value = {}              , .line = 2  , .column = 1  },
         {.type = lex::IDENT         , .value = "int_literal"   , .line = 2  , .column = 5  },
         {.type = lex::ASSIGN        , .value = {}              , .line = 2  , .column = 17 },
-        {.type = lex::NUM           , .value = 5               , .line = 2  , .column = 19 },
+        {.type = lex::NUM           , .value = 5.0             , .line = 2  , .column = 19 },
         {.type = lex::SEMICOLON     , .value = {}              , .line = 2  , .column = 20 },
 
         {.type = lex::PIN           , .value = {}              , .line = 3  , .column = 1  },
@@ -139,7 +146,7 @@ num++ ++num --num num--
 
         {.type = lex::HASH          , .value = {}              , .line = 18 , .column = 1  },
         {.type = lex::INCLUDE       , .value = {}              , .line = 18 , .column = 2  },
-        {.type = lex::STRING        , .value = "this is a string literal", .line = 18 , .column = 10 },
+        {.type = lex::STRING        , .value = "\"this is a string literal\"", .line = 18 , .column = 10 },
 
         {.type = lex::IDENT         , .value = "num"           , .line = 19 , .column = 1  },
         {.type = lex::PLUS_PLUS     , .value = {}              , .line = 19 , .column = 4  },
@@ -204,9 +211,11 @@ num++ ++num --num num--
         std::string actual_val_str = tokenVariantToString(actual);
         std::string expected_val_str = tokenVariantToString(expected);
 
-        ASSERT_EQ(actual.type, expected.type) << "Expected token type: " << lex::literalTokenToString(expected) << "\nGot: " << lex::literalTokenToString(actual) << '\n';
-        ASSERT_EQ(actual_val_str, expected_val_str) << "Expected token value: " << expected_val_str << "\nGot: " << actual_val_str << '\n'; 
-        ASSERT_EQ(actual.line, expected.line) << "Expected token line: " << expected.line << "\nGot: " << actual.line << '\n';
-        ++index;
+        ASSERT_EQ(lex::literalTokenToString(actual.type), lex::literalTokenToString(expected.type)) << "\nExpected:\n" << getFullTokenStat(expected) << "\nGot:\n" << getFullTokenStat(actual);
+        ASSERT_EQ(actual_val_str, expected_val_str) << "\nExpected:\n" << getFullTokenStat(expected) << "\nGot:\n" << getFullTokenStat(actual);
+        ASSERT_EQ(actual.line, expected.line) << "\nExpected:\n" << getFullTokenStat(expected) << "\nGot:\n" << getFullTokenStat(actual);
+        ASSERT_EQ(actual.column, expected.column) << "\nExpected:\n" << getFullTokenStat(expected) << "\nGot:\n" << getFullTokenStat(actual);
+
+        index++;
     }
 }
