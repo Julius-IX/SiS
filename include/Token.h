@@ -55,7 +55,7 @@ namespace lex {
     } TokenType;
 
     // Against accidental mangling of variants types order
-    typedef std::variant<std::monostate, int, double, bool, std::string> TokenVariant;
+    typedef std::variant<std::monostate, double, bool, std::string> TokenVariant;
 
     typedef struct Token {
         TokenType type;
@@ -101,11 +101,7 @@ namespace lex {
         case ILLEGAL: return "ILLEGAL"; 
         case IDENT: return std::get<std::string>(t_val);
 
-        case NUM: return std::to_string(( // Why not just double? idk either
-                      std::holds_alternative<int>(t_val) 
-                      ? std::get<int>(t_val) 
-                      : std::get<double>(t_val)));
-
+        case NUM: return std::to_string(std::get<double>(t_val));
         case STRING: return std::get<std::string>(t_val);
         case TRUE: return "TRUE";
         case FALSE: return "FALSE";

@@ -8,9 +8,6 @@ static std::string tokenVariantToString(const lex::Token token) {
     if (std::holds_alternative<std::monostate>(tok_var)) {
         return "std::monostate";
 
-    } else if (std::holds_alternative<int>(tok_var)) {
-        return std::to_string(std::get<int>(tok_var));
-
     } else if (std::holds_alternative<double>(tok_var)) {
         return std::to_string(std::get<double>(tok_var));
 
