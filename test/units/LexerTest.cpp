@@ -190,22 +190,25 @@ TEST(Lexer, CorrectTokenSplits) {
         {.type = lex::SEMICOLON     , .value = {}              , .line = 24 , .column = 10 , .len = 1  },
         {.type = lex::ARROW         , .value = {}              , .line = 25 , .column = 12 , .len = 2  },
 
-        {.type = lex::COMMENT_LINE  , .value = "// comment line", .line = 26 , .column = 1 , .len = 15  },
+        {.type = lex::COMMENT_LINE  , .value = "// comment line", .line = 26 , .column = 1 , .len = 15 },
 
-        {.type = lex::COMMENT_BLOCK , .value = "/* comment block\n* comment block\n*/", .line = 27, .column = 1, .len = 36}
+        {.type = lex::COMMENT_BLOCK , .value = "/* comment block\n* comment block\n*/", .line = 27, .column = 1, .len = 36},
+        {.type = lex::SIS_EOF       , .value = {}              ,  .line = 28, .column = 1  , .len = 1   }
     };
 
     lex::Lexer* lexer = lex::newLexer(input);
     int index{0};
-    while (lexer->cursor_pos != lex::SIS_EOF) {
+    while (true) {
         const lex::Token actual = lex::nextToken(*lexer);
         const lex::Token& expected = expected_tokens.at(index);
 
+        if (actual.type == lex::SIS_EOF) break;
+ 
         std::string actual_val_str = tokenVariantToString(actual);
         std::string expected_val_str = tokenVariantToString(expected);
 
         ASSERT_EQ(actual.type, expected.type) << "Expected token type: " << lex::literalTokenToString(expected) << "\nGot: " << lex::literalTokenToString(actual) << '\n';
-        ASSERT_EQ(actual.value, expected.value) << "Expected token value: " << expected_val_str << "\nGot: " << actual_val_str << '\n'; 
+        ASSERT_EQ(actual_val_str, expected_val_str) << "Expected token value: " << expected_val_str << "\nGot: " << actual_val_str << '\n'; 
         ASSERT_EQ(actual.line, expected.line) << "Expected token line: " << expected.line << "\nGot: " << actual.line << '\n';
         ASSERT_EQ(actual.len, expected.len) << "Expected token length: " << expected.len << "\nGot: " << actual.len << '\n';
         ++index;

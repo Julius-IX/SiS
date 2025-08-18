@@ -1,8 +1,6 @@
 #include "Lexer.h"
 #include "Token.h"
 
-#include <unordered_set>
-
 namespace lex {
     namespace {
         void readChar(Lexer& lexer) {
@@ -23,7 +21,7 @@ namespace lex {
         std::string peekChar(Lexer& lexer) {
             std::string nex_char{""};
 
-            if (lexer.next_pos >= lexer.input.length());
+            if (lexer.next_pos >= lexer.input.length()) {}
             else nex_char = lexer.input[lexer.next_pos];
 
             return nex_char;
@@ -31,7 +29,7 @@ namespace lex {
 
         void consumeSpace(Lexer& lexer) { 
             std::string cc;
-            while ((cc = lexer.current_char) == " " || cc ==  "\t" || cc == "\r" || cc == "\n") {
+            while ((cc = lexer.current_char) == " " || cc ==  "\t" || cc == "\r" || cc == "\n" || cc.empty()) {
                 if (cc == "\n") {
                     ++lexer.line;
                     lexer.begin_of_line = lexer.cursor_pos;
@@ -58,17 +56,21 @@ namespace lex {
             return newToken(default_tok, tok_val, line, column);
         }
 
-        template <typename... Args>
-        std::string readTill(Lexer& lexer, std::string terminator, Args... extra_terminators) {
-            std::string cc = lexer.current_char;
-            std::string final_string = cc;
-            std::unordered_set<std::string> terminators = {terminator, extra_terminators...};
+        std::string readTill(Lexer& lexer,  const std::string& terminator) {
+            std::string buffer;
+            buffer += lexer.current_char;
 
-            while (!terminators.contains(cc) && !lexer.eof_reached) {
+            while (!lexer.eof_reached) {
                 readChar(lexer);
-                final_string += cc = lexer.current_char;
+                buffer += lexer.current_char;
+
+                if (buffer.size() >= terminator.size() &&
+                        buffer.compare(buffer.size() - terminator.size(), terminator.size(), terminator) == 0) {
+                    break;
+                }
             }
-            return final_string;
+
+            return buffer;
         }
 
         Token parseSlashToken(Lexer& lexer) {
@@ -83,26 +85,27 @@ namespace lex {
                 return newToken(SLASH_ASSIGN, {}, line, column);
 
             } else if (peeked_char == "/") {
+                std::string line_comment = lexer.current_char + peeked_char; 
                 readChar(lexer);
-                std::string line_comment = readTill(lexer, "\n");
+                line_comment += readTill(lexer, "\n");
                 return newToken(COMMENT_LINE, line_comment, line, column);
 
             } else if (peeked_char == "*") {
+                std::string block_comment = lexer.current_char + peeked_char; 
                 readChar(lexer);
-                std::string block_comment = readTill(lexer, "*/");
+                block_comment += readTill(lexer, "*/");
                 return newToken(COMMENT_BLOCK, block_comment, line, column);
             }
 
             return newToken(SLASH, {}, line, column);
         }
         
-        
-        bool isNum(const std::string& current_char) {
-            return !current_char.empty() && (current_char[0] >= 48 && current_char[0] <= 57);
+        bool isNum(const std::string& str) {
+            return !str.empty() && (str[0] >= '0' && str[0] <= '9');
         }
 
         bool isAlpha(const std::string& str) {
-            return !str.empty() && ((str[0] >= 65 && str[0] <= 90) || (str[0] >= 97 && str[0] <= 122));
+            return !str.empty() && ((str[0] >= 'A' && str[0] <= 'Z') || (str[0] >= 'a' && str[0] <= 'z'));
         }
 
         Token parseNum(Lexer& lexer) {
@@ -113,6 +116,7 @@ namespace lex {
             std::string str_number = cc;
 
             while (isNum(cc) || (cc == "." && !encountered_dot)) {
+                if (cc == ".") encountered_dot = true;
                 str_number += cc;
                 readChar(lexer);
                 cc = lexer.current_char;
@@ -130,10 +134,10 @@ namespace lex {
         }
 
         Token parseWord(Lexer& lexer) {
-            std::string tok_val = lexer.current_char;
+            std::string tok_val;
             while (isAlpha(lexer.current_char) || isNum(lexer.current_char)) {
-                readChar(lexer);
                 tok_val += lexer.current_char;
+                readChar(lexer);
             }
 
             TokenType tok_type = lookupIdentifier(tok_val);
@@ -158,8 +162,8 @@ namespace lex {
         // Single char tokens
         if      (cc == "(") return newToken(L_PAREN  , {}, line, col);
         else if (cc == ")") return newToken(R_PAREN  , {}, line, col);
-        else if (cc == "[") return newToken(R_BRACK  , {}, line, col);
-        else if (cc == "]") return newToken(L_BRACK  , {}, line, col);
+        else if (cc == "[") return newToken(L_BRACK  , {}, line, col);
+        else if (cc == "]") return newToken(R_BRACK  , {}, line, col);
         else if (cc == "{") return newToken(L_BRACE  , {}, line, col);
         else if (cc == "}") return newToken(R_BRACE  , {}, line, col);
         else if (cc == ",") return newToken(COMMA    , {}, line, col);
@@ -168,7 +172,7 @@ namespace lex {
         
         // Possible double char tokens
         else if (cc == "+") return parseDoubleCharToken(lexer, PLUS, {{"+", PLUS_PLUS} , {"=", PLUS_ASSIGN}});
-        else if (cc == "-") return parseDoubleCharToken(lexer, MINUS, {{"-", MINUS_MINUS}, {"=", MINUS_ASSIGN}});
+        else if (cc == "-") return parseDoubleCharToken(lexer, MINUS, {{"-", MINUS_MINUS}, {"=", MINUS_ASSIGN}, {">", ARROW}});
         else if (cc == "*") return parseDoubleCharToken(lexer, STAR, {{"=", STAR_ASSIGN}});
         else if (cc == "%") return parseDoubleCharToken(lexer, PERCENT, {{"=", PERCENT_ASSIGN}});
         else if (cc == "=") return parseDoubleCharToken(lexer, ASSIGN, {{"=", EQUALS}});
@@ -177,7 +181,6 @@ namespace lex {
         else if (cc == "&") return parseDoubleCharToken(lexer, ILLEGAL, {{"&", AND}});
         else if (cc == "!") return parseDoubleCharToken(lexer, NOT, {{"=", NOT_EQUALS}});
         else if (cc == ":") return parseDoubleCharToken(lexer, COLON, {{":", SCOPE_RES}});
-        else if (cc == "-") return parseDoubleCharToken(lexer, ILLEGAL, {{">", ARROW}});
         else if (cc == "/") return parseSlashToken(lexer);
 
         // Multi char tokens

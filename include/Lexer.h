@@ -11,7 +11,7 @@ namespace lex {
         std::string current_file;
         std::string current_char;
 
-        size_t line{0};
+        size_t line{1};
         size_t begin_of_line{0};
 
         size_t cursor_pos{0};
