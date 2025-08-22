@@ -1,8 +1,6 @@
 #include "Lexer.h"
-#include "Token.h"
 
 #include <limits>
-#include <strings.h>
 
 namespace lex {
   DoubleSymbolTable Lexer::s_symbol_table = initSymbolTable();
@@ -107,7 +105,10 @@ namespace lex {
     }
   }
 
-  /* incoming segfault */
+  /* incoming segfault 
+   * strings are null terminated so accessing at string.size() is safe
+   * (if you use string.c_str or string.data)
+   */
   const char& Lexer::peekChar() const noexcept {
     if (this->m_state.next_pos >= this->m_input.length()) {
       return this->m_input.data()[this->m_input.size()];
@@ -285,7 +286,8 @@ namespace lex {
     TypeValuePair tvp{ILLEGAL, std::string{current_char}};
 
     switch (current_char) {
-      // Single char tokens
+
+    // Single char tokens
     case '(': tvp = {L_PAREN  , {}}; break;
     case ')': tvp = {R_PAREN  , {}}; break;
     case '[': tvp = {L_BRACK  , {}}; break;
