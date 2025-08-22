@@ -1,271 +1,373 @@
 #include "Lexer.h"
 #include "Token.h"
 
-#include <unordered_set>
+#include <limits>
+#include <strings.h>
 
 namespace lex {
-    namespace {
-        void readChar(Lexer& lexer) {
-            if (lexer.next_pos >= lexer.input.length()) {
-                lexer.current_char = {};
-            } else {
-                lexer.current_char = lexer.input[lexer.next_pos]; 
-            }
-            lexer.cursor_pos = lexer.next_pos;
-            ++lexer.next_pos;
-        }
+  DoubleSymbolTable Lexer::s_symbol_table = initSymbolTable();
+  // ValidKeyWordFollowerTable Lexer::s_keyword_follower_table = initKeyWordFollowerTable();
 
+  /* the keys in 'table' can either consist of one or two chars
+   * '\0' will represent the key to the default TokenType of the first char
+   * if said char is not followed by a second character that could be part of the token
+   */
+  DoubleSymbolTable Lexer::initSymbolTable() {
+    DoubleSymbolTable table;
 
-        Token newToken(TokenType token_type, TokenVariant value, size_t line, size_t column) {
-            return Token{.type = token_type, .value = value, .line = line, .column = column};
-        }
-        Token readNewToken(Lexer& lexer, TokenType token_type, TokenVariant value, size_t line, size_t column) {
-            readChar(lexer);
-            return newToken(token_type, value, line, column);
-        }
+    table['+'] = {{'\0', PLUS}, {'+', PLUS_PLUS}, {'=', PLUS_ASSIGN}};
+    table['-'] = {{'\0', MINUS}, {'-', MINUS_MINUS}, {'=', MINUS_ASSIGN}, {'>', ARROW}};
+    table['*'] = {{'\0', STAR}, {'=', STAR_ASSIGN}};
+    table['%'] = {{'\0', PERCENT}, {'=', PERCENT_ASSIGN}};
+    table['='] = {{'\0', ASSIGN}, {'=', EQUALS}};
+    table['<'] = {{'\0', LESS_THAN}, {'=', LESS_THAN_EQUALS}};
+    table['>'] = {{'\0', GREATER_THAN}, {'=', GREATER_THAN_EQUALS}};
+    table['|'] = {{'\0', ILLEGAL}, {'|', OR}};
+    table['&'] = {{'\0', ILLEGAL}, {'&', AND}};
+    table['!'] = {{'\0', NOT}, {'=', NOT_EQUALS}};
+    table[':'] = {{'\0', COLON}, {':', SCOPE_RES}};
+    table['/'] = {{'\0', SLASH}, {'=', SLASH_ASSIGN}};
 
-        std::string peekChar(Lexer& lexer) {
-            std::string nex_char{""};
+    return table;
+  }
 
-            if (lexer.next_pos >= lexer.input.length()) {}
-            else nex_char = lexer.input[lexer.next_pos];
+  // ValidKeyWordFollowerTable initKeyWordFollowerTable() {
+  //   ValidKeyWordFollowerTable table;
+  //
+  //   char op = '('; char cp = ')'; char t  = '\t';
+  //   char sp = ' '; char ob = '{'; char cb = '}';
+  //   char lt = '<'; char gt = '>'; char col = ':';
+  //   char sc = ';'; char c  = ','; char eq = '=';
+  //   char bg = '!';
+  //
+  //   table["true"]  = {sp, t, eq, bg, lt, gt, sc, cp};
+  //   table["false"] = {sp, t, eq, bg, lt, gt, sc, cp};
+  //   table["null"]  = {sp, t, eq, bg, lt, gt, sc, cp};
+  //
+  //   /* TODO: consider forcing grammar rule
+  //    * of having spaces behind flow control keywords
+  //    * bc it looks better 0_0
+  //    */
+  //   table["if"]       = {sp, t, op};
+  //   table["else"]     = {sp, t, op};
+  //   table["for"]      = {sp, t, op};
+  //   table["while"]    = {sp, t, op};
+  //   table["switch"]   = {sp, t, op};
+  //
+  //   table["case"]     = {sp, t};
+  //   table["return"]   = {sp, t, ob};
+  //   table["break"]    = {sp, t, sc};
+  //   table["continue"] = {sp, t, sc};
+  //
+  //   table["fn"]      = {sp, t};
+  //   table["pin"]     = {sp, t};
+  //   table["class"]   = {sp, t};
+  //   table["include"] = {sp, t};
+  //
+  //   return table;
+  // }
 
-            return nex_char;
-        }
+  TypeValuePair Lexer::parsePossiblePair(const char& table_id) {
+    const char& next_char = peekChar();
+    const std::unordered_map<char, TokenType>& table = s_symbol_table.at(table_id);
+    TypeValuePair tvp{ILLEGAL, {}};
 
-        void consumeSpace(Lexer& lexer) { 
-            std::string& cc = lexer.current_char;
-            while ((cc = lexer.current_char) == " " || cc ==  "\t" || cc == "\r" || cc == "\n") {
-                if (cc == "\n") {
-                    ++lexer.line;
-                    lexer.begin_of_line = lexer.cursor_pos;
-                }
-                readChar(lexer);
-            }
-        }
+    auto it = table.find(next_char);
+    if (it != table.end()) {
+      tvp.first = it->second;
+      advanceState();
+    } else {
+      const TokenType& tok_type = table.at('\0');
 
-        Token parseDoubleCharToken(Lexer& lexer, TokenType default_tok, std::unordered_map<std::string, TokenType> possible_pairs) {
-            std::string next_char = peekChar(lexer);
-            size_t line = lexer.line;
-            size_t column = lexer.cursor_pos - lexer.begin_of_line;
-            TokenVariant tok_val{};
-
-            if (default_tok == ILLEGAL) tok_val = lexer.current_char;
-            if (next_char.empty()) return newToken(default_tok, tok_val, line, column);
-
-            auto it = possible_pairs.find(next_char);
-            if (it != possible_pairs.end()) {
-                readChar(lexer);
-                readChar(lexer);
-                return newToken(it->second, {}, line, column); 
-            }
-
-            readChar(lexer);
-            return newToken(default_tok, tok_val, line, column);
-        }
-
-        std::string readTill(Lexer& lexer,  const std::string& terminator) {
-            std::string buffer;
-
-            while (!lexer.current_char.empty()) {
-                buffer += lexer.current_char;
-                if (lexer.current_char == "\n") {
-                    ++lexer.line;
-                    lexer.begin_of_line = lexer.cursor_pos;
-                }
-                if (buffer.size() >= terminator.size() &&
-                        buffer.compare(buffer.size() - terminator.size(), terminator.size(), terminator) == 0) {
-                    break;
-                }
-                readChar(lexer);
-            }
-
-            readChar(lexer);
-            return buffer;
-        }
-
-        Token parseSlashToken(Lexer& lexer) {
-            size_t line = lexer.line;
-            size_t column = lexer.cursor_pos - lexer.begin_of_line;
-            std::string peeked_char = peekChar(lexer);
-
-            Token token = newToken(SLASH, {}, line, column);
-            std::string buffer;
-            
-            if (peeked_char == "=") {
-                readChar(lexer);
-                token = newToken(SLASH_ASSIGN, {}, line, column);
-            } else if (peeked_char == "/") {
-                buffer = readTill(lexer, "\n");
-                return newToken(COMMENT_LINE, buffer, line, column);
-            } else if (peeked_char == "*") {
-                buffer = readTill(lexer, "*/");
-                size_t buf_size = buffer.size();
-                if (buffer[buf_size-1] == '/' && buffer[buf_size-2] == '*') {
-                    return newToken(COMMENT_BLOCK, buffer, line, column);
-                } else token = newToken(ILLEGAL, buffer, line, column);
-            }
-
-            readChar(lexer);
-            return token;
-        }
-        
-        bool isNum(const std::string& str) {
-            return !str.empty() && (str[0] >= '0' && str[0] <= '9');
-        }
-
-        /* Could have been on line line but this is not fun to read:
-         * return !str.empty() && (((str[0] >= 'A' && str[0] <= 'Z') || (str[0] >= 'a' && str[0] <= 'z')) || str[0] == '_'); 
-         */
-        bool isAlpha(const std::string& str) {
-            if (str.empty()) return false;
-
-            char c = str[0];
-            bool isLetter = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
-            bool isUnderscore = (c == '_');
-
-            return isLetter || isUnderscore;
-        }
-
-        Token parseNum(Lexer& lexer) {
-            size_t index_start = lexer.cursor_pos;
-            size_t line = lexer.line;
-            size_t column = lexer.cursor_pos - lexer.begin_of_line;
-            std::string tok_val;
-
-            std::string cc = lexer.current_char;
-            bool seen_dot{false};
-            while (isNum(cc) || (cc == "." && !seen_dot)) {
-                readChar(lexer);
-                cc = lexer.current_char;
-            }
-            if (isAlpha(peekChar(lexer))) {
-                readChar(lexer);
-                cc = lexer.current_char;
-                while (isAlpha(cc)) {
-                    readChar(lexer);
-                    cc = lexer.current_char;
-                }
-                tok_val = lexer.input.substr(index_start, lexer.cursor_pos - index_start); 
-                return newToken(ILLEGAL, tok_val, line, column);
-            }
-
-            tok_val = lexer.input.substr(index_start, lexer.cursor_pos - index_start);
-            return newToken(NUM, std::stod(tok_val), line, column);
-        }
-
-        Token parseWord(Lexer& lexer) {
-            size_t column = lexer.cursor_pos - lexer.begin_of_line;
-            size_t index_start = lexer.cursor_pos;
-            Token token{ILLEGAL, lexer.current_char, lexer.line, column};
-
-            while (isAlpha(lexer.current_char) || isNum(lexer.current_char)) {
-                readChar(lexer);
-            }
-
-            std::string tok_val = lexer.input.substr(index_start, lexer.cursor_pos - index_start);
-
-            TokenType tok_type = lookupIdentifier(tok_val);
-            if (tok_type == IDENT) token =  newToken(IDENT, tok_val, lexer.line, column);
-            else token = newToken(tok_type, {}, lexer.line, column);
-
-            return token;
-        }
-
-        // \b \t \n \r \" \' \? \\ \0
-        Token parseStringLiteral(Lexer& lexer) {
-            size_t line = lexer.line;
-            size_t column = lexer.cursor_pos - lexer.begin_of_line;
-            readChar(lexer);
-            size_t start_index = lexer.cursor_pos;
-
-            static const std::unordered_set<char> escaped_chars {
-                'b', 't', 'n', 'r', '"', '\'', '?', '\\', '0'
-            };
-
-            std::string cc = lexer.current_char;
-            while (!cc.empty() && cc != "\"") {
-                if (cc == "\\") {
-                    char next = peekChar(lexer)[0];
-                    if (!escaped_chars.contains(next)) {
-                        return newToken(
-                                ILLEGAL,
-                                lexer.input.substr(start_index, lexer.cursor_pos - start_index),
-                                line,
-                                column
-                                );
-                    }
-                    readChar(lexer);
-                }
-                readChar(lexer);
-                cc = lexer.current_char;
-            }
-
-            std::string final_string = lexer.input.substr(start_index, lexer.cursor_pos - start_index);
-            if (cc.empty()) return newToken(ILLEGAL, final_string, line, column);
-
-            readChar(lexer);
-            return newToken(STRING, final_string, line, column);
-        }
-    } // namespace ''
-
-    /* I wish c++ switch statements accepted more complex types ;-;
-     * performance difference is negligible but its too damn ugly 
-     * (╯°□°）╯︵ ┻━┻ 
-     */
-    Token nextToken(Lexer& lexer) {
-        consumeSpace(lexer);
-
-        const std::string& cc = lexer.current_char;
-        size_t line = lexer.line;
-        size_t col = lexer.cursor_pos - lexer.begin_of_line;
-
-        Token token = {ILLEGAL, cc, line, col};
-
-        // Single char tokens
-        if      (cc == "" ) token = readNewToken(lexer, SIS_EOF  , {}, line, col);
-        else if (cc == "(") token = readNewToken(lexer, L_PAREN  , {}, line, col);
-        else if (cc == ")") token = readNewToken(lexer, R_PAREN  , {}, line, col);
-        else if (cc == "[") token = readNewToken(lexer, L_BRACK  , {}, line, col);
-        else if (cc == "]") token = readNewToken(lexer, R_BRACK  , {}, line, col);
-        else if (cc == "{") token = readNewToken(lexer, L_BRACE  , {}, line, col);
-        else if (cc == "}") token = readNewToken(lexer, R_BRACE  , {}, line, col);
-        else if (cc == ",") token = readNewToken(lexer, COMMA    , {}, line, col);
-        else if (cc == ".") token = readNewToken(lexer, DOT      , {}, line, col);
-        else if (cc == ";") token = readNewToken(lexer, SEMICOLON, {}, line, col);
-        else if (cc == "#") token = readNewToken(lexer, HASH     , {}, line, col);
-        
-        // Possible double char tokens
-        else if (cc == "+") token = parseDoubleCharToken(lexer, PLUS, {{"+", PLUS_PLUS} , {"=", PLUS_ASSIGN}});
-        else if (cc == "-") token = parseDoubleCharToken(lexer, MINUS, {{"-", MINUS_MINUS}, {"=", MINUS_ASSIGN}, {">", ARROW}});
-        else if (cc == "*") token = parseDoubleCharToken(lexer, STAR, {{"=", STAR_ASSIGN}});
-        else if (cc == "%") token = parseDoubleCharToken(lexer, PERCENT, {{"=", PERCENT_ASSIGN}});
-        else if (cc == "=") token = parseDoubleCharToken(lexer, ASSIGN, {{"=", EQUALS}});
-        else if (cc == "<") token = parseDoubleCharToken(lexer, LESS_THAN, {{"=", LESS_THAN_EQUALS}});
-        else if (cc == ">") token = parseDoubleCharToken(lexer, GREATER_THAN, {{"=", GREATER_THAN_EQUALS}});
-        else if (cc == "|") token = parseDoubleCharToken(lexer, ILLEGAL, {{"|", OR}});
-        else if (cc == "&") token = parseDoubleCharToken(lexer, ILLEGAL, {{"&", AND}});
-        else if (cc == "!") token = parseDoubleCharToken(lexer, NOT, {{"=", NOT_EQUALS}});
-        else if (cc == ":") token = parseDoubleCharToken(lexer, COLON, {{":", SCOPE_RES}});
-        else if (cc == "/") token = parseSlashToken(lexer);
-        else if (cc == "\"") token = parseStringLiteral(lexer);
-
-        // Multi char tokens
-        else {
-            if (isNum(cc))   token =  parseNum(lexer);
-            if (isAlpha(cc)) token = parseWord(lexer);
-        }
-        return token;
+      if (tok_type == ILLEGAL) {
+        tvp.second = std::string{this->m_state.current_char, next_char};
+      } else {
+        tvp.first = tok_type;
+      }
     }
 
-    Lexer* newLexer(std::string input) {
-        Lexer* lexer = new Lexer{std::move(input)};
-        readChar(*lexer);
-        return lexer;
+    return tvp;
+  }
+
+  void Lexer::advanceState() {
+    State& state = this->m_state;
+
+    if (state.next_pos >= this->m_input.size()) {
+      state.current_char = '\0';
+      state.pos = this->m_input.size();
+
+    } else {
+      if (state.current_char == '\n') {
+        ++state.line;
+        state.bol = state.next_pos;
+      }
+
+      state.current_char = this->m_input[state.next_pos];
+      state.pos = state.next_pos;
+      ++state.next_pos;
+
+    }
+  }
+
+  void Lexer::consumeSpace() {
+    const char& cc = this->m_state.current_char;
+    while (stateIsNotAtEof() && isSpace(cc)) {
+      advanceState();
+      const char& next_char = peekChar();
+      if (cc == '/' && (next_char == '*' || next_char == '/')) {
+        skipComment(cc, next_char);
+      }
+    }
+  }
+  
+  void Lexer::skipComment(const char& current_char, const char& next_char) {
+    if (next_char == '/') {
+      while (stateIsNotAtEof() && peekChar() != '\n') {
+        advanceState();
+      }
+        advanceState();
+    } else if (next_char == '*') {
+      std::string current_next_pair = {current_char, next_char};
+      while (stateIsNotAtEof() && current_next_pair != "*/") {
+        advanceState();
+        current_next_pair[0] = current_next_pair[1];
+        current_next_pair[1] = peekChar();
+      }
+
+      /* Two more times to get rid of block comment terminator
+       * no need to wrap in if block
+       * advanceState() prevents going past m_input.size();
+       */
+      advanceState();
+      advanceState();
+    }
+  }
+
+  /* incoming segfault */
+  const char& Lexer::peekChar() const noexcept {
+    if (this->m_state.next_pos >= this->m_input.length()) {
+      return this->m_input.data()[this->m_input.size()];
+    } else {
+      return this->m_input.data()[this->m_state.next_pos];
+    }
+  }
+
+  /* incoming segfault */
+  TypeValuePair Lexer::parseNum() {
+    const size_t start_index = this->m_state.pos;
+    bool seen_dot{false};
+    TypeValuePair tvp{ILLEGAL, {}};
+    const char* next_char = &peekChar();
+
+    while (isNum(*next_char) || (*next_char == '.' && !seen_dot)) {
+      advanceState();
+      if (*next_char == '.') seen_dot = true;
+
+      ++next_char;
     }
 
+    if (!isValidNumFollower(*next_char)) {
+      skipInvalidNumSequence(next_char);
+      size_t end_index = (this->m_state.pos - start_index) + 1;
+      tvp.second = this->m_input.substr(start_index, end_index);
+    } else {
+      tvp = processValidNumLiteral(start_index);
+    }
+
+    return tvp;
+  }
+
+  TypeValuePair Lexer::processValidNumLiteral(const size_t& index_start) {
+    TypeValuePair tvp{ILLEGAL, {}};
+    std::string num_str = this->m_input.substr(index_start, (this->m_state.pos - index_start) +1);
+
+    double double_val = std::stod(num_str);
+    bool fits_in_double =
+      double_val >= std::numeric_limits<double>::lowest()
+      && double_val <= std::numeric_limits<double>::max();
+
+    if (fits_in_double) {
+      tvp.first = NUM;
+      tvp.second = double_val;
+    } else {
+      tvp.second = num_str;
+    }
+
+    return tvp;
+  }
+
+  /* No im not going to merge these into one function
+   * predicates can suck mah ass
+   * and function pointers are scary
+   *
+   * yes these are separate functions bc otherwise
+   * the others have too many branches which is annoying
+   * they already have too many
+   */
+  void Lexer::skipInvalidNumSequence(const char* next_char) {
+    while (!isValidNumFollower(*next_char)) {
+      advanceState();
+      ++next_char;
+    }
+  }
+  void Lexer::skipInvalidIdentSequence(const char* next_char) {
+    while (!isValidWordFollower(*next_char)) {
+      advanceState();
+      ++next_char;
+    }
+  }
+
+  /* TODO: assign error code for ILLEGAL token type
+   * TODO: assign error code for ILLEGAL token type
+   * incoming segfault
+   */
+  TypeValuePair Lexer::parseIdent() {
+    const size_t start_index = this->m_state.pos;
+    const char* next_char = &peekChar();
+    TypeValuePair tvp{ILLEGAL, "FAILED TO PARSE IDENTIFIER"};
+
+    while (isAlpha(*next_char) || isNum(*next_char)) {
+      advanceState();
+      ++next_char;
+    }
+
+    if (!isValidWordFollower(*next_char)) {
+      skipInvalidIdentSequence(next_char);
+      size_t end_index = (this->m_state.pos - start_index) + 1;
+      tvp.second = this->m_input.substr(start_index, end_index);
+
+    } else {
+      size_t end_index = (this->m_state.pos - start_index) + 1;
+      std::string str = this->m_input.substr(start_index, end_index);
+
+      tvp.first = lookupIdentifier(str);
+
+      if (tvp.first == IDENT) {
+        tvp.second = str;
+      } else {
+        tvp.second = std::monostate();
+      }
+    }
+
+    return tvp;
+  }
+
+  TypeValuePair Lexer::parseString() {
+    advanceState(); // consume initial quote
+
+    const size_t start_index = this->m_state.pos;
+    const char& current_char = this->m_state.current_char;
+
+    TypeValuePair tvp{ILLEGAL, {}};
+
+    while (stateIsNotAtEof() && current_char != '"') {
+      if (current_char == '\\' && peekChar() == '\0') {
+        char escaped_char;
+        advanceState();
+      }
+      advanceState();
+    }
+
+    size_t end_index = this->m_state.pos;
+    advanceState();
+
+    std::string str = this->m_input.substr(start_index, end_index - start_index);
+    escapeChars(str);
+
+    tvp = {STRING, str};
+    return tvp;
+  }
+
+  void Lexer::escapeChars(std::string& str) {
+    size_t write_index = 0;
+
+    for (size_t read_index = 0; read_index < str.size(); ++read_index) {
+      if (str[read_index] == '\\' && read_index + 1 < str.size()) {
+        ++read_index;
+        switch (str[read_index]) {
+        case 'n':  str[write_index++] = '\n'; break;
+        case 'r':  str[write_index++] = '\r'; break;
+        case 't':  str[write_index++] = '\t'; break;
+        case 'b':  str[write_index++] = '\b'; break;
+        case 'f':  str[write_index++] = '\f'; break;
+        case 'v':  str[write_index++] = '\v'; break;
+        case 'a':  str[write_index++] = '\a'; break;
+        case '0':  str[write_index++] = '\0'; break;
+        case '\\': str[write_index++] = '\\'; break;
+        case '"':  str[write_index++] = '"'; break;
+        case '\'': str[write_index++] = '\''; break;
+        default:
+                   str[write_index++] = '\\';
+                   str[write_index++] = str[read_index];
+                   break;
+        }
+      } else {
+        str[write_index++] = str[read_index];
+      }
+    }
+
+    str.resize(write_index);
+  }
+
+  /* TODO: log ILLEGAL tokens */
+  const Token Lexer::nextToken() {
+    Token token = this->m_buffer;
+    consumeSpace();
+
+    size_t line = getAheadLine();
+    size_t column = getAheadColumn();
+    this->m_live_pos.line = line;
+    this->m_live_pos.column = column;
+    
+    char& current_char = this->m_state.current_char;
+
+    TypeValuePair tvp{ILLEGAL, std::string{current_char}};
+
+    switch (current_char) {
+      // Single char tokens
+    case '(': tvp = {L_PAREN  , {}}; break;
+    case ')': tvp = {R_PAREN  , {}}; break;
+    case '[': tvp = {L_BRACK  , {}}; break;
+    case ']': tvp = {R_BRACK  , {}}; break;
+    case '{': tvp = {L_BRACE  , {}}; break;
+    case '}': tvp = {R_BRACE  , {}}; break;
+    case ',': tvp = {COMMA    , {}}; break;
+    case '.': tvp = {DOT      , {}}; break;
+    case ';': tvp = {SEMICOLON, {}}; break;
+    case '#': tvp = {HASH     , {}}; break;
+
+    // 1-2 char long tokens
+    case '+':
+    case '-':
+    case '*':
+    case '%':
+    case '=':
+    case '<':
+    case '>':
+    case '|':
+    case '&':
+    case '!':
+    case '/':
+    case ':': tvp = parsePossiblePair(current_char); break;
+
+    // Special tokens
+    case '"': tvp = parseString(); break;
+    case  0 : tvp = {SIS_EOF, {}};; break;
+    default :
+      {
+        if (isNum(current_char)) {
+          tvp = parseNum();
+
+        } else if (isAlpha(current_char)) {
+          tvp = parseIdent();
+        }
+      }
+      break;
+    }
+
+    advanceState();
+    this->m_buffer = Token{.type = tvp.first, .value = tvp.second, .line = line, .column = column};
+
+    return token;
+  }
 } // namespace lex
-
-/* TODO: account for the these token types
- * STRING,
- */
