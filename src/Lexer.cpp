@@ -6,7 +6,6 @@
 
 namespace lex {
   DoubleSymbolTable Lexer::s_symbol_table = initSymbolTable();
-  // ValidKeyWordFollowerTable Lexer::s_keyword_follower_table = initKeyWordFollowerTable();
 
   /* the keys in 'table' can either consist of one or two chars
    * '\0' will represent the key to the default TokenType of the first char
@@ -30,42 +29,6 @@ namespace lex {
 
     return table;
   }
-
-  // ValidKeyWordFollowerTable initKeyWordFollowerTable() {
-  //   ValidKeyWordFollowerTable table;
-  //
-  //   char op = '('; char cp = ')'; char t  = '\t';
-  //   char sp = ' '; char ob = '{'; char cb = '}';
-  //   char lt = '<'; char gt = '>'; char col = ':';
-  //   char sc = ';'; char c  = ','; char eq = '=';
-  //   char bg = '!';
-  //
-  //   table["true"]  = {sp, t, eq, bg, lt, gt, sc, cp};
-  //   table["false"] = {sp, t, eq, bg, lt, gt, sc, cp};
-  //   table["null"]  = {sp, t, eq, bg, lt, gt, sc, cp};
-  //
-  //   /* TODO: consider forcing grammar rule
-  //    * of having spaces behind flow control keywords
-  //    * bc it looks better 0_0
-  //    */
-  //   table["if"]       = {sp, t, op};
-  //   table["else"]     = {sp, t, op};
-  //   table["for"]      = {sp, t, op};
-  //   table["while"]    = {sp, t, op};
-  //   table["switch"]   = {sp, t, op};
-  //
-  //   table["case"]     = {sp, t};
-  //   table["return"]   = {sp, t, ob};
-  //   table["break"]    = {sp, t, sc};
-  //   table["continue"] = {sp, t, sc};
-  //
-  //   table["fn"]      = {sp, t};
-  //   table["pin"]     = {sp, t};
-  //   table["class"]   = {sp, t};
-  //   table["include"] = {sp, t};
-  //
-  //   return table;
-  // }
 
   TypeValuePair Lexer::parsePossiblePair(const char& table_id) {
     const char& next_char = peekChar();

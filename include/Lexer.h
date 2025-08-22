@@ -7,7 +7,6 @@
 namespace lex {
   typedef std::pair<TokenType, TokenVariant> TypeValuePair;
   typedef std::unordered_map<char, std::unordered_map<char, TokenType>> DoubleSymbolTable;
-  // typedef std::unordered_map<std::string, std::unordered_set<char>> ValidKeyWordFollowerTable;
 
   typedef struct LexState {
     char current_char{' '};
@@ -66,10 +65,8 @@ namespace lex {
       State m_state;
       Token m_buffer;
       static DoubleSymbolTable s_symbol_table;
-      // static ValidKeyWordFollowerTable s_keyword_follower_table;
 
       [[nodiscard]] static DoubleSymbolTable initSymbolTable();
-      // [[nodiscard]] static ValidKeyWordFollowerTable initKeyWordFollowerTable();
 
       [[nodiscard]] size_t getAheadLine() const noexcept {
         return this->m_state.line;
