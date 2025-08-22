@@ -44,6 +44,7 @@ namespace lex {
 
       if (tok_type == ILLEGAL) {
         tvp.second = std::string{this->m_state.current_char, next_char};
+        advanceState();
       } else {
         tvp.first = tok_type;
       }
