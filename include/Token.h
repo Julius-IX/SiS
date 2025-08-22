@@ -51,7 +51,7 @@ namespace lex {
     HASH,
     ARROW,
 
-    COMMENT_LINE, COMMENT_BLOCK,
+    COMMENT,
   } TokenType;
 
   // Against accidental mangling of variants types order
@@ -161,8 +161,7 @@ namespace lex {
     case HASH: return "HASH";
     case ARROW: return "ARROW";
 
-    case COMMENT_LINE:
-    case COMMENT_BLOCK: return std::get<std::string>(t_val);
+    case COMMENT: return std::get<std::string>(t_val);
     default: return "";
     }
   }
@@ -172,8 +171,7 @@ namespace lex {
     case IDENT: return "IDENT";
     case NUM: return "NUM";
     case STRING: return "STRING";
-    case COMMENT_LINE: return "COMMENT_LINE";
-    case COMMENT_BLOCK: return "COMMENT_BLOCK";
+    case COMMENT: return "COMMENT";
     default: return tokenToString(token);
     }
   }
