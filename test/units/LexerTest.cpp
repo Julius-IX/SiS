@@ -119,7 +119,7 @@ TEST(Lexer, LexerReusabilityWorks) {
   std::string first_input = "pin var1 = 20;";
   std::string second_input = "if (true) {/* comment */}";
 
-  const std::vector<lex::Token> set_one_expected_tokens {
+  const TokenVector set_one_expected_tokens {
     {.type = lex::PIN,       .value = {},     .line = 1, .column = 1  },
     {.type = lex::IDENT,     .value = "var1", .line = 1, .column = 5  },
     {.type = lex::ASSIGN,    .value = {},     .line = 1, .column = 10 },
@@ -127,7 +127,7 @@ TEST(Lexer, LexerReusabilityWorks) {
     {.type = lex::SEMICOLON, .value = {},     .line = 1, .column = 14 },
     {.type = lex::SIS_EOF,   .value = {},     .line = 1, .column = 15 },
   };
-  const std::vector<lex::Token> set_two_expected_tokens {
+  const TokenVector set_two_expected_tokens {
     {.type = lex::IF,      .value = {}, .line = 1, .column = 1  },
     {.type = lex::L_PAREN, .value = {}, .line = 1, .column = 4  },
     {.type = lex::TRUE,    .value = {}, .line = 1, .column = 5  },
@@ -182,7 +182,7 @@ TEST(Lexer, CorrectTokenSplits) {
     /*30 */  "/* This is a random comment */"
              ;
 
-  static const std::vector<lex::Token> expected_tokens = {
+  static const TokenVector expected_tokens = {
     {.type = lex::PIN           , .value = {}              , .line = 1  , .column = 1  },
     {.type = lex::IDENT         , .value = "int_literal"   , .line = 1  , .column = 5  },
     {.type = lex::ASSIGN        , .value = {}              , .line = 1  , .column = 17 },
