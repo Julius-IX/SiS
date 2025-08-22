@@ -73,6 +73,12 @@ namespace lex {
 
   void Lexer::consumeSpace() {
     const char& cc = this->m_state.current_char;
+
+    const char& next_char = peekChar();
+    if (cc == '/' && (next_char == '*' || next_char == '/')) {
+      skipComment(cc, next_char);
+    }
+
     while (stateIsNotAtEof() && isSpace(cc)) {
       advanceState();
       const char& next_char = peekChar();
