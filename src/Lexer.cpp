@@ -180,10 +180,7 @@ namespace lex {
     }
   }
 
-  /* TODO: assign error code for ILLEGAL token type
-   * TODO: assign error code for ILLEGAL token type
-   * incoming segfault
-   */
+  /* incoming segfault */
   TypeValuePair Lexer::parseIdent() {
     const size_t start_index = this->m_state.pos;
     const char* next_char = &peekChar();
@@ -224,15 +221,13 @@ namespace lex {
     TypeValuePair tvp{ILLEGAL, {}};
 
     while (stateIsNotAtEof() && current_char != '"') {
-      if (current_char == '\\' && peekChar() == '\0') {
-        char escaped_char;
+      if (current_char == '\\' && peekChar() == '"') {
         advanceState();
       }
       advanceState();
     }
 
     size_t end_index = this->m_state.pos;
-    advanceState();
 
     std::string str = this->m_input.substr(start_index, end_index - start_index);
     escapeChars(str);
@@ -272,7 +267,9 @@ namespace lex {
     str.resize(write_index);
   }
 
-  /* TODO: log ILLEGAL tokens */
+  /* TODO: assign error code for ILLEGAL token type
+   * TODO: log ILLEGAL tokens
+   */
   const Token Lexer::nextToken() {
     Token token = this->m_buffer;
     consumeSpace();
