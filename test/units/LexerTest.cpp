@@ -92,7 +92,7 @@ void compareTokenStream(lex::Lexer& lexer, const TokenVector& expected_tokens) {
     }
 }
 
-TEST(Lexer, SkipComments) {
+TEST(Lexer, TreatCommentAsSpaces) {
   std::string input =
     "class DaClass /* Random comment */ {};\n"
     "pin this_variable = //line comment getting in the way \" value of variable \""
@@ -186,11 +186,11 @@ TEST(Lexer, ReturnIllegalOnUnknownChar) {
 }
 
 
-TEST(Lexer, LexerReusabilityWorks) {
+TEST(Lexer, ReusabilityWorks) {
   std::string first_input = "pin var1 = 20;";
   std::string second_input = "if (true) {/* comment */}";
 
-  const TokenVector set_one_expected_tokens {
+  const TokenVector expected_set_one {
     {.type = lex::PIN,       .value = {},     .line = 1, .column = 1  },
     {.type = lex::IDENT,     .value = "var1", .line = 1, .column = 5  },
     {.type = lex::ASSIGN,    .value = {},     .line = 1, .column = 10 },
@@ -198,7 +198,7 @@ TEST(Lexer, LexerReusabilityWorks) {
     {.type = lex::SEMICOLON, .value = {},     .line = 1, .column = 14 },
     {.type = lex::SIS_EOF,   .value = {},     .line = 1, .column = 15 },
   };
-  const TokenVector set_two_expected_tokens {
+  const TokenVector expected_set_two {
     {.type = lex::IF,      .value = {}, .line = 1, .column = 1  },
     {.type = lex::L_PAREN, .value = {}, .line = 1, .column = 4  },
     {.type = lex::TRUE,    .value = {}, .line = 1, .column = 5  },
@@ -210,15 +210,15 @@ TEST(Lexer, LexerReusabilityWorks) {
 
   lex::Lexer lexer(first_input);
 
-  compareTokenStream(lexer, set_one_expected_tokens);
+  compareTokenStream(lexer, expected_set_one);
 
   lexer.reset();
   lexer.newInput(second_input);
 
-  compareTokenStream(lexer, set_two_expected_tokens);
+  compareTokenStream(lexer, expected_set_two);
 }
 
-TEST(Lexer, CorrectTokenSplits) {
+TEST(Lexer, SplitsTokensCorretly) {
   const std::string input =
     /* 12345678901234567890123456789012345678901234567890*/
     /* 1 */  "pin int_literal = 5;\n"
@@ -253,7 +253,7 @@ TEST(Lexer, CorrectTokenSplits) {
     /*30 */  "/* This is a random comment */"
              ;
 
-  static const TokenVector expected_tokens = {
+  const TokenVector expected {
     {.type = lex::PIN           , .value = {}              , .line = 1  , .column = 1  },
     {.type = lex::IDENT         , .value = "int_literal"   , .line = 1  , .column = 5  },
     {.type = lex::ASSIGN        , .value = {}              , .line = 1  , .column = 17 },
@@ -387,15 +387,6 @@ TEST(Lexer, CorrectTokenSplits) {
     {.type = lex::SIS_EOF       , .value = {}              ,  .line = 30, .column = 31 }
   };
 
-  lex::Lexer* lexer = new lex::Lexer(input);
-  int index{0};
-  while (true) {
-    const lex::Token actual = lexer->nextToken();
-    const lex::Token& expected = expected_tokens.at(index);
-
-    areTokensEqual(actual, expected);
-
-    if (actual.type == lex::SIS_EOF) break;
-    index++;
-  }
+  lex::Lexer lexer(input);
+  compareTokenStream(lexer, expected);
 }
