@@ -29,7 +29,7 @@ static std::string tokenVariantToString(const lex::Token& token) {
   return "ERROR: could not parse TokenVariant value to std::string";
 }
 
-void areTokensEqual(const lex::Token actual, const lex::Token expected) {
+void areTokensEqual(const lex::Token& actual, const lex::Token& expected) {
     bool same_type = (actual.type == expected.type);
     bool same_line = (actual.line == expected.line);
     bool same_column = (actual.column == expected.column);
@@ -79,7 +79,7 @@ void areTokensEqual(const lex::Token actual, const lex::Token expected) {
     }
 }
 
-void compareTokenStream(lex::Lexer& lexer, const TokenVector expected_tokens) {
+void compareTokenStream(lex::Lexer& lexer, const TokenVector& expected_tokens) {
     lex::Token token = lexer.nextToken();
     size_t index{0};
 
@@ -98,7 +98,7 @@ TEST(Lexer, SkipComments) {
     "pin this_variable = //line comment getting in the way \" value of variable \""
     ;
 
-  const TokenVector expected = {
+  const TokenVector expected {
     {.type = lex::CLASS,     .value = {}, .line = 1, .column = 1},
     {.type = lex::IDENT,     .value = "DaClass", .line = 1, .column = 7},
     {.type = lex::L_BRACE,   .value = {}, .line = 1, .column = 36},
@@ -111,9 +111,80 @@ TEST(Lexer, SkipComments) {
     {.type = lex::SIS_EOF, .value = {}, .line = 2, .column = 87},
   };
 
-  lex::Lexer lexer = lex::Lexer(input);
+  lex::Lexer lexer(input);
   compareTokenStream(lexer, expected);
 }
+
+TEST(Lexer, CanDiscernValidInvalidNumber) {
+  std::string input =
+    "123, 111.018, 1100., 1414..4, 12B34";
+
+  const TokenVector expected {
+    {.type = lex::NUM,     .value = 123.,      .line = 1, .column = 1  },
+    {.type = lex::COMMA,   .value = {},        .line = 1, .column = 4  },
+    {.type = lex::NUM,     .value = 111.018,   .line = 1, .column = 6  },
+    {.type = lex::COMMA,   .value = {},        .line = 1, .column = 13 },
+    {.type = lex::NUM,     .value = 1100.,     .line = 1, .column = 15 },
+    {.type = lex::COMMA,   .value = {},        .line = 1, .column = 20 },
+    {.type = lex::ILLEGAL, .value = "1414..4", .line = 1, .column = 22 },
+    {.type = lex::COMMA,   .value = {},        .line = 1, .column = 29 },
+    {.type = lex::ILLEGAL, .value = "12B34",   .line = 1, .column = 31 },
+    {.type = lex::SIS_EOF, .value = {},        .line = 1, .column = 36 },
+  };
+
+  lex::Lexer lexer(input);
+  compareTokenStream(lexer, expected);
+}
+
+TEST(Lexer, CanDiscernValidInvalidIdentifier) {
+  std::string input =
+    "validIdent valid_ident_\n"
+    "_valid_ valid123\n"
+    "valid{}valid\n"
+    "invalid@\n";
+
+  const TokenVector expected {
+    {.type = lex::IDENT,   .value = "validIdent",   .line = 1, .column = 1  },
+    {.type = lex::IDENT,   .value = "valid_ident_", .line = 1, .column = 12 },
+    {.type = lex::IDENT,   .value = "_valid_",      .line = 2, .column = 1  },
+    {.type = lex::IDENT,   .value = "valid123",     .line = 2, .column = 9  },
+    {.type = lex::IDENT,   .value = "valid",        .line = 3, .column = 1  },
+    {.type = lex::L_BRACE, .value = {},             .line = 3, .column = 6  },
+    {.type = lex::R_BRACE, .value = {},             .line = 3, .column = 7  },
+    {.type = lex::IDENT,   .value = "valid",        .line = 3, .column = 8  },
+    {.type = lex::ILLEGAL, .value = "invalid@",     .line = 4, .column = 1  },
+    {.type = lex::SIS_EOF, .value = {},             .line = 5, .column = 1  },
+  };
+
+  lex::Lexer lexer(input);
+  compareTokenStream(lexer, expected);
+}
+
+TEST(Lexer, ReturnIllegalOnUnknownChar) {
+  std::string input =
+    "@ beans & |\n"
+    "~ ` ? pin\n"
+    "for $ in\n";
+
+  const TokenVector expected {
+    {.type = lex::ILLEGAL, .value = "@",     .line = 1, .column = 1 },
+    {.type = lex::IDENT  , .value = "beans", .line = 1, .column = 3  },
+    {.type = lex::ILLEGAL, .value = "&",     .line = 1, .column = 9  },
+    {.type = lex::ILLEGAL, .value = "|",     .line = 1, .column = 11 },
+    {.type = lex::ILLEGAL, .value = "~",     .line = 2, .column = 1  },
+    {.type = lex::ILLEGAL, .value = "`",     .line = 2, .column = 3  },
+    {.type = lex::ILLEGAL, .value = "?",     .line = 2, .column = 5  },
+    {.type = lex::PIN,     .value = {},      .line = 2, .column = 7  },
+    {.type = lex::FOR,     .value = {},      .line = 3, .column = 1  },
+    {.type = lex::ILLEGAL, .value = "$",     .line = 3, .column = 5  },
+    {.type = lex::IDENT,   .value = "in",    .line = 3, .column = 7  },
+    {.type = lex::SIS_EOF, .value = {},      .line = 4, .column = 10 },
+  };
+
+  lex::Lexer lexer(input);
+  compareTokenStream(lexer, expected);
+}
+
 
 TEST(Lexer, LexerReusabilityWorks) {
   std::string first_input = "pin var1 = 20;";
