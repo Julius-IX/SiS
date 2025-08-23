@@ -41,8 +41,7 @@ namespace lex {
       const TokenType& tok_type = table.at('\0');
 
       if (tok_type == ILLEGAL) {
-        tvp.second = std::string{this->m_state.current_char, next_char};
-        advanceState();
+        tvp.second = std::string{this->m_state.current_char};
       } else {
         tvp.first = tok_type;
       }
