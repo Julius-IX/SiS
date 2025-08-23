@@ -84,7 +84,7 @@ namespace lex {
       void skipComment(const char& current_char, const char& next_char);
 
       [[nodiscard]] bool stateIsNotAtEof() const {
-        return (this->m_state.next_pos < this->m_input.size());
+        return (this->m_state.pos < this->m_input.size());
       }
 
       [[nodiscard]] const char& peekChar() const noexcept;
@@ -123,7 +123,8 @@ namespace lex {
     bool is_valid = isValidNumFollower(c);
     if (!is_valid) {
       switch (c) {
-      case '(': case '[': case '{': case ':': is_valid = true;
+      case '(': case '[': case '{': case ':': is_valid = true; break;
+      default: break;
       }
     }
 
