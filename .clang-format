@@ -13,13 +13,13 @@ NamespaceIndentation: All
 # With IndentWidth=2, offset of 0 means they align with members.
 AccessModifierOffset: 0
 
-# Line length — keep long signatures and call expressions on one line where possible
+# Line length keep long signatures and call expressions on one line where possible
 ColumnLimit: 180
 
-# Braces — same line (K&R style)
+# Braces same line (K&R style)
 BreakBeforeBraces: Attach
 
-# Pointer alignment — attached to type (uint8_t* not uint8_t *)
+# Pointer alignment attached to type (uint8_t* not uint8_t *)
 PointerAlignment: Left
 
 # Spacing
@@ -38,13 +38,13 @@ AllowShortLoopsOnASingleLine: false
 AllowShortBlocksOnASingleLine: Empty
 AllowShortCaseLabelsOnASingleLine: true
 
-# Don't bin-pack parameters — either all on one line or each on its own
+# Don't bin-pack parameters either all on one line or each on its own
 BinPackParameters: false
 BinPackArguments: false
 # When a call/signature does have to wrap, indent continuation by 2
 ContinuationIndentWidth: 2
 
-# Include sorting — sort within groups but preserve blank-line separators
+# Include sorting sort within groups but preserve blank-line separators
 SortIncludes: CaseSensitive
 IncludeBlocks: Preserve
 
