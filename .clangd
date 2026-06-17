@@ -1,0 +1,9 @@
+CompileFlags:
+  CompilationDatabase: ./build/Debug
+  Remove:
+    - -fno-gnu-unique
+  Add:
+    - -std=c++23
+
+Diagnostics:
+  UnusedIncludes: None

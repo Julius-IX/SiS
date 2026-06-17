@@ -1,0 +1,67 @@
+---
+Language: Cpp
+BasedOnStyle: LLVM
+
+# Indentation
+IndentWidth: 2
+TabWidth: 2
+UseTab: Never
+IndentCaseLabels: true
+NamespaceIndentation: All
+# Access modifiers (public/private/protected) sit at the same indent level
+# as the class body members, not outdented to the class level.
+# With IndentWidth=2, offset of 0 means they align with members.
+AccessModifierOffset: 0
+
+# Line length — keep long signatures and call expressions on one line where possible
+ColumnLimit: 180
+
+# Braces — same line (K&R style)
+BreakBeforeBraces: Attach
+
+# Pointer alignment — attached to type (uint8_t* not uint8_t *)
+PointerAlignment: Left
+
+# Spacing
+SpaceBeforeParens: ControlStatements
+SpaceAfterCStyleCast: false
+SpaceInEmptyParentheses: false
+SpacesInAngles: Never
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+
+# Short constructs on a single line
+AllowShortFunctionsOnASingleLine: All        # e.g. toGlm(...) { return {...}; }
+AllowShortLambdasOnASingleLine: All
+AllowShortIfStatementsOnASingleLine: WithoutElse  # if (!x) return false; stays one line
+AllowShortLoopsOnASingleLine: false
+AllowShortBlocksOnASingleLine: Empty
+
+# Don't bin-pack parameters — either all on one line or each on its own
+BinPackParameters: false
+BinPackArguments: false
+# When a call/signature does have to wrap, indent continuation by 2
+ContinuationIndentWidth: 2
+
+# Include sorting — sort within groups but preserve blank-line separators
+SortIncludes: CaseSensitive
+IncludeBlocks: Preserve
+
+# Constructor initializer lists
+BreakConstructorInitializers: BeforeColon
+ConstructorInitializerIndentWidth: 2
+PackConstructorInitializers: Never
+
+# Template / trailing return
+AlwaysBreakTemplateDeclarations: Yes
+
+# Alignment
+AlignTrailingComments: true
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
+
+# Misc
+Cpp11BracedListStyle: true
+FixNamespaceComments: true
+ReflowComments: false
+MaxEmptyLinesToKeep: 1
