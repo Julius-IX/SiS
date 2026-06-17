@@ -36,6 +36,7 @@ AllowShortLambdasOnASingleLine: All
 AllowShortIfStatementsOnASingleLine: WithoutElse  # if (!x) return false; stays one line
 AllowShortLoopsOnASingleLine: false
 AllowShortBlocksOnASingleLine: Empty
+AllowShortCaseLabelsOnASingleLine: true
 
 # Don't bin-pack parameters — either all on one line or each on its own
 BinPackParameters: false
