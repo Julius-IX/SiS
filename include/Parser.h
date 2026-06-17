@@ -1,7 +1,7 @@
 #ifndef SIS_PARSER_H
 #define SIS_PARSER_H
 
-#include "Lexer.h"
+#include <Lexer.h>
 
 namespace par {
 
@@ -14,32 +14,32 @@ namespace par {
     }
   } Atom;
 
-  typedef struct Expression: Atom {
+  typedef struct Expression : Atom {
     Atom* left = nullptr;
     Atom* middle = nullptr;
     Atom* right = nullptr;
 
     ~Expression() {
-      if (left != nullptr) delete left; left = nullptr;
-      if (middle != nullptr) delete middle; middle = nullptr;
-      if (right != nullptr) delete right; right = nullptr;
+      // clang-format off
+      if (left != nullptr) { delete left; left = nullptr; }
+      if (middle != nullptr) { delete middle; middle = nullptr; }
+      if (right != nullptr) { delete right; right = nullptr; }
+      // clang-format on
     }
 
   } Expr;
 
   class Parser {
     public:
-      Parser() {}
-      ~Parser() {
-        lexer = nullptr;
-      }
+    Parser() = default;
+    ~Parser() { lexer = nullptr; }
 
-      void parse(lex::Lexer* lexer);
+    void parse(lex::Lexer* lexer);
 
     private:
-      lex::Lexer* lexer;
+    lex::Lexer* lexer;
   };
 
-}
+} // namespace par
 
 #endif // SIS_PARSE_H

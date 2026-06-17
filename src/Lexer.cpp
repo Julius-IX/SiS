@@ -66,7 +66,6 @@ namespace lex {
       state.current_char = this->m_input[state.next_pos];
       state.pos = state.next_pos;
       ++state.next_pos;
-
     }
   }
 
@@ -86,13 +85,13 @@ namespace lex {
       }
     }
   }
-  
+
   void Lexer::skipComment(const char& current_char, const char& next_char) {
     if (next_char == '/') {
       while (stateIsNotAtEof() && peekChar() != '\n') {
         advanceState();
       }
-        advanceState();
+      advanceState();
     } else if (next_char == '*') {
       std::string current_next_pair = {current_char, next_char};
       while (stateIsNotAtEof() && current_next_pair != "*/") {
@@ -149,12 +148,10 @@ namespace lex {
 
   TypeValuePair Lexer::processValidNumLiteral(const size_t& index_start) {
     TypeValuePair tvp{ILLEGAL, {}};
-    std::string num_str = this->m_input.substr(index_start, (this->m_state.pos - index_start) +1);
+    std::string num_str = this->m_input.substr(index_start, (this->m_state.pos - index_start) + 1);
 
     double double_val = std::stod(num_str);
-    bool fits_in_double =
-      double_val >= std::numeric_limits<double>::lowest()
-      && double_val <= std::numeric_limits<double>::max();
+    bool fits_in_double = double_val >= std::numeric_limits<double>::lowest() && double_val <= std::numeric_limits<double>::max();
 
     if (fits_in_double) {
       tvp.first = NUM;
@@ -250,21 +247,21 @@ namespace lex {
       if (str[read_index] == '\\' && read_index + 1 < str.size()) {
         ++read_index;
         switch (str[read_index]) {
-        case 'n':  str[write_index++] = '\n'; break;
-        case 'r':  str[write_index++] = '\r'; break;
-        case 't':  str[write_index++] = '\t'; break;
-        case 'b':  str[write_index++] = '\b'; break;
-        case 'f':  str[write_index++] = '\f'; break;
-        case 'v':  str[write_index++] = '\v'; break;
-        case 'a':  str[write_index++] = '\a'; break;
-        case '0':  str[write_index++] = '\0'; break;
-        case '\\': str[write_index++] = '\\'; break;
-        case '"':  str[write_index++] = '"'; break;
-        case '\'': str[write_index++] = '\''; break;
-        default:
-                   str[write_index++] = '\\';
-                   str[write_index++] = str[read_index];
-                   break;
+          case 'n': str[write_index++] = '\n'; break;
+          case 'r': str[write_index++] = '\r'; break;
+          case 't': str[write_index++] = '\t'; break;
+          case 'b': str[write_index++] = '\b'; break;
+          case 'f': str[write_index++] = '\f'; break;
+          case 'v': str[write_index++] = '\v'; break;
+          case 'a': str[write_index++] = '\a'; break;
+          case '0': str[write_index++] = '\0'; break;
+          case '\\': str[write_index++] = '\\'; break;
+          case '"': str[write_index++] = '"'; break;
+          case '\'': str[write_index++] = '\''; break;
+          default:
+            str[write_index++] = '\\';
+            str[write_index++] = str[read_index];
+            break;
         }
       } else {
         str[write_index++] = str[read_index];
@@ -285,52 +282,53 @@ namespace lex {
     size_t column = getAheadColumn();
     this->m_live_pos.line = line;
     this->m_live_pos.column = column;
-    
+
     char& current_char = this->m_state.current_char;
 
     TypeValuePair tvp{ILLEGAL, std::string{current_char}};
 
     switch (current_char) {
 
-    // Single char tokens
-    case '(': tvp = {L_PAREN  , {}}; break;
-    case ')': tvp = {R_PAREN  , {}}; break;
-    case '[': tvp = {L_BRACK  , {}}; break;
-    case ']': tvp = {R_BRACK  , {}}; break;
-    case '{': tvp = {L_BRACE  , {}}; break;
-    case '}': tvp = {R_BRACE  , {}}; break;
-    case ',': tvp = {COMMA    , {}}; break;
-    case '.': tvp = {DOT      , {}}; break;
-    case ';': tvp = {SEMICOLON, {}}; break;
-    case '#': tvp = {HASH     , {}}; break;
+      // Single char tokens
+      case '(': tvp = {L_PAREN, {}}; break;
+      case ')': tvp = {R_PAREN, {}}; break;
+      case '[': tvp = {L_BRACK, {}}; break;
+      case ']': tvp = {R_BRACK, {}}; break;
+      case '{': tvp = {L_BRACE, {}}; break;
+      case '}': tvp = {R_BRACE, {}}; break;
+      case ',': tvp = {COMMA, {}}; break;
+      case '.': tvp = {DOT, {}}; break;
+      case ';': tvp = {SEMICOLON, {}}; break;
+      case '#': tvp = {HASH, {}}; break;
 
-    // 1-2 char long tokens
-    case '+':
-    case '-':
-    case '*':
-    case '%':
-    case '=':
-    case '<':
-    case '>':
-    case '|':
-    case '&':
-    case '!':
-    case '/':
-    case ':': tvp = parsePossiblePair(current_char); break;
+      // 1-2 char long tokens
+      case '+':
+      case '-':
+      case '*':
+      case '%':
+      case '=':
+      case '<':
+      case '>':
+      case '|':
+      case '&':
+      case '!':
+      case '/':
+      case ':': tvp = parsePossiblePair(current_char); break;
 
-    // Special tokens
-    case '"': tvp = parseString(); break;
-    case  0 : tvp = {SIS_EOF, {}};; break;
-    default :
-      {
+      // Special tokens
+      case '"': tvp = parseString(); break;
+      case 0:
+        tvp = {SIS_EOF, {}};
+        ;
+        break;
+      default: {
         if (isNum(current_char)) {
           tvp = parseNum();
 
         } else if (isAlpha(current_char)) {
           tvp = parseIdent();
         }
-      }
-      break;
+      } break;
     }
 
     advanceState();
