@@ -1,7 +1,6 @@
-#ifndef SIS_LEXER_H
-#define SIS_LEXER_H
+#pragma once
 
-#include "Token.h"
+#include <Token.h>
 #include <string>
 
 namespace lex {
@@ -130,5 +129,3 @@ namespace lex {
 
   [[nodiscard]] static bool isSpace(const char& c) noexcept { return (c == ' ' || c == '\t' || c == '\r' || c == '\n'); }
 } // namespace lex
-
-#endif // SIS_LEXER_H

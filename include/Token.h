@@ -1,5 +1,4 @@
-#ifndef SIS_TOKEN_H
-#define SIS_TOKEN_H
+#pragma once
 
 #include <cstdint>
 #include <string>
@@ -180,5 +179,3 @@ namespace lex {
 
   inline std::string literalTokenToString(const TokenType& token_type) { return literalTokenToString(Token{.type = token_type, .value = "", .line = 0, .column = 0}); }
 } // namespace lex
-
-#endif // SIS_TOKEN_H

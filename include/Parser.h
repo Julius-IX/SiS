@@ -1,5 +1,4 @@
-#ifndef SIS_PARSER_H
-#define SIS_PARSER_H
+#pragma once
 
 #include <Lexer.h>
 
@@ -41,5 +40,3 @@ namespace par {
   };
 
 } // namespace par
-
-#endif // SIS_PARSE_H
