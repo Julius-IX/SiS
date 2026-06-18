@@ -39,7 +39,7 @@ namespace par {
   }
   typedef std::variant<std::monostate, double, bool, std::string> LiteralType;
 
-  struct Literal : Node {
+  struct Literal final : Node {
     static constexpr NodeType TYPE = NodeType::LITERAL;
     LiteralType value;
 
@@ -48,7 +48,7 @@ namespace par {
         value(std::move(value)) {}
   };
 
-  struct Identifier : Node {
+  struct Identifier final : Node {
     static constexpr NodeType TYPE = NodeType::IDENTIFIER;
     std::string name;
 
@@ -57,7 +57,7 @@ namespace par {
         name(std::move(name)) {}
   };
 
-  struct Unary : Node {
+  struct Unary final : Node {
     static constexpr NodeType TYPE = NodeType::UNARY;
     lex::TokenType operation;
     Node* operand;
@@ -68,7 +68,7 @@ namespace par {
         operand(operand) {}
   };
 
-  struct Binary : Node {
+  struct Binary final : Node {
     static constexpr NodeType TYPE = NodeType::BINARY;
     lex::TokenType operation;
     Node* left;
@@ -81,7 +81,7 @@ namespace par {
         right(right) {}
   };
 
-  struct Block : Node {
+  struct Block final : Node {
     static constexpr NodeType TYPE = NodeType::BLOCK;
     std::vector<Node*> statements;
 
@@ -90,7 +90,7 @@ namespace par {
         statements(std::move(statements)) {}
   };
 
-  struct If : Node {
+  struct If final : Node {
     static constexpr NodeType TYPE = NodeType::IF;
     Node* condition;
     Node* then_branch;
@@ -103,7 +103,7 @@ namespace par {
         else_branch(else_branch) {}
   };
 
-  struct While : Node {
+  struct While final : Node {
     static constexpr NodeType TYPE = NodeType::WHILE;
     Node* condition;
     Node* body;
@@ -114,7 +114,7 @@ namespace par {
         body(body) {}
   };
 
-  struct VarDecl : Node {
+  struct VarDecl final : Node {
     static constexpr NodeType TYPE = NodeType::VAR_DECL;
     std::string name;
     Node* initializer; // nullptr if declared without a value
@@ -125,16 +125,16 @@ namespace par {
         initializer(initializer) {}
   };
 
-  struct ExprStmt : Node {
+  struct ExprStmt final : Node {
     static constexpr NodeType TYPE = NodeType::EXPR_STMT;
     Node* expr;
-    
+
     explicit ExprStmt(Node* expr)
       : Node(TYPE),
         expr(expr) {}
   };
 
-  struct Call : Node {
+  struct Call final : Node {
     static constexpr NodeType TYPE = NodeType::CALL;
     Node* callee;
     std::vector<Node*> args;
