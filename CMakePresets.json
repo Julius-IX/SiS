@@ -1,0 +1,41 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "debug",
+      "binaryDir": "${sourceDir}/build/Debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "BUILD_GMOCK": "OFF"
+      }
+    },
+    {
+      "name": "release",
+      "binaryDir": "${sourceDir}/build/Release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_GMOCK": "OFF"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "debug",
+      "configurePreset": "debug"
+    },
+    {
+      "name": "release",
+      "configurePreset": "release"
+    },
+    {
+      "name": "tdebug",
+      "configurePreset": "debug",
+      "targets": ["all", "run_tests"]
+    },
+    {
+      "name": "trelease",
+      "configurePreset": "release",
+      "targets": ["all", "run_tests"]
+    }
+  ]
+}
