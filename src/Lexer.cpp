@@ -1,4 +1,4 @@
-#include "Lexer.h"
+#include <Lexer.h>
 
 #include <limits>
 
@@ -116,9 +116,8 @@ namespace lex {
   const char& Lexer::peekChar() const noexcept {
     if (this->m_state.next_pos >= this->m_input.length()) {
       return this->m_input.data()[this->m_input.size()];
-    } else {
-      return this->m_input.data()[this->m_state.next_pos];
     }
+    return this->m_input.data()[this->m_state.next_pos];
   }
 
   /* incoming segfault */

@@ -92,9 +92,9 @@ namespace lex {
     [[nodiscard]] TypeValuePair parseString();
   };
 
-  [[nodiscard]] static bool isNum(const char& c) noexcept { return (c >= '0' && c <= '9'); }
+  [[nodiscard]] static bool isNum(const char& c /* NOLINT */) noexcept { return (c >= '0' && c <= '9'); }
 
-  [[nodiscard]] static bool isValidNumFollower(const char& c) noexcept {
+  [[nodiscard]] static bool isValidNumFollower(const char& c /* NOLINT */) noexcept {
     // clang-format off
     switch (c) {
     case '+': case '-': case '*': case '/': case '%': case '=':
@@ -107,7 +107,7 @@ namespace lex {
     // clang-format on
   }
 
-  [[nodiscard]] static bool isValidWordFollower(const char& c) noexcept {
+  [[nodiscard]] static bool isValidWordFollower(const char& c /* NOLINT */) noexcept {
     bool is_valid = isValidNumFollower(c);
     if (!is_valid) {
       // clang-format off
@@ -121,11 +121,11 @@ namespace lex {
     return is_valid;
   }
 
-  [[nodiscard]] static bool isAlpha(const char& c) noexcept {
+  [[nodiscard]] static bool isAlpha(const char& c /* NOLINT */) noexcept {
     bool is_letter = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
     bool is_underscore = (c == '_');
     return (is_letter || is_underscore);
   }
 
-  [[nodiscard]] static bool isSpace(const char& c) noexcept { return (c == ' ' || c == '\t' || c == '\r' || c == '\n'); }
+  [[nodiscard]] static bool isSpace(const char& c /* NOLINT */) noexcept { return (c == ' ' || c == '\t' || c == '\r' || c == '\n'); }
 } // namespace lex
