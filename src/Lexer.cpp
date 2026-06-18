@@ -273,7 +273,7 @@ namespace lex {
   /* TODO: assign error code for ILLEGAL token type
    * TODO: log ILLEGAL tokens
    */
-  const Token Lexer::nextToken() {
+  Token Lexer::nextToken() {
     Token token = this->m_buffer;
     consumeSpace();
 

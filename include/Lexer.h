@@ -34,7 +34,7 @@ namespace lex {
     }
     ~Lexer() = default;
 
-    [[nodiscard]] const Token nextToken();
+    [[nodiscard]] Token nextToken();
     [[nodiscard]] const Token& peekToken() const noexcept { return this->m_buffer; }
 
     void newInput(std::string input) {
