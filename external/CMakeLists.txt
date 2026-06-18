@@ -21,3 +21,11 @@ FetchContent_Declare(
         GIT_TAG 44380e5 # v3.3.1 
 )
 FetchContent_MakeAvailable(cxxopts)
+
+# spdlog
+FetchContent_Declare(
+        spdlog
+        GIT_REPOSITORY git@github.com:gabime/spdlog.git
+        GIT_TAG v1.17.0
+)
+FetchContent_MakeAvailable(spdlog)

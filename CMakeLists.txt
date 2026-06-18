@@ -15,6 +15,7 @@ endif()
 
 # Fetch external dependencies
 add_subdirectory(external)
+find_package(Threads REQUIRED)
 
 # Source fetcher
 file(GLOB_RECURSE SOURCES 
@@ -30,7 +31,10 @@ target_link_libraries(SiSlib PUBLIC
 
 add_executable(SiS src/main.cpp)
 
-target_link_libraries(SiS PRIVATE SiSlib)
+target_link_libraries(SiS PRIVATE
+    SiSlib
+    spdlog::spdlog $<$<BOOL:${MINGW}>:ws2_32>
+)
 
 # Test that shit
 enable_testing()
