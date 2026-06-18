@@ -35,7 +35,8 @@ namespace par {
   // generic downcast helper relies on every derived struct exposing static constexpr TYPE
   template <typename T>
   T* as(Node* node) {
-    return node->type == T::TYPE ? static_cast<T*>(node) : nullptr;
+    if (node == nullptr || node->type != T::TYPE) return nullptr;
+    return static_cast<T*>(node);
   }
   typedef std::variant<std::monostate, double, bool, std::string> LiteralType;
 
