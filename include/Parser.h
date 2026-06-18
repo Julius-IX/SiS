@@ -6,12 +6,14 @@ namespace par {
   class Parser {
     public:
     Parser() = default;
-    ~Parser() { lexer = nullptr; }
+    ~Parser() = default;
 
     void parse(lex::Lexer* lexer);
 
     private:
-    lex::Lexer* lexer;
+    lex::Lexer* m_lexer;
+
+    void parseLiteral(lex::Token& token);
   };
 
 } // namespace par
