@@ -1,12 +1,38 @@
 #pragma once
 
+#include <Logging.h>
 #include <Token.h>
 #include <string>
-#include <Logging.h>
 
 namespace lex {
   typedef std::pair<TokenType, TokenVariant> TypeValuePair;
   typedef std::unordered_map<char, std::unordered_map<char, TokenType>> DoubleSymbolTable;
+
+  typedef struct TokenBuffer {
+    static constexpr uint8_t CAPACITY = 5;
+    Token slots[CAPACITY];
+    uint8_t head{0};
+    uint8_t count{0};
+
+    void append(const Token& token) {
+      assert(count < CAPACITY && "TokenBuffer overflow");
+      slots[(head + count) % CAPACITY] = token;
+      count++;
+    }
+
+    Token pop() {
+      assert(count > 0 && "TokenBuffer underflow");
+      Token token = slots[head];
+      head = (head + 1) % CAPACITY;
+      --count;
+      return token;
+    }
+
+    [[nodiscard]] const Token& peek(const ushort index = 1) const noexcept {
+      assert(index <= count && "TokenBuffer peek out of range");
+      return slots[(head + index - 1) % CAPACITY];
+    }
+  } TokenBuffer;
 
   typedef struct LexState {
     char current_char{' '};
@@ -31,17 +57,24 @@ namespace lex {
         m_state({}),
         m_buffer({}) {
       if (!this->m_input.empty()) this->m_state.current_char = this->m_input[0];
-      const Token token = nextToken();
+
+      for (size_t i = 0; i < TokenBuffer::CAPACITY; ++i) {
+        fillBuffer();
+      }
     }
     ~Lexer() = default;
 
     [[nodiscard]] Token nextToken();
-    [[nodiscard]] const Token& peekToken() const noexcept { return this->m_buffer; }
+    [[nodiscard]] const Token& peekToken(const ushort index = 1) const noexcept { return m_buffer.peek(index); }
 
     void newInput(std::string input) {
+      reset();
       this->m_input = std::move(input);
       if (!this->m_input.empty()) this->m_state.current_char = this->m_input[0];
-      const Token token = nextToken();
+
+      for (size_t i = 0; i < TokenBuffer::CAPACITY; ++i) {
+        fillBuffer();
+      }
     }
 
     void reset() noexcept {
@@ -67,7 +100,7 @@ namespace lex {
     Position m_live_pos;
     std::unordered_map<size_t, std::string> m_line_cache;
     State m_state;
-    Token m_buffer;
+    TokenBuffer m_buffer;
     static DoubleSymbolTable s_symbol_table;
 
     [[nodiscard]] static DoubleSymbolTable initSymbolTable();
@@ -79,6 +112,7 @@ namespace lex {
       return Token{.type = type, .value = value, .line = line, .column = column};
     }
 
+    void fillBuffer();
     void advanceState();
     void consumeSpace();
     void skipComment(const char& current_char, const char& next_char);

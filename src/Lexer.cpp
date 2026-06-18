@@ -276,8 +276,7 @@ namespace lex {
   /* TODO: assign error code for ILLEGAL token type
    * TODO: log ILLEGAL tokens
    */
-  Token Lexer::nextToken() {
-    Token token = this->m_buffer;
+  void Lexer::fillBuffer() {
     consumeSpace();
 
     size_t line = getAheadLine();
@@ -286,7 +285,6 @@ namespace lex {
     this->m_live_pos.column = column;
 
     char& current_char = this->m_state.current_char;
-
     TypeValuePair tvp{ILLEGAL, std::string{current_char}};
 
     switch (current_char) {
@@ -334,8 +332,12 @@ namespace lex {
     }
 
     advanceState();
-    this->m_buffer = Token{.type = tvp.first, .value = tvp.second, .line = line, .column = column};
+    this->m_buffer.append(Token{.type = tvp.first, .value = tvp.second, .line = line, .column = column});
+  }
 
+  Token Lexer::nextToken() {
+    Token token = m_buffer.pop();
+    fillBuffer();
     return token;
   }
 } // namespace lex
