@@ -2,6 +2,7 @@
 
 #include <Token.h>
 #include <string>
+#include <Logging.h>
 
 namespace lex {
   typedef std::pair<TokenType, TokenVariant> TypeValuePair;
@@ -54,9 +55,17 @@ namespace lex {
 
     [[nodiscard]] size_t getColumn() const noexcept { return this->m_live_pos.column; }
 
+    [[nodiscard]] std::string getLineContent(size_t line) {
+      if (!this->m_line_cache.contains(line)) {
+        return {};
+      }
+      return this->m_line_cache[line];
+    }
+
     private:
     std::string m_input;
     Position m_live_pos;
+    std::unordered_map<size_t, std::string> m_line_cache;
     State m_state;
     Token m_buffer;
     static DoubleSymbolTable s_symbol_table;

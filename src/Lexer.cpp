@@ -54,11 +54,14 @@ namespace lex {
     State& state = this->m_state;
 
     if (state.next_pos >= this->m_input.size()) {
+      size_t len = (state.current_char == '\n') ? (state.pos - state.bol) : (state.pos - state.bol + 1);
+      m_line_cache[state.line] = this->m_input.substr(state.bol, len);
+
       state.current_char = '\0';
       state.pos = this->m_input.size();
-
     } else {
       if (state.current_char == '\n') {
+        m_line_cache[state.line] = this->m_input.substr(state.bol, state.pos - state.bol);
         ++state.line;
         state.bol = state.next_pos;
       }
