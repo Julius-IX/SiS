@@ -25,7 +25,7 @@ namespace lex {
   class Lexer {
     public:
     explicit Lexer(std::string input)
-      : m_input(input),
+      : m_input(std::move(input)),
         m_live_pos({}),
         m_state({}),
         m_buffer({}) {
@@ -38,7 +38,7 @@ namespace lex {
     [[nodiscard]] const Token& peekToken() const noexcept { return this->m_buffer; }
 
     void newInput(std::string input) {
-      this->m_input = input;
+      this->m_input = std::move(input);
       if (!this->m_input.empty()) this->m_state.current_char = this->m_input[0];
       const Token token = nextToken();
     }
@@ -66,7 +66,7 @@ namespace lex {
     [[nodiscard]] size_t getAheadLine() const noexcept { return this->m_state.line; }
     [[nodiscard]] size_t getAheadColumn() const noexcept { return this->m_state.pos - this->m_state.bol + 1; }
 
-    [[nodiscard]] Token newToken(const TokenType type, const TokenVariant& value, const size_t line, const size_t column) {
+    [[nodiscard]] static Token newToken(const TokenType type, const TokenVariant& value, const size_t line, const size_t column) {
       return Token{.type = type, .value = value, .line = line, .column = column};
     }
 
