@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Lexer.h>
+#include <vector>
 
 namespace par {
   class Parser {
@@ -12,8 +13,10 @@ namespace par {
 
     private:
     lex::Lexer* m_lexer;
+    std::vector<lex::Token> m_tokens;
 
-    void parseLiteral(lex::Token& token);
+    void parseLiteral(const lex::Token& token);
+    std::string formatIllegalTokenMessage(const lex::Token& token);
   };
 
 } // namespace par

@@ -81,4 +81,14 @@ namespace par {
     }
     m_lexer = nullptr;
   }
+
+  std::string Parser::formatIllegalTokenMessage(const lex::Token& token) {
+    return fmt::format(
+      "Illegal token received {}:{}\n{}\n{}",
+      token.line,
+      token.column,
+      m_lexer->getLineContent(token.line),
+      std::string(token.column - 1, ' ') + std::string(m_lexer->peekToken().column - token.column, '^')
+    );
+  }
 } // namespace par
