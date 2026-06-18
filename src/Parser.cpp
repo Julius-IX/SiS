@@ -1,19 +1,25 @@
 #include <Parser.h>
+#include <Logging.h>
 
 namespace par {
   void Parser::parse(lex::Lexer* lexer) {
     m_lexer = lexer;
-    lex::Token current_token = m_lexer->nextToken();
-    while (current_token.type != lex::TokenType::SIS_EOF) {
-      switch (current_token.type) {
-        case lex::TokenType::ILLEGAL: break;;
+    lex::Token* current_token = nullptr;
+
+    // big ass switch statement to handle all the different token types ಥ_ಥ
+    while (current_token->type != lex::TokenType::SIS_EOF) {
+      m_tokens.push_back(m_lexer->nextToken());
+      current_token = &m_tokens.back();
+
+      switch (current_token->type) {
+        case lex::TokenType::ILLEGAL: LOG_ERROR(formatIllegalTokenMessage(*current_token)); break;
         case lex::TokenType::IDENT: break;
 
         case lex::TokenType::NUM:
         case lex::TokenType::STRING:
         case lex::TokenType::TRUE:
         case lex::TokenType::FALSE:
-        case lex::TokenType::SIS_NULL: parseLiteral(current_token); break;
+        case lex::TokenType::SIS_NULL: parseLiteral(*current_token); break;
 
         case lex::TokenType::IF: break;
         case lex::TokenType::ELSE: break;
