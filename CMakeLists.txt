@@ -26,7 +26,8 @@ list(FILTER SOURCES EXCLUDE REGEX ".*/main\\.cpp$")
 add_library(SiSlib STATIC ${SOURCES})
 target_include_directories(SiSlib PUBLIC ${PROJECT_SOURCE_DIR}/include)
 target_link_libraries(SiSlib PUBLIC
-        cxxopts
+    cxxopts
+    spdlog::spdlog $<$<BOOL:${MINGW}>:ws2_32>
 )
 
 add_executable(SiS src/main.cpp)
