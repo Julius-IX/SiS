@@ -32,7 +32,17 @@ namespace par {
     virtual ~Node() = default;
   };
 
-  // generic downcast helper relies on every derived struct exposing static constexpr TYPE
+  // Downcasts Node* to a concrete derived type (e.g. as<Binary>(node)) so you can
+  // read/modify its typed fields in place. Returns nullptr if node is null or its
+  // ->type doesn't match T::TYPE, so you can use the result directly in an `if`.
+  // Relies on every derived struct exposing `static constexpr NodeType TYPE`.
+  //
+  // Non-owning: the returned pointer is only valid as long as the Node it points
+  // to is alive. Don't store it beyond that node's lifetime, and don't use it to
+  // transfer ownership — it's for inline inspection/mutation, not for holding on to.
+  //
+  // WARN: T must be a concrete leaf type with its own TYPE constant never call
+  // as<Node>(...), that's the base type and has no TYPE of its own to compare against.
   template <typename T>
   T* as(Node* node) {
     if (node == nullptr || node->type != T::TYPE) return nullptr;
