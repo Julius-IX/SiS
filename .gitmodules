@@ -1,0 +1,6 @@
+[submodule "external/--force"]
+	path = external/--force
+	url = https://github.com/gabime/spdlog.git
+[submodule "external/spdlog"]
+	path = external/spdlog
+	url = https://github.com/gabime/spdlog.git
