@@ -1,6 +1,8 @@
 #pragma once
+
 #include <Token.h>
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <variant>
 #include <vector>
@@ -71,9 +73,9 @@ namespace par {
   struct Unary final : Node {
     static constexpr NodeType TYPE = NodeType::UNARY;
     lex::TokenType operation;
-    Node* operand;
+    std::unique_ptr<Node> operand;
 
-    Unary(lex::TokenType operation, Node* operand)
+    explicit Unary(lex::TokenType operation, Node* operand)
       : Node(TYPE),
         operation(operation),
         operand(operand) {}
@@ -82,77 +84,89 @@ namespace par {
   struct Binary final : Node {
     static constexpr NodeType TYPE = NodeType::BINARY;
     lex::TokenType operation;
-    Node* left;
-    Node* right;
+    std::unique_ptr<Node> left;
+    std::unique_ptr<Node> right;
 
-    Binary(lex::TokenType operation, Node* left, Node* right)
+    // clang-format off
+    explicit Binary(
+      lex::TokenType operation,
+      std::unique_ptr<Node> left,
+      std::unique_ptr<Node> right
+    )
       : Node(TYPE),
         operation(operation),
-        left(left),
-        right(right) {}
+        left(std::move(left)),
+        right(std::move(right)) {}
+    // clang-format on
   };
 
   struct Block final : Node {
     static constexpr NodeType TYPE = NodeType::BLOCK;
-    std::vector<Node*> statements;
+    std::vector<std::unique_ptr<Node>> statements;
 
-    explicit Block(std::vector<Node*> statements)
+    explicit Block(std::vector<std::unique_ptr<Node>> statements)
       : Node(TYPE),
         statements(std::move(statements)) {}
   };
 
   struct If final : Node {
     static constexpr NodeType TYPE = NodeType::IF;
-    Node* condition;
-    Node* then_branch;
-    Node* else_branch; // nullptr if there's no else
+    std::unique_ptr<Node> condition;
+    std::unique_ptr<Node> then_branch;
+    std::unique_ptr<Node> else_branch; // nullptr if there's no else
 
-    If(Node* condition, Node* then_branch, Node* else_branch = nullptr)
+    // clang-format off
+    explicit If(
+      std::unique_ptr<Node> condition,
+      std::unique_ptr<Node> then_branch,
+      std::unique_ptr<Node> else_branch = nullptr
+    )
       : Node(TYPE),
-        condition(condition),
-        then_branch(then_branch),
-        else_branch(else_branch) {}
+        condition(std::move(condition)),
+        then_branch(std::move(then_branch)),
+        else_branch(std::move(else_branch)) {}
+    // clang-format on
   };
 
   struct While final : Node {
     static constexpr NodeType TYPE = NodeType::WHILE;
-    Node* condition;
-    Node* body;
+    std::unique_ptr<Node> condition;
+    std::unique_ptr<Node> body;
 
-    While(Node* condition, Node* body)
+    explicit While(std::unique_ptr<Node> condition, std::unique_ptr<Node> body)
       : Node(TYPE),
-        condition(condition),
-        body(body) {}
+        condition(std::move(condition)),
+        body(std::move(body)) {}
   };
 
   struct VarDecl final : Node {
     static constexpr NodeType TYPE = NodeType::VAR_DECL;
     std::string name;
-    Node* initializer; // nullptr if declared without a value
+    std::unique_ptr<Node> initializer; // nullptr if declared without a value
 
-    explicit VarDecl(std::string name, Node* initializer = nullptr)
+    explicit VarDecl(std::string name, std::unique_ptr<Node> initializer = nullptr)
       : Node(TYPE),
         name(std::move(name)),
-        initializer(initializer) {}
+        initializer(std::move(initializer)) {}
   };
 
   struct ExprStmt final : Node {
     static constexpr NodeType TYPE = NodeType::EXPR_STMT;
-    Node* expr;
+    std::unique_ptr<Node> expr;
 
-    explicit ExprStmt(Node* expr)
+    explicit ExprStmt(std::unique_ptr<Node> expr)
       : Node(TYPE),
-        expr(expr) {}
+        expr(std::move(expr)) {}
   };
 
   struct Call final : Node {
     static constexpr NodeType TYPE = NodeType::CALL;
-    Node* callee;
-    std::vector<Node*> args;
+    std::unique_ptr<Node> callee;
+    std::vector<std::unique_ptr<Node>> args;
 
-    Call(Node* callee, std::vector<Node*> args)
+    Call(std::unique_ptr<Node> callee, std::vector<std::unique_ptr<Node>> args)
       : Node(TYPE),
-        callee(callee),
+        callee(std::move(callee)),
         args(std::move(args)) {}
   };
 } // namespace par
