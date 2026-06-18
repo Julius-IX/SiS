@@ -39,3 +39,9 @@ target_link_libraries(SiS PRIVATE
 # Test that shit
 enable_testing()
 add_subdirectory(test)
+
+add_custom_target(run_tests
+    COMMAND ctest --output-on-failure
+    DEPENDS sis_tests
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
