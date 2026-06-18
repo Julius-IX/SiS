@@ -63,6 +63,9 @@ namespace lex {
     TokenVariant value;
     size_t line;
     size_t column;
+
+    auto operator<=>(const Token&) const = delete;
+    bool operator==(const Token& other) const { return this->type == other.type && this->value == other.value; }
   } Token;
 
   inline TokenType lookupIdentifier(const std::string& identifier) {
