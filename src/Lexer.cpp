@@ -279,6 +279,7 @@ namespace lex {
   void Lexer::fillBuffer() {
     consumeSpace();
 
+    size_t start_pos = this->m_state.pos;
     size_t line = getAheadLine();
     size_t column = getAheadColumn();
     this->m_live_pos.line = line;
@@ -331,8 +332,9 @@ namespace lex {
       } break;
     }
 
+    size_t length = (this->m_state.pos - start_pos) + 1;
     advanceState();
-    this->m_buffer.append(Token{.type = tvp.first, .value = tvp.second, .line = line, .column = column});
+    this->m_buffer.append(Token{.type = tvp.first, .value = tvp.second, .line = line, .column = column, .length = length});
   }
 
   Token Lexer::nextToken() {
