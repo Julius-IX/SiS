@@ -30,74 +30,74 @@ static std::string tokenVariantToString(const lex::Token& token) {
 }
 
 void areTokensEqual(const lex::Token& actual, const lex::Token& expected) {
-    bool same_type = (actual.type == expected.type);
-    bool same_line = (actual.line == expected.line);
-    bool same_column = (actual.column == expected.column);
+  bool same_type = (actual.type == expected.type);
+  bool same_line = (actual.line == expected.line);
+  bool same_column = (actual.column == expected.column);
 
-    bool same_value = false;
+  bool same_value = false;
 
-    std::visit([&same_value](auto&& arg1, auto&& arg2) {
-        using T1 = std::decay_t<decltype(arg1)>;
-        using T2 = std::decay_t<decltype(arg2)>;
+  std::visit(
+    [&same_value](auto&& arg1, auto&& arg2) {
+      using T1 = std::decay_t<decltype(arg1)>;
+      using T2 = std::decay_t<decltype(arg2)>;
 
-        if constexpr (std::is_same_v<T1, T2>) {
-            same_value = (arg1 == arg2);
-        } else {
-            same_value = false;
-        }
-    }, actual.value, expected.value);
+      if constexpr (std::is_same_v<T1, T2>) {
+        same_value = (arg1 == arg2);
+      } else {
+        same_value = false;
+      }
+    },
+    actual.value,
+    expected.value);
 
-    bool result = same_type && same_value && same_line && same_column;
+  bool result = same_type && same_value && same_line && same_column;
 
-    if (!result) {
-        std::string message = "Token mismatch: ";
-        
-        if (!same_type) {
-            message += "\n- Type mismatch: "
-            "\n  actual: " + lex::literalTokenToString(actual.type) +
-            "\n  expected: " + lex::literalTokenToString(expected.type) + '\n';
-        }
-        if (!same_value) {
-            message += "\n- Value mismatch: "
-            "\n  actual: " + tokenVariantToString(actual) +
-            "\n  expected: " + tokenVariantToString(expected) + '\n';
-        }
-        if (!same_line) {
-            message +=
-                "\n- Line mismatch: "
-                "\n actual: " + std::to_string(actual.line) +
-                "\n expected: " + std::to_string(expected.line) + '\n';
-        }
-        if (!same_column) {
-            message +=
-              "\n- Column mismatch: "
-              "\n actual: " + std::to_string(actual.column) +
-              "\n expected: " + std::to_string(expected.column) + '\n';
-        }
-        ADD_FAILURE();
-        std::cout << message << "\n\n";
+  if (!result) {
+    std::string message = "Token mismatch: ";
+
+    if (!same_type) {
+      message += "\n- Type mismatch: "
+                 "\n  actual: " +
+                 lex::literalTokenToString(actual.type) + "\n  expected: " + lex::literalTokenToString(expected.type) + '\n';
     }
+    if (!same_value) {
+      message += "\n- Value mismatch: "
+                 "\n  actual: " +
+                 tokenVariantToString(actual) + "\n  expected: " + tokenVariantToString(expected) + '\n';
+    }
+    if (!same_line) {
+      message += "\n- Line mismatch: "
+                 "\n actual: " +
+                 std::to_string(actual.line) + "\n expected: " + std::to_string(expected.line) + '\n';
+    }
+    if (!same_column) {
+      message += "\n- Column mismatch: "
+                 "\n actual: " +
+                 std::to_string(actual.column) + "\n expected: " + std::to_string(expected.column) + '\n';
+    }
+    ADD_FAILURE();
+    std::cout << message << "\n\n";
+  }
 }
 
 void compareTokenStream(lex::Lexer& lexer, const TokenVector& expected_tokens) {
-    lex::Token token = lexer.nextToken();
-    size_t index{0};
+  lex::Token token = lexer.nextToken();
+  size_t index{0};
 
-    while (true) {
-      areTokensEqual(token, expected_tokens.at(index));
-      token = lexer.nextToken();
+  while (true) {
+    areTokensEqual(token, expected_tokens.at(index));
+    token = lexer.nextToken();
 
-      if (token.type == lex::SIS_EOF) break;
-      ++index;
-    }
+    if (token.type == lex::SIS_EOF) break;
+    ++index;
+  }
 }
 
 TEST(Lexer, TreatCommentAsSpaces) {
-  std::string input =
-    "class DaClass /* Random comment */ {};\n"
-    "pin this_variable = //line comment getting in the way \" value of variable \""
-    ;
+  std::string input = "class DaClass /* Random comment */ {};\n"
+                      "pin this_variable = //line comment getting in the way \" value of variable \"";
 
+  // clang-format off
   const TokenVector expected {
     {.type = lex::CLASS,     .value = {}, .line = 1, .column = 1},
     {.type = lex::IDENT,     .value = "DaClass", .line = 1, .column = 7},
@@ -110,15 +110,16 @@ TEST(Lexer, TreatCommentAsSpaces) {
     {.type = lex::ASSIGN,  .value = {}, .line = 2, .column = 19},
     {.type = lex::SIS_EOF, .value = {}, .line = 2, .column = 87},
   };
+  // clang-format on
 
   lex::Lexer lexer(input);
   compareTokenStream(lexer, expected);
 }
 
 TEST(Lexer, CanDiscernValidInvalidNumber) {
-  std::string input =
-    "123, 111.018, 1100., 1414..4, 12B34";
+  std::string input = "123, 111.018, 1100., 1414..4, 12B34";
 
+  // clang-format off
   const TokenVector expected {
     {.type = lex::NUM,     .value = 123.,      .line = 1, .column = 1  },
     {.type = lex::COMMA,   .value = {},        .line = 1, .column = 4  },
@@ -131,18 +132,19 @@ TEST(Lexer, CanDiscernValidInvalidNumber) {
     {.type = lex::ILLEGAL, .value = "12B34",   .line = 1, .column = 31 },
     {.type = lex::SIS_EOF, .value = {},        .line = 1, .column = 36 },
   };
+  // clang-format on
 
   lex::Lexer lexer(input);
   compareTokenStream(lexer, expected);
 }
 
 TEST(Lexer, CanDiscernValidInvalidIdentifier) {
-  std::string input =
-    "validIdent valid_ident_\n"
-    "_valid_ valid123\n"
-    "valid{}valid\n"
-    "invalid@\n";
+  std::string input = "validIdent valid_ident_\n"
+                      "_valid_ valid123\n"
+                      "valid{}valid\n"
+                      "invalid@\n";
 
+  // clang-format off
   const TokenVector expected {
     {.type = lex::IDENT,   .value = "validIdent",   .line = 1, .column = 1  },
     {.type = lex::IDENT,   .value = "valid_ident_", .line = 1, .column = 12 },
@@ -155,17 +157,18 @@ TEST(Lexer, CanDiscernValidInvalidIdentifier) {
     {.type = lex::ILLEGAL, .value = "invalid@",     .line = 4, .column = 1  },
     {.type = lex::SIS_EOF, .value = {},             .line = 5, .column = 1  },
   };
+  // clang-format on
 
   lex::Lexer lexer(input);
   compareTokenStream(lexer, expected);
 }
 
 TEST(Lexer, ReturnIllegalOnUnknownChar) {
-  std::string input =
-    "@ beans & |\n"
-    "~ ` ? pin\n"
-    "for $ in\n";
+  std::string input = "@ beans & |\n"
+                      "~ ` ? pin\n"
+                      "for $ in\n";
 
+  // clang-format off
   const TokenVector expected {
     {.type = lex::ILLEGAL, .value = "@",     .line = 1, .column = 1 },
     {.type = lex::IDENT  , .value = "beans", .line = 1, .column = 3  },
@@ -180,16 +183,17 @@ TEST(Lexer, ReturnIllegalOnUnknownChar) {
     {.type = lex::IDENT,   .value = "in",    .line = 3, .column = 7  },
     {.type = lex::SIS_EOF, .value = {},      .line = 4, .column = 10 },
   };
+  // clang-format on
 
   lex::Lexer lexer(input);
   compareTokenStream(lexer, expected);
 }
 
-
 TEST(Lexer, ReusabilityWorks) {
   std::string first_input = "pin var1 = 20;";
   std::string second_input = "if (true) {/* comment */}";
 
+  // clang-format off
   const TokenVector expected_set_one {
     {.type = lex::PIN,       .value = {},     .line = 1, .column = 1  },
     {.type = lex::IDENT,     .value = "var1", .line = 1, .column = 5  },
@@ -207,6 +211,7 @@ TEST(Lexer, ReusabilityWorks) {
     {.type = lex::R_BRACE, .value = {}, .line = 1, .column = 25 },
     {.type = lex::SIS_EOF, .value = {}, .line = 1, .column = 26 },
   };
+  // clang-format on
 
   lex::Lexer lexer(first_input);
 
@@ -220,6 +225,7 @@ TEST(Lexer, ReusabilityWorks) {
 
 TEST(Lexer, SplitsTokensCorretly) {
   const std::string input =
+    // clang-format off
     /* 12345678901234567890123456789012345678901234567890*/
     /* 1 */  "pin int_literal = 5;\n"
     /* 2 */  "pin double_literal = 5.5;\n"
@@ -386,6 +392,7 @@ TEST(Lexer, SplitsTokensCorretly) {
     {.type = lex::IDENT         , .value = "THIS_IS_A_TEST_IDENTIFIER", .line = 29, .column = 1},
     {.type = lex::SIS_EOF       , .value = {}              ,  .line = 30, .column = 31 }
   };
+  // clang-format on
 
   lex::Lexer lexer(input);
   compareTokenStream(lexer, expected);

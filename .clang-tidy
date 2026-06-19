@@ -1,0 +1,78 @@
+Checks: "clang-analyzer-*,clang-analyzer-core-*,bugprone-*,performance-*,performance-unnecessary-copy-initialization,performance-inefficient-vector-operation,performance-move-const-arg,performance-struct-packing,performance-unnecessary-value-param,readability-*,readability-const-return-type,readability-identifier-naming,readability-braces-around-statements,modernize-*,modernize-use-noexcept,modernize-use-override,modernize-use-final,-modernize-use-trailing-return-type,-modernize-use-using,cppcoreguidelines-*,-cppcoreguidelines-macro-usage,-cppcoreguidelines-pro-type-member-init,-cppcoreguidelines-avoid-magic-numbers,misc-unused-parameters,misc-unused-function,-cppcoreguidelines-pro-type-union-access,-cppcoreguidelines-special-member-functions,-hicpp-special-member-functions"
+
+CheckOptions:
+  - key: modernize-pass-by-value.CheckConstReference
+    value: 'true'
+  - key: performance-unnecessary-value-param.AllowedTypes
+    value: ''
+  - key: readability-identifier-length.MinimumVariableNameLength
+    value: '1'
+  - key: modernize-use-auto.MinTypeNameLength
+    value: '0'
+
+  # Braces required around multiline if/else/for/while bodies, but
+  # single-statement bodies on the same line as the condition are fine.
+  - key: readability-braces-around-statements.ShortStatementLines
+    value: '1'
+
+  # --- Naming conventions ---
+  # Classes — PascalCase with m_ on members
+  - key: readability-identifier-naming.ClassCase
+    value: CamelCase
+  - key: readability-identifier-naming.ClassMemberCase
+    value: lower_case
+  - key: readability-identifier-naming.ClassMemberPrefix
+    value: m_
+
+  # Structs PascalCase, members are plain snake_case (no m_ prefix)
+  - key: readability-identifier-naming.StructCase
+    value: CamelCase
+  - key: readability-identifier-naming.PublicMemberCase
+    value: lower_case
+  # No PublicMemberPrefix so struct fields are unprefixed
+
+  # Enums PascalCase type, UPPER_CASE values
+  - key: readability-identifier-naming.EnumCase
+    value: CamelCase
+  - key: readability-identifier-naming.EnumConstantCase
+    value: UPPER_CASE
+
+  # Functions and methods camelCase
+  - key: readability-identifier-naming.FunctionCase
+    value: camelBack
+  - key: readability-identifier-naming.MethodCase
+    value: camelBack
+
+  # Local variables and parameters snake_case
+  - key: readability-identifier-naming.LocalVariableCase
+    value: lower_case
+  - key: readability-identifier-naming.ParameterCase
+    value: lower_case
+
+  # Static member variables s_ prefix + snake_case
+  - key: readability-identifier-naming.StaticMemberCase
+    value: lower_case
+  - key: readability-identifier-naming.StaticMemberPrefix
+    value: s_
+
+  # Namespaces snake_case
+  - key: readability-identifier-naming.NamespaceCase
+    value: lower_case
+
+  # Template parameters PascalCase
+  - key: readability-identifier-naming.TemplateParameterCase
+    value: CamelCase
+
+  # Constants and macros UPPER_SNAKE_CASE
+  - key: readability-identifier-naming.ConstexprVariableCase
+    value: UPPER_CASE
+  - key: readability-identifier-naming.MacroDefinitionCase
+    value: UPPER_CASE
+
+  # Global variables snake_case
+  - key: readability-identifier-naming.GlobalVariableCase
+    value: lower_case
+
+WarningsAsErrors: ''
+HeaderFilterRegex: '.*'
+FormatStyle: file
