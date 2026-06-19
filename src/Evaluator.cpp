@@ -4,6 +4,7 @@
 #include <cmath>
 #include <print>
 #include <stdexcept>
+#include <iostream>
 
 namespace eval {
   static bool isAssignmentOperator(lex::TokenType type) {
@@ -188,6 +189,23 @@ namespace eval {
                    return back;
                  },
              }));
+
+    env->define(
+      "read", Value(NativeFunction{
+                 .name = "read",
+                 .fn =
+                   [](std::vector<Value>& args) -> Value {
+                     if (args.size() > 1) {
+                       throw std::runtime_error("read() expects at most 1 argument, got " + std::to_string(args.size()));
+                     }
+                     if (args.size() == 1) {
+                       std::print("{}", args[0].toString());
+                     }
+                     std::string input;
+                     std::cin >> input;
+                     return Value{input};
+                   },
+               }));
   }
 
   Evaluator::Evaluator()
