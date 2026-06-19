@@ -5,8 +5,9 @@
 #include <print>
 
 int main(const int argc, const char* argv[]) {
-  if (argc < 1) {
-    std::print("usage: SiS <path/to/file.sis>");
+  if (argc < 2) {
+    std::print("usage: {} <path/to/file.sis>\n", argv[0]);
+    return 1;
   }
 
   par::Parser parser;
