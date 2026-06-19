@@ -8,6 +8,12 @@ namespace par {
     public:
     ~Parser() = default;
 
+    // Parses an entire input as a sequence of top level statements.
+    // Returns true on success, false if any parseX call failed along the way.
+    // The resulting tree is stored in m_root and can be read with getRoot()
+    // or printed with printTree().
+    bool parse(lex::Lexer* lexer);
+
     [[nodiscard]] const Block* const getRoot() const { return m_root.get(); }
 
     // Prints the parsed tree to stdout. Only useful after a successful parse() call.
@@ -31,13 +37,20 @@ namespace par {
     std::unique_ptr<Node> parseLiteral(lex::Lexer* lexer);
     std::unique_ptr<Node> parseIdentifier(lex::Lexer* lexer);
     std::unique_ptr<Node> parseUnary(lex::Lexer* lexer);
-    std::unique_ptr<Node> parseBinary(lex::Lexer* lexer);
+    std::unique_ptr<Node> parseBinary(lex::Lexer* lexer, int min_prec);
+    std::unique_ptr<Node> parseAssignment(lex::Lexer* lexer);
+    std::unique_ptr<Node> parsePostfix(lex::Lexer* lexer);
+    std::unique_ptr<Node> parsePrimary(lex::Lexer* lexer);
     std::unique_ptr<Node> parseBlock(lex::Lexer* lexer);
+    std::unique_ptr<Node> parseStatement(lex::Lexer* lexer);
     std::unique_ptr<Node> parseIf(lex::Lexer* lexer);
     std::unique_ptr<Node> parseWhile(lex::Lexer* lexer);
     std::unique_ptr<Node> parseVarDecl(lex::Lexer* lexer);
     std::unique_ptr<Node> parseExprStmt(lex::Lexer* lexer);
-    std::unique_ptr<Node> parseCall(lex::Lexer* lexer);
+    std::unique_ptr<Node> parseCall(lex::Lexer* lexer, std::unique_ptr<Node> callee);
+    std::unique_ptr<Node> parseFnLiteral(lex::Lexer* lexer);
+    std::unique_ptr<Node> parseExpression(lex::Lexer* lexer);
+    std::unique_ptr<Node> parseArrayLiteral(lex::Lexer* lexer);
   };
 
 } // namespace par
