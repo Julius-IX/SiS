@@ -20,6 +20,7 @@ namespace par {
     EXPR_STMT,
     CALL,
     FN_LITERAL,
+    MEMBER_ACCESS,
   };
 
   struct Node {
@@ -182,5 +183,18 @@ namespace par {
       : Node(TYPE),
         params(std::move(params)),
         body(std::move(body)) {}
+  };
+
+  // Represents a single '.' access, e.g. the "something" part of ident.something
+  // Chains like a.b.c are built as nested MemberAccess nodes by the parser loop.
+  struct MemberAccess final : Node {
+    static constexpr NodeType TYPE = NodeType::MEMBER_ACCESS;
+    std::unique_ptr<Node> object;
+    std::string field;
+
+    MemberAccess(std::unique_ptr<Node> object, std::string field)
+      : Node(TYPE),
+        object(std::move(object)),
+        field(std::move(field)) {}
   };
 } // namespace par
