@@ -1,18 +1,17 @@
 #pragma once
 
 #include <Lexer.h>
-#include <vector>
 #include <ParserNodeTypes.h>
 
 namespace par {
   class Parser {
     public:
-    Parser() = delete;
     ~Parser() = default;
 
     private:
     std::vector<lex::Token> m_tokens;
-    Block m_root;
+    Block m_root = Block({});
+
     std::string formatIllegalTokenMessage(lex::Lexer* lexer, const lex::Token& token, std::string_view msg = "");
 
 
