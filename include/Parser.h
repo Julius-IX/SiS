@@ -12,7 +12,7 @@ namespace par {
     std::vector<lex::Token> m_tokens;
     std::unique_ptr<Block> m_root = nullptr;
 
-    std::string formatIllegalTokenMessage(lex::Lexer* lexer, const lex::Token& token, std::string_view msg = "");
+    static std::string formatIllegalTokenMessage(lex::Lexer* lexer, const lex::Token& token, std::string_view msg = "");
 
     static bool check(lex::Lexer* lexer, lex::TokenType type);
     static bool isAtEnd(lex::Lexer* lexer);
