@@ -2,6 +2,7 @@
 
 #include <Logging.h>
 #include <Token.h>
+#include <cassert>
 #include <string>
 
 namespace lex {
