@@ -155,7 +155,7 @@ namespace par { // Include resolving
     return true;
   }
 
-  void Parser::parseRoot(const Path& path) {
+  bool Parser::parseRoot(const Path& path) {
     Path full_root_path = resolveRootDirectory(path);
     LOG_DEBUG_FLUSH("Full root path: {}", full_root_path.string());
 
@@ -188,6 +188,8 @@ namespace par { // Include resolving
       m_include_stack.push_back(current_path);
       m_include_stack.push_back(include_path.value().value());
     }
+
+    return !std::ranges::contains(m_root->statements, nullptr);
   }
 
   std::expected<std::optional<Path>, std::string> Parser::checkForInclude(const Path& path) {
@@ -909,7 +911,10 @@ namespace par { // Complex parsing structures
     return true;
   }
 
-  bool Parser::parseClassBody(State* state, std::vector<std::unique_ptr<VarDecl>>* out_fields, std::vector<std::unique_ptr<FnLiteral>>* out_methods, std::vector<std::string>* out_method_names) {
+  bool Parser::parseClassBody(State* state,
+                              std::vector<std::unique_ptr<VarDecl>>* out_fields,
+                              std::vector<std::unique_ptr<FnLiteral>>* out_methods,
+                              std::vector<std::string>* out_method_names) {
     while (!check(state->lexer.get(), lex::TokenType::R_BRACE) && !isAtEnd(state->lexer.get())) {
       if (check(state->lexer.get(), lex::TokenType::PIN)) {
         auto field_node = parseClassField(state);

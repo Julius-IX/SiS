@@ -28,7 +28,7 @@ namespace par {
     Parser();
     ~Parser() = default;
 
-    void parseRoot(const Path& path);
+    bool parseRoot(const Path& path);
     bool parse(State* state);
 
     const Block& peekRoot() const { return *m_root; }
