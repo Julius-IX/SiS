@@ -8,11 +8,18 @@ namespace par {
     public:
     ~Parser() = default;
 
+    [[nodiscard]] const Block* const getRoot() const { return m_root.get(); }
+
+    // Prints the parsed tree to stdout. Only useful after a successful parse() call.
+    void printTree() const;
+
     private:
     std::vector<lex::Token> m_tokens;
     std::unique_ptr<Block> m_root = nullptr;
 
     static std::string formatIllegalTokenMessage(lex::Lexer* lexer, const lex::Token& token, std::string_view msg = "");
+
+    static void printNode(const Node* node, const std::string& prefix, bool is_last, std::string_view label = "");
 
     static bool check(lex::Lexer* lexer, lex::TokenType type);
     static bool isAtEnd(lex::Lexer* lexer);
