@@ -19,6 +19,7 @@ namespace par {
     VAR_DECL,
     EXPR_STMT,
     CALL,
+    FN_LITERAL,
   };
 
   struct Node {
@@ -168,5 +169,18 @@ namespace par {
       : Node(TYPE),
         callee(std::move(callee)),
         args(std::move(args)) {}
+  };
+
+  // Represents a function literal, e.g. fn(x, y) { return x + y; }
+  // Params are plain names for now, body is always a Block.
+  struct FnLiteral final : Node {
+    static constexpr NodeType TYPE = NodeType::FN_LITERAL;
+    std::vector<std::string> params;
+    std::unique_ptr<Node> body; // a Block
+
+    FnLiteral(std::vector<std::string> params, std::unique_ptr<Node> body)
+      : Node(TYPE),
+        params(std::move(params)),
+        body(std::move(body)) {}
   };
 } // namespace par
