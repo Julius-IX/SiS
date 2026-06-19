@@ -24,7 +24,7 @@ namespace lex {
 
     FN,
     PIN,
-    CLASS,
+    CLASS, EXTENDS, NEW, THIS, SUPER,
     INCLUDE,
 
     PLUS, PLUS_PLUS,
@@ -88,6 +88,10 @@ namespace lex {
       {"fn", FN},
       {"pin", PIN},
       {"class", CLASS},
+      {"extends", EXTENDS},
+      {"new", NEW},
+      {"this", THIS},
+      {"super", SUPER},
       {"include", INCLUDE},
     };
 
@@ -125,6 +129,10 @@ namespace lex {
       case FN: return "FN";
       case PIN: return "PIN";
       case CLASS: return "CLASS";
+      case EXTENDS: return "EXTENDS";
+      case NEW: return "NEW";
+      case THIS: return "THIS";
+      case SUPER: return "SUPER";
       case INCLUDE: return "INCLUDE";
 
       case PLUS: return "PLUS";
