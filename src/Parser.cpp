@@ -3,12 +3,152 @@
 #include <ParserNodeTypes.h>
 #include <Token.h>
 #include <algorithm>
+#include <filesystem>
+#include <fstream>
 #include <print>
+#include <sstream>
 
 // NOTE: placeholder
 static void panic(const std::string_view msg) { std::print("PANIC: {}\n", msg.data()); }
 
 namespace par {
+  // ---------------------------------------------------------------------
+  // #include preprocessing
+  //
+  // This runs entirely on raw source TEXT, before the Lexer ever sees it.
+  // Conceptually identical to what a C preprocessor does with #include:
+  // scan for the directive, read the target file, recursively expand IT,
+  // and splice the result in verbatim where the directive was. By the time
+  // parse()/the Lexer run, includes simply don't exist anymore, it's all
+  // one flat string.
+  //
+  // Why text instead of tokens or AST nodes: the Lexer in this codebase is
+  // a single streaming pass with a small read-ahead buffer, it has no
+  // "pause, lex this other file, then resume" capability, and patching that
+  // in would be far more invasive than doing the splice a layer below it.
+  // ---------------------------------------------------------------------
+
+  std::optional<std::string> readFileToString(const std::string& path) {
+    std::ifstream file(path, std::ios::in | std::ios::binary);
+    if (!file) return std::nullopt;
+
+    std::ostringstream buffer;
+    buffer << file.rdbuf();
+    return buffer.str();
+  }
+
+  namespace {
+    // Finds the byte offset of the next `include "..."` (or `include '...'`)
+    // directive at or after `from`. An "include" is only recognized as the
+    // directive (not, say, part of a longer identifier like "includes" or a
+    // string literal containing the word) if it's preceded by nothing but
+    // whitespace/start-of-line and followed by whitespace then a quote.
+    // Returns std::string::npos if there are no more include directives.
+    struct IncludeMatch {
+      size_t directive_start; // index of the 'i' in "include"
+      size_t directive_end; // index just past the closing ';' (or EOL if missing)
+      std::string target_path;
+    };
+
+    [[nodiscard]] bool isIdentChar(char c) { return std::isalnum(static_cast<unsigned char>(c)) || c == '_'; }
+
+    [[nodiscard]] std::optional<IncludeMatch> findNextInclude(const std::string& source, size_t from) {
+      static const std::string kKeyword = "include";
+
+      size_t search_pos = from;
+      while (true) {
+        size_t pos = source.find(kKeyword, search_pos);
+        if (pos == std::string::npos) return std::nullopt;
+
+        // Reject matches that are part of a longer identifier, e.g. "include_path".
+        bool left_ok = (pos == 0) || !isIdentChar(source[pos - 1]);
+        size_t after_keyword = pos + kKeyword.size();
+        bool right_ok = (after_keyword >= source.size()) || !isIdentChar(source[after_keyword]);
+
+        if (!left_ok || !right_ok) {
+          search_pos = pos + kKeyword.size();
+          continue;
+        }
+
+        // Skip whitespace between 'include' and the expected quote.
+        size_t cursor = after_keyword;
+        while (cursor < source.size() && std::isspace(static_cast<unsigned char>(source[cursor]))) ++cursor;
+
+        if (cursor >= source.size() || (source[cursor] != '"' && source[cursor] != '\'')) {
+          // Not actually a directive (e.g. a variable named "include" used
+          // as a regular identifier elsewhere), keep scanning past it.
+          search_pos = pos + kKeyword.size();
+          continue;
+        }
+
+        char quote = source[cursor];
+        size_t path_start = cursor + 1;
+        size_t path_end = source.find(quote, path_start);
+        if (path_end == std::string::npos) {
+          // Unterminated string, nothing sane to do, stop looking.
+          return std::nullopt;
+        }
+
+        std::string target_path = source.substr(path_start, path_end - path_start);
+
+        // Consume an optional trailing ';' and the rest of the line's
+        // trailing whitespace so we don't leave a dangling stray semicolon
+        // or blank-looking line behind after splicing.
+        size_t directive_end = path_end + 1;
+        size_t semi_scan = directive_end;
+        while (semi_scan < source.size() && std::isspace(static_cast<unsigned char>(source[semi_scan])) && source[semi_scan] != '\n') ++semi_scan;
+        if (semi_scan < source.size() && source[semi_scan] == ';') {
+          directive_end = semi_scan + 1;
+        }
+
+        return IncludeMatch{.directive_start = pos, .directive_end = directive_end, .target_path = std::move(target_path)};
+      }
+    }
+  } // namespace
+
+  std::string preprocessIncludes(const std::string& source, const std::string& source_path, std::set<std::string>& already_included) {
+    std::filesystem::path base_dir = std::filesystem::path(source_path).has_parent_path() ? std::filesystem::path(source_path).parent_path() : std::filesystem::path(".");
+
+    std::string result;
+    result.reserve(source.size());
+
+    size_t cursor = 0;
+    while (true) {
+      auto match = findNextInclude(source, cursor);
+      if (!match) {
+        result.append(source, cursor, std::string::npos);
+        break;
+      }
+
+      // Copy everything before the directive untouched.
+      result.append(source, cursor, match->directive_start - cursor);
+
+      std::filesystem::path resolved = std::filesystem::weakly_canonical(base_dir / match->target_path);
+      std::string resolved_str = resolved.string();
+
+      if (already_included.contains(resolved_str)) {
+        // #pragma once semantics: silently drop this include, the file's
+        // contents are already in the output from an earlier directive.
+      } else {
+        already_included.insert(resolved_str);
+
+        auto included_source = readFileToString(resolved_str);
+        if (!included_source) {
+          panic(fmt::format("Could not open included file '{}' (resolved to '{}')", match->target_path, resolved_str));
+        } else {
+          // Recursively expand the included file's own includes BEFORE
+          // splicing, so nested includes resolve relative to where they're
+          // declared, not relative to the root file.
+          result.append(preprocessIncludes(*included_source, resolved_str, already_included));
+        }
+      }
+
+      cursor = match->directive_end;
+    }
+
+    return result;
+  }
+
   std::string Parser::formatIllegalTokenMessage(lex::Lexer* lexer, const lex::Token& token, const std::string_view msg) {
     std::string fmted_msg = fmt::format("Illegal token received {}:{}\n", token.line, token.column);
     if (!msg.empty()) {
@@ -111,6 +251,10 @@ namespace par {
   // statements and stores the result in m_root. Stops early and returns false
   // if any statement fails to parse, since there's nothing sensible to
   // recover into yet (no synchronize() logic).
+  //
+  // NOTE: this assumes `lexer` was already constructed from fully
+  // include-expanded source. If you're starting from a file on disk, call
+  // parseFile() instead, which does the expansion for you first.
   bool Parser::parse(lex::Lexer* lexer) {
     std::vector<std::unique_ptr<Node>> statements;
 
@@ -122,6 +266,21 @@ namespace par {
 
     m_root = std::make_unique<Block>(std::move(statements));
     return true;
+  }
+
+  bool Parser::parseFile(const std::string& path) {
+    auto source = readFileToString(path);
+    if (!source) {
+      panic(fmt::format("Could not open source file '{}'", path));
+      return false;
+    }
+
+    std::set<std::string> already_included;
+    already_included.insert(std::filesystem::weakly_canonical(path).string());
+    std::string expanded = preprocessIncludes(*source, path, already_included);
+
+    lex::Lexer lexer(std::move(expanded));
+    return parse(&lexer);
   }
 
   // Precedence-climbing: parses everything from `min_prec` upward in one loop
@@ -155,7 +314,7 @@ namespace par {
     if (!left) return nullptr;
 
     if (isAssignmentOperator(lexer->peekToken().type)) {
-      if (left->type != NodeType::IDENTIFIER && left->type != NodeType::MEMBER_ACCESS) {
+      if (left->type != NodeType::IDENTIFIER && left->type != NodeType::MEMBER_ACCESS && left->type != NodeType::SUPER_ACCESS) {
         panic(formatIllegalTokenMessage(lexer, lexer->peekToken(), "Invalid assignment target"));
         return nullptr;
       }
@@ -181,6 +340,13 @@ namespace par {
   // Handles chains of '.' and '(...)' on a base expression. A loop, not a fixed
   // lookahead check, because the chain can go arbitrarily deep
   // (e.g. ident.something().else.again()).
+  //
+  // ARROW ('->') is NOT handled here: it's only legal as the very first hop
+  // off a bare `this`/`super`, which parsePrimary -> parseThisOrSuper already
+  // consumes before parsePostfix gets a chance to run. By the time we're in
+  // this loop, any ARROW use has already happened (or the source is invalid
+  // and the dangling '->' will fail to match anything below, surfacing as a
+  // normal "unexpected token" error from whatever called us next).
   std::unique_ptr<Node> Parser::parsePostfix(lex::Lexer* lexer) {
     std::unique_ptr<Node> expr = parsePrimary(lexer);
     if (!expr) return nullptr;
@@ -221,6 +387,11 @@ namespace par {
       case lex::TokenType::FN: return parseFnLiteral(lexer);
 
       case lex::TokenType::L_BRACK: return parseArrayLiteral(lexer);
+
+      case lex::TokenType::NEW: return parseNewExpr(lexer);
+
+      case lex::TokenType::THIS: return parseThisOrSuper(lexer, /*is_super=*/false);
+      case lex::TokenType::SUPER: return parseThisOrSuper(lexer, /*is_super=*/true);
 
       case lex::TokenType::L_PAREN: {
         advance(lexer); // consume '('
@@ -361,6 +532,10 @@ namespace par {
       case lex::TokenType::IF: return parseIf(lexer);
       case lex::TokenType::WHILE: return parseWhile(lexer);
       case lex::TokenType::L_BRACE: return parseBlock(lexer);
+      case lex::TokenType::CLASS: return parseClassDecl(lexer);
+      case lex::TokenType::RETURN: return parseReturn(lexer);
+      case lex::TokenType::BREAK: return parseBreak(lexer);
+      case lex::TokenType::CONTINUE: return parseContinue(lexer);
       default: return parseExprStmt(lexer);
     }
   }
@@ -441,6 +616,208 @@ namespace par {
     }
 
     return std::make_unique<VarDecl>(std::move(name), std::move(init));
+  }
+
+  // We enter this function while lexer->peekToken()::type == lex::TokenType::RETURN
+  // Bare `return;` (no expression before the semicolon) returns null, same
+  // idea as a C function falling off the end of a void/value-returning path.
+  std::unique_ptr<Node> Parser::parseReturn(lex::Lexer* lexer) {
+    advance(lexer); // consume 'return'
+
+    if (match(lexer, lex::TokenType::SEMICOLON)) {
+      return std::make_unique<Return>(nullptr);
+    }
+
+    std::unique_ptr<Node> value = parseExpression(lexer);
+    if (!value) return nullptr;
+
+    if (!expect(lexer, lex::TokenType::SEMICOLON, "Expected ';' after return value")) {
+      return nullptr;
+    }
+
+    return std::make_unique<Return>(std::move(value));
+  }
+
+  std::unique_ptr<Node> Parser::parseBreak(lex::Lexer* lexer) {
+    advance(lexer); // consume 'break'
+    if (!expect(lexer, lex::TokenType::SEMICOLON, "Expected ';' after 'break'")) {
+      return nullptr;
+    }
+    return std::make_unique<Break>();
+  }
+
+  std::unique_ptr<Node> Parser::parseContinue(lex::Lexer* lexer) {
+    advance(lexer); // consume 'continue'
+    if (!expect(lexer, lex::TokenType::SEMICOLON, "Expected ';' after 'continue'")) {
+      return nullptr;
+    }
+    return std::make_unique<Continue>();
+  }
+
+  // We enter this function while lexer->peekToken()::type is THIS or SUPER.
+  // Consumes the keyword, then:
+  //   - bare `this` (not followed by ARROW): returns a ThisExpr, parsePostfix
+  //     can still chain '.'/'(' off of it normally afterward.
+  //   - bare `super` with no ARROW is invalid, `super` only makes sense as
+  //     the left side of `super->something`, there's no standalone value for
+  //     "the parent class" to hand back.
+  //   - `this->field` / `super->field`: returns a SuperAccess node. Further
+  //     '.'/'(' chaining off of THAT happens normally in parsePostfix since
+  //     SuperAccess is just another expression node as far as it's concerned
+  //     (e.g. `super->getList().length` works: ARROW only governs the very
+  //     first hop off this/super, everything after is regular '.'/call syntax).
+  std::unique_ptr<Node> Parser::parseThisOrSuper(lex::Lexer* lexer, bool is_super) {
+    advance(lexer); // consume 'this' or 'super'
+
+    if (!check(lexer, lex::TokenType::ARROW)) {
+      if (is_super) {
+        panic(formatIllegalTokenMessage(lexer, lexer->peekToken(), "'super' must be followed by '->member' or '->method(...)'"));
+        return nullptr;
+      }
+      return std::make_unique<ThisExpr>();
+    }
+
+    advance(lexer); // consume '->'
+    if (!expect(lexer, lex::TokenType::IDENT, "Expected identifier after '->'")) {
+      return nullptr;
+    }
+    auto field_name = getFromVariant<std::string>(m_tokens.back());
+    if (!field_name) {
+      panic(formatIllegalTokenMessage(lexer, m_tokens.back(), "Empty identifier after '->'"));
+      return nullptr;
+    }
+
+    return std::make_unique<SuperAccess>(is_super, std::move(*field_name));
+  }
+
+  // We enter this function while lexer->peekToken()::type == lex::TokenType::CLASS
+  // class Name [extends Parent] {
+  //   pin field [= init];   // any number; pin/fn statements can appear in any
+  //                         // order in the source, they're sorted into the
+  //                         // right bucket (fields vs methods) below
+  //   fn name(...) { ... }  // any number
+  // }
+  std::unique_ptr<Node> Parser::parseClassDecl(lex::Lexer* lexer) {
+    advance(lexer); // consume 'class'
+
+    if (!expect(lexer, lex::TokenType::IDENT, "Expected class name after 'class'")) {
+      return nullptr;
+    }
+    auto class_name = getFromVariant<std::string>(m_tokens.back());
+    if (!class_name) {
+      panic(formatIllegalTokenMessage(lexer, m_tokens.back(), "Empty class name"));
+      return nullptr;
+    }
+
+    std::string parent_name;
+    if (match(lexer, lex::TokenType::EXTENDS)) {
+      if (!expect(lexer, lex::TokenType::IDENT, "Expected parent class name after 'extends'")) {
+        return nullptr;
+      }
+      auto name = getFromVariant<std::string>(m_tokens.back());
+      if (!name) {
+        panic(formatIllegalTokenMessage(lexer, m_tokens.back(), "Empty parent class name"));
+        return nullptr;
+      }
+      parent_name = std::move(*name);
+    }
+
+    if (!expect(lexer, lex::TokenType::L_BRACE, "Expected '{' to start class body")) {
+      return nullptr;
+    }
+
+    std::vector<std::unique_ptr<VarDecl>> fields;
+    std::vector<std::unique_ptr<FnLiteral>> methods;
+    std::vector<std::string> method_names;
+
+    while (!check(lexer, lex::TokenType::R_BRACE) && !isAtEnd(lexer)) {
+      if (check(lexer, lex::TokenType::PIN)) {
+        std::unique_ptr<Node> field_node = parseVarDecl(lexer);
+        if (!field_node) return nullptr;
+        // parseVarDecl always returns a VarDecl, this cast is just to get
+        // back the concrete type so it can go in the typed `fields` vector.
+        fields.push_back(std::unique_ptr<VarDecl>(static_cast<VarDecl*>(field_node.release())));
+      } else if (check(lexer, lex::TokenType::FN)) {
+        if (!expect(lexer, lex::TokenType::FN, "Expected 'fn'")) return nullptr;
+        if (!expect(lexer, lex::TokenType::IDENT, "Expected method name after 'fn'")) {
+          return nullptr;
+        }
+        auto method_name = getFromVariant<std::string>(m_tokens.back());
+        if (!method_name) {
+          panic(formatIllegalTokenMessage(lexer, m_tokens.back(), "Empty method name"));
+          return nullptr;
+        }
+
+        if (!expect(lexer, lex::TokenType::L_PAREN, "Expected '(' after method name")) {
+          return nullptr;
+        }
+        std::vector<std::string> params;
+        if (!check(lexer, lex::TokenType::R_PAREN)) {
+          do {
+            if (!expect(lexer, lex::TokenType::IDENT, "Expected parameter name")) {
+              return nullptr;
+            }
+            auto param_name = getFromVariant<std::string>(m_tokens.back());
+            if (!param_name) {
+              panic(formatIllegalTokenMessage(lexer, m_tokens.back(), "Empty parameter name"));
+              return nullptr;
+            }
+            params.push_back(std::move(*param_name));
+          } while (match(lexer, lex::TokenType::COMMA));
+        }
+        if (!expect(lexer, lex::TokenType::R_PAREN, "Expected ')' after parameters")) {
+          return nullptr;
+        }
+
+        std::unique_ptr<Node> body = parseBlock(lexer);
+        if (!body) return nullptr;
+
+        methods.push_back(std::make_unique<FnLiteral>(std::move(params), std::move(body)));
+        method_names.push_back(std::move(*method_name));
+      } else {
+        panic(formatIllegalTokenMessage(lexer, lexer->peekToken(), "Expected 'pin' field or 'fn' method in class body"));
+        return nullptr;
+      }
+    }
+
+    if (!expect(lexer, lex::TokenType::R_BRACE, "Expected '}' to close class body")) {
+      return nullptr;
+    }
+
+    return std::make_unique<ClassDecl>(std::move(*class_name), std::move(parent_name), std::move(fields), std::move(methods), std::move(method_names));
+  }
+
+  // We enter this function while lexer->peekToken()::type == lex::TokenType::NEW
+  std::unique_ptr<Node> Parser::parseNewExpr(lex::Lexer* lexer) {
+    advance(lexer); // consume 'new'
+
+    if (!expect(lexer, lex::TokenType::IDENT, "Expected class name after 'new'")) {
+      return nullptr;
+    }
+    auto class_name = getFromVariant<std::string>(m_tokens.back());
+    if (!class_name) {
+      panic(formatIllegalTokenMessage(lexer, m_tokens.back(), "Empty class name after 'new'"));
+      return nullptr;
+    }
+
+    if (!expect(lexer, lex::TokenType::L_PAREN, "Expected '(' after class name in 'new' expression")) {
+      return nullptr;
+    }
+
+    std::vector<std::unique_ptr<Node>> args;
+    if (!check(lexer, lex::TokenType::R_PAREN)) {
+      do {
+        std::unique_ptr<Node> arg = parseExpression(lexer);
+        if (!arg) return nullptr;
+        args.push_back(std::move(arg));
+      } while (match(lexer, lex::TokenType::COMMA));
+    }
+
+    if (!expect(lexer, lex::TokenType::R_PAREN, "Expected ')' after constructor arguments")) {
+      return nullptr;
+    }
+
+    return std::make_unique<NewExpr>(std::move(*class_name), std::move(args));
   }
 
   // printTree: public entry point, walks m_root and prints the parsed
@@ -583,6 +960,62 @@ namespace par {
         std::print("{}{}ArrayLiteral\n", connector, label);
         for (size_t i = 0; i < array->elements.size(); ++i) {
           printNode(array->elements[i].get(), child_prefix, i + 1 == array->elements.size());
+        }
+        break;
+      }
+
+      case NodeType::RETURN: {
+        const auto* ret = static_cast<const Return*>(node);
+        std::print("{}{}Return\n", connector, label);
+        if (ret->value) {
+          printNode(ret->value.get(), child_prefix, true);
+        }
+        break;
+      }
+
+      case NodeType::BREAK: {
+        std::print("{}{}Break\n", connector, label);
+        break;
+      }
+
+      case NodeType::CONTINUE: {
+        std::print("{}{}Continue\n", connector, label);
+        break;
+      }
+
+      case NodeType::THIS_EXPR: {
+        std::print("{}{}This\n", connector, label);
+        break;
+      }
+
+      case NodeType::SUPER_ACCESS: {
+        const auto* super_access = static_cast<const SuperAccess*>(node);
+        std::print("{}{}{}(->{})\n", connector, label, super_access->is_super ? "Super" : "This", super_access->field);
+        break;
+      }
+
+      case NodeType::NEW_EXPR: {
+        const auto* new_expr = static_cast<const NewExpr*>(node);
+        std::print("{}{}New({})\n", connector, label, new_expr->class_name);
+        for (size_t i = 0; i < new_expr->args.size(); ++i) {
+          printNode(new_expr->args[i].get(), child_prefix, i + 1 == new_expr->args.size());
+        }
+        break;
+      }
+
+      case NodeType::CLASS_DECL: {
+        const auto* class_decl = static_cast<const ClassDecl*>(node);
+        std::print(
+          "{}{}Class({}{})\n", connector, label, class_decl->name, class_decl->parent_name.empty() ? "" : (" extends " + class_decl->parent_name));
+        size_t total = class_decl->fields.size() + class_decl->methods.size();
+        size_t i = 0;
+        for (const auto& field : class_decl->fields) {
+          ++i;
+          printNode(field.get(), child_prefix, i == total, "field: ");
+        }
+        for (size_t m = 0; m < class_decl->methods.size(); ++m) {
+          ++i;
+          printNode(class_decl->methods[m].get(), child_prefix, i == total, "method " + class_decl->method_names[m] + ": ");
         }
         break;
       }
