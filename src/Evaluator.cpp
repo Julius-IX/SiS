@@ -202,7 +202,7 @@ namespace eval {
                        std::print("{}", args[0].toString());
                      }
                      std::string input;
-                     std::cin >> input;
+                     std::getline(std::cin, input);
                      return Value{input};
                    },
                }));
