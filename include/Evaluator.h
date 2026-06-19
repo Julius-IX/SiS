@@ -1,0 +1,137 @@
+#pragma once
+
+#include <Environment.h>
+#include <ParserNodeTypes.h>
+#include <Value.h>
+#include <memory>
+
+namespace eval {
+  // Thrown to unwind the C++ call stack back up to the nearest enclosing
+  // function call when a return statement runs. evalReturn throws this,
+  // callFunction is what catches it (see Evaluator.cpp), any block/if/while
+  // frames in between just let it pass through unmodified, which is exactly
+  // the "unwind until you hit a function boundary" semantics return needs.
+  struct ReturnSignal {
+    Value value;
+  };
+
+  // Same idea for loop control: evalBreak/evalContinue throw these,
+  // evalWhile is what catches them. Anything nested inside the loop body
+  // (if-statements, nested blocks) just lets the exception fly through.
+  struct BreakSignal {};
+  struct ContinueSignal {};
+
+  class Evaluator {
+    public:
+    Evaluator();
+
+    // Runs an entire parsed program (the top level Block from Parser::parse)
+    // in the global environment. Returns the value of the last statement,
+    // mostly useful for REPL style usage, the return value doesn't matter for
+    // running a script for its side effects.
+    Value run(const par::Block& program);
+
+    private:
+    std::shared_ptr<Environment> m_global;
+
+    // Name -> runtime Class, populated as ClassDecl statements are
+    // evaluated. Looked up by name from evalNewExpr and from MemberAccess
+    // method-call resolution. Keyed separately from m_global (rather than
+    // just stuffing the Class Value into the environment under its name,
+    // which ALSO happens, see evalClassDecl) so `new Foo(...)` can resolve
+    // the class even if `Foo` the variable got shadowed or reassigned
+    // somewhere, classes are looked up by their declared identity, not by
+    // whatever a variable currently holds.
+    std::unordered_map<std::string, std::shared_ptr<Class>> m_classes;
+
+    // Registers every native (built-in) function into `env`, e.g. print(),
+    // len(). Called once from the constructor against m_global. See
+    // registerBuiltins() in Evaluator.cpp for the actual list, that's the
+    // single place to add a new built-in: define a NativeFunction and
+    // env->define() it.
+    static void registerBuiltins(const std::shared_ptr<Environment>& env);
+
+    Value evaluate(const par::Node* node, const std::shared_ptr<Environment>& env);
+
+    Value evalBlock(const par::Block* node, const std::shared_ptr<Environment>& env);
+    Value evalLiteral(const par::Literal* node);
+    Value evalIdentifier(const par::Identifier* node, const std::shared_ptr<Environment>& env);
+    Value evalUnary(const par::Unary* node, const std::shared_ptr<Environment>& env);
+    Value evalBinary(const par::Binary* node, const std::shared_ptr<Environment>& env);
+    Value evalIf(const par::If* node, const std::shared_ptr<Environment>& env);
+    Value evalWhile(const par::While* node, const std::shared_ptr<Environment>& env);
+    Value evalVarDecl(const par::VarDecl* node, const std::shared_ptr<Environment>& env);
+    Value evalExprStmt(const par::ExprStmt* node, const std::shared_ptr<Environment>& env);
+    Value evalCall(const par::Call* node, const std::shared_ptr<Environment>& env);
+    Value evalFnLiteral(const par::FnLiteral* node, const std::shared_ptr<Environment>& env);
+    Value evalArrayLiteral(const par::ArrayLiteral* node, const std::shared_ptr<Environment>& env);
+    Value evalMemberAccess(const par::MemberAccess* node, const std::shared_ptr<Environment>& env);
+
+    // return [expr]; throws ReturnSignal{evaluated value}, caught in
+    // callFunction. Never returns normally, but has a Value return type to
+    // match every other evalX so evaluate()'s switch stays uniform.
+    Value evalReturn(const par::Return* node, const std::shared_ptr<Environment>& env);
+
+    // break; / continue; throw BreakSignal{} / ContinueSignal{}, caught in
+    // evalWhile. Same "never actually returns" story as evalReturn.
+    Value evalBreak(const par::Break* node, const std::shared_ptr<Environment>& env);
+    Value evalContinue(const par::Continue* node, const std::shared_ptr<Environment>& env);
+
+    // class Name [extends Parent] { ... }. Builds the runtime Class
+    // (resolving the parent class by name if `extends` was used, error if
+    // it's not found or isn't actually a class), registers it under m_classes
+    // AND defines a variable of the same name in `env` holding the Class as
+    // a first-class Value (so e.g. `pin C = SomeClass;` and passing classes
+    // around works the same way functions do).
+    Value evalClassDecl(const par::ClassDecl* node, const std::shared_ptr<Environment>& env);
+
+    // new ClassName(args). Looks up the class by name, allocates a fresh
+    // field map, walks the inheritance chain applying every field default
+    // (parent's fields first, so a subclass can re-declare/override a
+    // field name and have its own default win), then calls `constructor`
+    // if the class (or an ancestor) defines one.
+    Value evalNewExpr(const par::NewExpr* node, const std::shared_ptr<Environment>& env);
+
+    // Bare `this`. Only valid where the call scope chain has a "this"
+    // variable bound (i.e. inside a method body), errors otherwise.
+    Value evalThisExpr(const par::ThisExpr* node, const std::shared_ptr<Environment>& env);
+
+    // this->field / super->field, and (when wrapped in a Call by evalCall)
+    // this->method(...) / super->method(...). For `this`, looks up `field`
+    // starting at the instance's own class. For `super`, looks up `field`
+    // starting at the PARENT of the class the currently-executing method was
+    // defined on (not the parent of the instance's runtime class, that
+    // distinction matters for multi-level inheritance: a grandchild calling
+    // an overridden method that itself calls super-> should resolve to the
+    // grandparent, not loop back to itself). That "which class is the
+    // current method defined on" context is threaded through via a
+    // "__class__" entry placed in the call environment by callFunction.
+    Value evalSuperAccess(const par::SuperAccess* node, const std::shared_ptr<Environment>& env);
+
+    // Handles the case where node->operation is an assignment operator
+    // (=, +=, -=, etc). Called from evalBinary, which checks this first
+    // before falling into normal arithmetic/comparison handling. Now also
+    // handles MemberAccess and SuperAccess targets (instance->field = ...,
+    // this->field = ...) in addition to plain identifiers.
+    Value evalAssignment(const par::Binary* node, const std::shared_ptr<Environment>& env);
+
+    // Invokes a Function value with already evaluated arguments. Builds a
+    // fresh Environment whose parent is the closure (not the call site),
+    // that's what makes scoping lexical instead of dynamic. If `bound_this`
+    // is set, it's defined as "this" in that fresh scope (method call), and
+    // `defining_class` (when set) is stashed as "__class__" so evalSuperAccess
+    // knows which class's parent to start searching from.
+    Value callFunction(
+      const Function& fn, std::vector<Value> args, const par::Node* call_node, const std::optional<Value>& bound_this = std::nullopt,
+      const std::shared_ptr<Class>& defining_class = nullptr);
+
+    // Shared implementation behind evalMemberAccess and the this->/super->
+    // paths in evalSuperAccess: given an already-evaluated `object` Value
+    // and a field name, returns the field's value, a bound method (a
+    // Function whose closure has "this" pre-defined), or array .length.
+    // `search_class` overrides which class's method table to search instead
+    // of the instance's own runtime class, used by super-> to skip past the
+    // current class straight to its parent.
+    Value resolveMember(const Value& object, const std::string& field, const par::Node* node, const std::shared_ptr<Class>& search_class = nullptr);
+  };
+} // namespace eval
