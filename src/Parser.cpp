@@ -8,7 +8,7 @@
 static void panic(const std::string_view msg) { std::print("PANIC: {}\n", msg.data()); }
 
 namespace par {
-  std::string Parser::formatIllegalTokenMessage(const lex::Token& token, const std::string_view msg) {
+  std::string Parser::formatIllegalTokenMessage(lex::Lexer* lexer, const lex::Token& token, const std::string_view msg) {
     std::string fmted_msg = fmt::format("Illegal token received {}:{}\n", token.line, token.column);
     if (!msg.empty()) {
       fmted_msg += msg;

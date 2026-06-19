@@ -11,11 +11,10 @@ namespace par {
     ~Parser() = default;
 
     private:
-    lex::Lexer* m_lexer;
     std::vector<lex::Token> m_tokens;
     Block m_root;
+    std::string formatIllegalTokenMessage(lex::Lexer* lexer, const lex::Token& token, std::string_view msg = "");
 
-    std::string formatIllegalTokenMessage(const lex::Token& token, std::string_view msg = "");
 
     std::unique_ptr<Node> parseLiteral(lex::Lexer* lexer);
     std::unique_ptr<Node> parseIdentifier(lex::Lexer* lexer);
