@@ -22,6 +22,15 @@ namespace par {
     FN_LITERAL,
     MEMBER_ACCESS,
     ARRAY_LITERAL,
+
+    RETURN,
+    BREAK,
+    CONTINUE,
+
+    CLASS_DECL,
+    NEW_EXPR,
+    THIS_EXPR,
+    SUPER_ACCESS,
   };
 
   struct Node {
@@ -53,6 +62,14 @@ namespace par {
     if (node == nullptr || node->type != T::TYPE) return nullptr;
     return static_cast<T*>(node);
   }
+
+  // const overload, same rules as above, just for `const Node*`.
+  template <typename T>
+  const T* as(const Node* node) {
+    if (node == nullptr || node->type != T::TYPE) return nullptr;
+    return static_cast<const T*>(node);
+  }
+
   typedef std::variant<std::monostate, double, bool, std::string> LiteralType;
 
   struct Literal final : Node {
@@ -142,6 +159,9 @@ namespace par {
         body(std::move(body)) {}
   };
 
+  // pin name [= initializer];  -- also reused for class field declarations,
+  // where `initializer` becomes the default value applied before the
+  // constructor runs (nullptr means "default to null").
   struct VarDecl final : Node {
     static constexpr NodeType TYPE = NodeType::VAR_DECL;
     std::string name;
@@ -186,7 +206,12 @@ namespace par {
         body(std::move(body)) {}
   };
 
-  // Represents a single '.' access, e.g. the "something" part of ident.something
+  // Represents a single '.' or '->' access, e.g. the "something" part of
+  // ident.something or this->something. `via_arrow` records which token was
+  // used, the evaluator/parser enforce that '->' is only legal when `object`
+  // is a ThisExpr or SuperAccess root (this->x->y is fine because by the
+  // time you've built the outer node `object` is a MemberAccess, not a raw
+  // SuperAccess, so the rule only applies to the immediate `this`/`super`).
   // Chains like a.b.c are built as nested MemberAccess nodes by the parser loop.
   struct MemberAccess final : Node {
     static constexpr NodeType TYPE = NodeType::MEMBER_ACCESS;
@@ -207,5 +232,87 @@ namespace par {
     explicit ArrayLiteral(std::vector<std::unique_ptr<Node>> elements)
       : Node(TYPE),
         elements(std::move(elements)) {}
+  };
+
+  // return [expr];
+  struct Return final : Node {
+    static constexpr NodeType TYPE = NodeType::RETURN;
+    std::unique_ptr<Node> value; // nullptr means "return null"
+
+    explicit Return(std::unique_ptr<Node> value = nullptr)
+      : Node(TYPE),
+        value(std::move(value)) {}
+  };
+
+  // break;
+  struct Break final : Node {
+    static constexpr NodeType TYPE = NodeType::BREAK;
+    Break()
+      : Node(TYPE) {}
+  };
+
+  // continue;
+  struct Continue final : Node {
+    static constexpr NodeType TYPE = NodeType::CONTINUE;
+    Continue()
+      : Node(TYPE) {}
+  };
+
+  // this
+  struct ThisExpr final : Node {
+    static constexpr NodeType TYPE = NodeType::THIS_EXPR;
+    ThisExpr()
+      : Node(TYPE) {}
+  };
+
+  // this->field or super->field (and this->method()/super->method() once
+  // wrapped in a Call, same as MemberAccess + Call). `is_super` distinguishes
+  // "look this up starting from my own class" (this) from "look this up
+  // starting from my parent class, but keep `this` bound to me" (super).
+  struct SuperAccess final : Node {
+    static constexpr NodeType TYPE = NodeType::SUPER_ACCESS;
+    bool is_super;
+    std::string field;
+
+    SuperAccess(bool is_super, std::string field)
+      : Node(TYPE),
+        is_super(is_super),
+        field(std::move(field)) {}
+  };
+
+  // new ClassName(args)
+  struct NewExpr final : Node {
+    static constexpr NodeType TYPE = NodeType::NEW_EXPR;
+    std::string class_name;
+    std::vector<std::unique_ptr<Node>> args;
+
+    NewExpr(std::string class_name, std::vector<std::unique_ptr<Node>> args)
+      : Node(TYPE),
+        class_name(std::move(class_name)),
+        args(std::move(args)) {}
+  };
+
+  // class Name [extends Parent] { pin field [= init]; ... fn method(...) {...} ... }
+  // Fields and methods are split into separate vectors rather than kept as one
+  // mixed statement list because the evaluator needs to process all field
+  // defaults before any method becomes callable (methods may reference
+  // sibling fields, but field initializers run in constructor order, not
+  // method-definition order).
+  struct ClassDecl final : Node {
+    static constexpr NodeType TYPE = NodeType::CLASS_DECL;
+    std::string name;
+    std::string parent_name; // empty if no `extends`
+    std::vector<std::unique_ptr<VarDecl>> fields;
+    std::vector<std::unique_ptr<FnLiteral>> methods;
+    std::vector<std::string> method_names; // parallel to `methods`
+
+    ClassDecl(std::string name, std::string parent_name, std::vector<std::unique_ptr<VarDecl>> fields, std::vector<std::unique_ptr<FnLiteral>> methods,
+        std::vector<std::string> method_names)
+      : Node(TYPE),
+        name(std::move(name)),
+        parent_name(std::move(parent_name)),
+        fields(std::move(fields)),
+        methods(std::move(methods)),
+        method_names(std::move(method_names)) {}
   };
 } // namespace par
