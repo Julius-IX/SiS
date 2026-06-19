@@ -155,7 +155,7 @@ namespace lex {
     if (!is_valid) {
       // clang-format off
       switch (c) {
-      case '(': case '[': case '{': case ':': is_valid = true; break;
+      case '(': case '[': case '{': case ':': case '.': is_valid = true; break;
       default: break;
       }
     }
