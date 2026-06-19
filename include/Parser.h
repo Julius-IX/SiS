@@ -14,6 +14,12 @@ namespace par {
 
     std::string formatIllegalTokenMessage(lex::Lexer* lexer, const lex::Token& token, std::string_view msg = "");
 
+    static bool check(lex::Lexer* lexer, lex::TokenType type);
+    static bool isAtEnd(lex::Lexer* lexer);
+    bool expect(lex::Lexer* lexer, lex::TokenType type, std::string_view err_msg);
+    bool match(lex::Lexer* lexer, lex::TokenType type);
+    bool matchAny(lex::Lexer* lexer, std::initializer_list<lex::TokenType> types);
+    lex::Token advance(lex::Lexer* lexer);
 
     std::unique_ptr<Node> parseLiteral(lex::Lexer* lexer);
     std::unique_ptr<Node> parseIdentifier(lex::Lexer* lexer);
