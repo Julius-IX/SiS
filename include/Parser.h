@@ -10,7 +10,7 @@ namespace par {
 
     private:
     std::vector<lex::Token> m_tokens;
-    Block m_root = Block({});
+    std::unique_ptr<Block> m_root = nullptr;
 
     std::string formatIllegalTokenMessage(lex::Lexer* lexer, const lex::Token& token, std::string_view msg = "");
 
