@@ -21,6 +21,7 @@ namespace par {
     CALL,
     FN_LITERAL,
     MEMBER_ACCESS,
+    ARRAY_LITERAL,
   };
 
   struct Node {
@@ -196,5 +197,15 @@ namespace par {
       : Node(TYPE),
         object(std::move(object)),
         field(std::move(field)) {}
+  };
+
+  // Represents an array literal, e.g. [1, 2, 3]
+  struct ArrayLiteral final : Node {
+    static constexpr NodeType TYPE = NodeType::ARRAY_LITERAL;
+    std::vector<std::unique_ptr<Node>> elements;
+
+    explicit ArrayLiteral(std::vector<std::unique_ptr<Node>> elements)
+      : Node(TYPE),
+        elements(std::move(elements)) {}
   };
 } // namespace par
