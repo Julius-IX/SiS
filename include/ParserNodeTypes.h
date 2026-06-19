@@ -44,9 +44,9 @@ namespace par {
   //
   // Non-owning: the returned pointer is only valid as long as the Node it points
   // to is alive. Don't store it beyond that node's lifetime, and don't use it to
-  // transfer ownership — it's for inline inspection/mutation, not for holding on to.
+  // transfer ownership, it's for inline inspection/mutation, not for holding on to.
   //
-  // WARN: T must be a concrete leaf type with its own TYPE constant never call
+  // WARN: T must be a concrete leaf type with its own TYPE constant, never call
   // as<Node>(...), that's the base type and has no TYPE of its own to compare against.
   template <typename T>
   T* as(Node* node) {
