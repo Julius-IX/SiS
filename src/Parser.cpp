@@ -14,9 +14,15 @@ namespace par {
       fmted_msg += msg;
       fmted_msg += "\n";
     }
-    return fmted_msg +
-           fmt::format("{}\n{}\n", m_lexer->getLineContent(token.line), std::string(token.column - 1, ' ') + std::string(m_lexer->peekToken().column - token.column, '^'));
+
+    std::string line_content = lexer->getLineContent(token.line);
+    while (!line_content.empty() && (line_content.back() == '\n' || line_content.back() == '\r')) {
+      line_content.pop_back();
+    }
+
+    return fmted_msg + fmt::format("{}\n{}", line_content, std::string(token.column - 1, ' ') + std::string(std::max<size_t>(token.length, 1), '^'));
   }
+
   static bool isAssignmentOperator(lex::TokenType type) {
     switch (type) {
       case lex::TokenType::ASSIGN:
