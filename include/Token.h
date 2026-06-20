@@ -20,24 +20,25 @@ namespace lex {
 
     IF, ELSE,
     FOR, WHILE,
-    SWITCH, CASE, RETURN, BREAK, CONTINUE,
+    SWITCH, CASE, RETURN, BREAK, CONTINUE, DEFAULT,
 
     FN,
     PIN,
     CLASS, EXTENDS, NEW, THIS, SUPER,
     INCLUDE,
 
-    PLUS, PLUS_PLUS,
-    MINUS, MINUS_MINUS,
+    PLUS,
+    MINUS,
     STAR,
     SLASH,
     PERCENT,
+    QUESTION_MARK,
     ASSIGN, PLUS_ASSIGN, MINUS_ASSIGN, STAR_ASSIGN, SLASH_ASSIGN, PERCENT_ASSIGN,
 
     EQUALS, NOT_EQUALS,
     LESS_THAN, LESS_THAN_EQUALS,
     GREATER_THAN, GREATER_THAN_EQUALS,
-    AND, OR, NOT,
+    AND, OR, NOT, // symbols only no natural language equivalents
 
     L_PAREN, R_PAREN,
     L_BRACK, R_BRACK,
@@ -46,9 +47,7 @@ namespace lex {
     COMMA,
     DOT,
     COLON,
-    SCOPE_RES,
     SEMICOLON,
-    HASH,
     ARROW,
 
     COMMENT,
@@ -71,28 +70,13 @@ namespace lex {
 
   inline TokenType lookupIdentifier(const std::string& identifier) {
     static std::unordered_map<std::string, TokenType> keywords = {
-      {"true", TRUE},
-      {"false", FALSE},
-      {"null", SIS_NULL},
+      {"true", TRUE}, {"false", FALSE},   {"null", SIS_NULL},
 
-      {"if", IF},
-      {"else", ELSE},
-      {"for", FOR},
-      {"while", WHILE},
-      {"switch", SWITCH},
-      {"case", CASE},
-      {"return", RETURN},
-      {"break", BREAK},
-      {"continue", CONTINUE},
+      {"if", IF},     {"else", ELSE},     {"for", FOR},         {"while", WHILE},       {"switch", SWITCH},
+      {"case", CASE}, {"return", RETURN}, {"break", BREAK},     {"continue", CONTINUE}, {"default", DEFAULT},
 
-      {"fn", FN},
-      {"pin", PIN},
-      {"class", CLASS},
-      {"extends", EXTENDS},
-      {"new", NEW},
-      {"this", THIS},
-      {"super", SUPER},
-      {"include", INCLUDE},
+      {"fn", FN},     {"pin", PIN},       {"class", CLASS},     {"extends", EXTENDS},   {"new", NEW},
+      {"this", THIS}, {"super", SUPER},   {"include", INCLUDE},
     };
 
     auto keyword_it = keywords.find(identifier);
@@ -125,6 +109,7 @@ namespace lex {
       case RETURN: return "RETURN";
       case BREAK: return "BREAK";
       case CONTINUE: return "CONTINUE";
+      case DEFAULT: return "DEFAULT";
 
       case FN: return "FN";
       case PIN: return "PIN";
@@ -136,12 +121,11 @@ namespace lex {
       case INCLUDE: return "INCLUDE";
 
       case PLUS: return "PLUS";
-      case PLUS_PLUS: return "PLUS_PLUS";
       case MINUS: return "MINUS";
-      case MINUS_MINUS: return "MINUS_MINUS";
       case STAR: return "STAR";
       case SLASH: return "SLASH";
       case PERCENT: return "PERCENT";
+      case QUESTION_MARK: return "QUESTION_MARK";
       case ASSIGN: return "ASSIGN";
       case PLUS_ASSIGN: return "PLUS_ASSIGN";
       case MINUS_ASSIGN: return "MINUS_ASSIGN";
@@ -169,9 +153,7 @@ namespace lex {
       case COMMA: return "COMMA";
       case DOT: return "DOT";
       case COLON: return "COLON";
-      case SCOPE_RES: return "SCOPE_RES";
       case SEMICOLON: return "SEMICOLON";
-      case HASH: return "HASH";
       case ARROW: return "ARROW";
 
       case COMMENT: return std::get<std::string>(t_val);
