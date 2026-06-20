@@ -20,6 +20,7 @@ namespace fpar {
   struct ParserHooks {
     std::function<std::optional<std::string>(const Path&)> read_file;
     std::function<std::string(State*, const lex::Token&, std::string_view)> format_error;
+    std::function<std::optional<Path>(const Path& root, const Path& file)> resolve_file;
   };
 
   class Parser {
