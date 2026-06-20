@@ -41,6 +41,10 @@ namespace fpar {
     std::deque<Path> m_include_stack;
     std::unordered_map<Path, State> m_states;
 
+    void initRootState(const Path& full_root_path, const Path& original_path);
+    void parseCurrentFile(const Path& current_path);
+    bool loadIncludeSource(const Path& include_path);
+
     static lex::Token advance(State* state);
     static bool match(State* state, lex::TokenType type);
     static bool check(lex::Lexer* lexer, lex::TokenType type);

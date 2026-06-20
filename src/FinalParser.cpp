@@ -1,9 +1,10 @@
 #include <FinalParser.h>
+#include <Logging.h>
 
 #include <algorithm>
+#include <filesystem>
 #include <fstream>
 #include <print>
-#include <Logging.h>
 
 // NOTE: placeholder
 static void panic(const std::string_view msg) {
@@ -121,15 +122,51 @@ namespace fpar {
     return true;
   }
 
-  void Parser::parseRoot(const Path& path) {
-    std::optional<std::string> source = m_hooks.read_file(path);
+  static Path resolveRootDirectory(const Path& path) {
+    std::error_code err;
+    Path full_root_path = std::filesystem::weakly_canonical(path, err);
+    if (err) {
+      panic(fmt::format("Could not resolve path '{}'\nError: {}", path.string(), err.message()));
+    }
+    return full_root_path;
+  }
+
+  void Parser::initRootState(const Path& full_root_path, const Path& original_path) {
+    std::optional<std::string> source = m_hooks.read_file(full_root_path);
     if (source == std::nullopt) {
-      panic(fmt::format("Could not open root source file '{}'", path.string()));
+      panic(fmt::format("Could not open root source file '{}'", original_path.string()));
       return;
     }
-    m_states[path] = State{.lexer = std::make_unique<lex::Lexer>(source.value(), path), .tokens = {}, .token_idex = 0};
-    m_include_stack.push_back(path);
+    m_states[full_root_path] = State{.lexer = std::make_unique<lex::Lexer>(source.value(), full_root_path), .tokens = {}, .token_idex = 0};
+  }
 
+  void Parser::parseCurrentFile(const Path& current_path) {
+    LOG_DEBUG_FLUSH("Parsing full file {}", current_path.string());
+    try { // TODO: remove try/catch after full refactor
+      parse(&m_states[current_path]);
+    } catch (const std::exception& e) {
+      panic(fmt::format("Error parsing '{}': {}", current_path.string(), e.what()));
+    }
+  }
+
+  bool Parser::loadIncludeSource(const Path& include_path) {
+    LOG_DEBUG_FLUSH("Resolving include path: {}", include_path.string());
+    std::optional<std::string> source = m_hooks.read_file(include_path);
+    if (source == std::nullopt) {
+      panic(fmt::format("Could not open included source file '{}'", include_path.string()));
+      return false;
+    }
+    m_states[include_path] = State{.lexer = std::make_unique<lex::Lexer>(source.value(), include_path), .tokens = {}, .token_idex = 0};
+    return true;
+  }
+
+  void Parser::parseRoot(const Path& path) {
+    Path full_root_path = resolveRootDirectory(path);
+    LOG_DEBUG_FLUSH("Full root path: {}", full_root_path.string());
+
+    initRootState(full_root_path, path);
+
+    m_include_stack.push_back(full_root_path);
     while (!m_include_stack.empty()) { // NOLINT
       Path current_path = m_include_stack.back();
       m_include_stack.pop_back();
@@ -141,7 +178,7 @@ namespace fpar {
       }
 
       if (include_path.value() == std::nullopt) {
-        parse(&m_states[current_path]);
+        parseCurrentFile(current_path);
         continue;
       }
 
@@ -150,13 +187,9 @@ namespace fpar {
         break;
       }
 
-      source = m_hooks.read_file(include_path.value().value()); // TODO: expand path
-      if (source == std::nullopt) {
-        panic(fmt::format("Could not open included source file '{}'", include_path.value().value().string()));
+      if (!loadIncludeSource(include_path.value().value())) {
         break;
       }
-
-      m_states[include_path.value().value()] = State{.lexer = std::make_unique<lex::Lexer>(source.value(), include_path.value().value()), .tokens = {}, .token_idex = 0};
       m_include_stack.push_back(current_path);
     }
   }
