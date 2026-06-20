@@ -69,9 +69,27 @@ namespace fpar { // NOTE: separate namespace block for readability
     return fmted_msg + fmt::format("{}\n{}", line_content, std::string(token.column - 1, ' ') + std::string(std::max<size_t>(token.length, 1), '^'));
   }
 
+  std::optional<Path> resolveFile(const Path& root, const Path& relative_include_path) {
+    std::filesystem::path full = root / relative_include_path;
+
+    std::error_code ec;
+    auto canonical = std::filesystem::weakly_canonical(full, ec);
+
+    if (ec) {
+      return std::nullopt;
+    }
+
+    if (!std::filesystem::is_regular_file(canonical)) {
+      return std::nullopt;
+    }
+
+    return canonical;
+  }
+
   Parser::Parser() {
     m_hooks.read_file = readFileToString;
     m_hooks.format_error = formatIllegalTokenMessage;
+    m_hooks.resolve_file = resolveFile;
   }
 } // namespace fpar
 
