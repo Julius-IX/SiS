@@ -171,7 +171,7 @@ namespace fpar {
     return true;
   }
 
-  std::expected<std::optional<Path>, std::string> Parser::processIncludes(const Path& path) {
+  std::expected<std::optional<Path>, std::string> Parser::checkForInclude(const Path& path) {
     lex::Lexer* lexer = m_states[path].lexer.get();
     if (!check(lexer, lex::TokenType::INCLUDE)) {
       return std::nullopt;
@@ -191,6 +191,11 @@ namespace fpar {
 
     if (!match(&m_states[path], lex::TokenType::SEMICOLON)) {
       return std::unexpected(m_hooks.format_error(&m_states[path], m_states[path].tokens.back(), "Expected ';' after 'include' expression"));
+    }
+
+    include_path = m_hooks.resolve_file(path.parent_path(), include_path.value());
+    if (!include_path) {
+      return std::unexpected(m_hooks.format_error(&m_states[path], m_states[path].tokens.back(), "Failed to resolve include path"));
     }
 
     return include_path;
