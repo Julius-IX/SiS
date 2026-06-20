@@ -331,7 +331,16 @@ namespace lex {
 
     size_t length = (this->m_state.pos - start_pos) + 1;
     advanceState();
-    this->m_buffer.append(Token{.type = tvp.first, .value = tvp.second, .line = line, .column = column, .length = length});
+    // clang-format off
+    this->m_buffer.append(Token{
+      .source = this->m_source_path,
+      .type = tvp.first,
+      .value = tvp.second,
+      .line = line,
+      .column = column,
+      .length = length,
+    });
+    // clang-format on
   }
 
   Token Lexer::nextToken() {

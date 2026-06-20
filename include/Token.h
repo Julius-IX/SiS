@@ -4,6 +4,9 @@
 #include <string>
 #include <unordered_map>
 #include <variant>
+#include <filesystem>
+
+using Path = std::filesystem::path;
 
 namespace lex {
   // clang-format off
@@ -58,6 +61,7 @@ namespace lex {
   typedef std::variant<std::monostate, double, bool, std::string> TokenVariant;
 
   typedef struct Token {
+    std::optional<Path> source; // TODO: deduplicate via string_view or some other bs
     TokenType type;
     TokenVariant value;
     size_t line;
