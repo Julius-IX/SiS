@@ -29,7 +29,7 @@ namespace fpar {
     ~Parser() = default;
 
     void parseRoot(const Path& path);
-    void parse(State* state);                                                                                      // TODO: implement
+    bool parse(State* state);                                                                                      // TODO: implement
     void printTree() const;                                                                                        // TODO: refactor
     static void printNode(const Node* node, const std::string& prefix, bool is_last, std::string_view label = ""); // TODO: refactor
 
@@ -48,9 +48,12 @@ namespace fpar {
     static lex::Token advance(State* state);
     static bool match(State* state, lex::TokenType type);
     static bool check(lex::Lexer* lexer, lex::TokenType type);
+    static bool isAtEnd(lex::Lexer* lexer);
     bool expect(State* state, lex::TokenType type, std::string_view err_msg) const;
 
     std::expected<std::optional<Path>, std::string> checkForInclude(const Path& path);
+
+    std::unique_ptr<Node> parseStatement(State* state);
 
     std::unique_ptr<Node> parseLiteral(State* state);
     std::unique_ptr<Node> parseIdentifier(State* state);
