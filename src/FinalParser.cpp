@@ -11,33 +11,33 @@ static void panic(const std::string_view msg) {
   std::exit(1);
 }
 
-namespace fpar { // NOTE: separate namespace stuff that is not implemented yet
+namespace fpar {                     // NOTE: separate namespace stuff that is not implemented yet
   void Parser::parse(State* state) { // NOLINT
     throw std::logic_error("Not implemented");
   }
 
   // NOLINTBEGIN
   // clangd-format off
-  std::unique_ptr<Node> Parser::parseLiteral(State* state)       { throw std::logic_error("Not implemented"); }
-  std::unique_ptr<Node> Parser::parseIdentifier(State* state)    { throw std::logic_error("Not implemented"); }
-  std::unique_ptr<Node> Parser::parseUnary(State* state)         { throw std::logic_error("Not implemented"); }
-  std::unique_ptr<Node> Parser::parseBinary(State* state)        { throw std::logic_error("Not implemented"); }
-  std::unique_ptr<Node> Parser::parseBlock(State* state)         { throw std::logic_error("Not implemented"); }
-  std::unique_ptr<Node> Parser::parseIf(State* state)            { throw std::logic_error("Not implemented"); }
-  std::unique_ptr<Node> Parser::parseWhile(State* state)         { throw std::logic_error("Not implemented"); }
-  std::unique_ptr<Node> Parser::parseVar_decl(State* state)      { throw std::logic_error("Not implemented"); }
-  std::unique_ptr<Node> Parser::parseExpr_stmt(State* state)     { throw std::logic_error("Not implemented"); }
-  std::unique_ptr<Node> Parser::parseCall(State* state)          { throw std::logic_error("Not implemented"); }
-  std::unique_ptr<Node> Parser::parseFn_literal(State* state)    { throw std::logic_error("Not implemented"); }
-  std::unique_ptr<Node> Parser::parseMember_access(State* state) { throw std::logic_error("Not implemented"); }
-  std::unique_ptr<Node> Parser::parseArray_literal(State* state) { throw std::logic_error("Not implemented"); }
-  std::unique_ptr<Node> Parser::parseReturn(State* state)        { throw std::logic_error("Not implemented"); }
-  std::unique_ptr<Node> Parser::parseBreak(State* state)         { throw std::logic_error("Not implemented"); }
-  std::unique_ptr<Node> Parser::parseContinue(State* state)      { throw std::logic_error("Not implemented"); }
-  std::unique_ptr<Node> Parser::parseClass_decl(State* state)    { throw std::logic_error("Not implemented"); }
-  std::unique_ptr<Node> Parser::parseNew_expr(State* state)      { throw std::logic_error("Not implemented"); }
-  std::unique_ptr<Node> Parser::parseThis_expr(State* state)     { throw std::logic_error("Not implemented"); }
-  std::unique_ptr<Node> Parser::parseSuper_access(State* state)  { throw std::logic_error("Not implemented"); }
+  std::unique_ptr<Node> Parser::parseLiteral(State* state) { throw std::logic_error("Not implemented"); }
+  std::unique_ptr<Node> Parser::parseIdentifier(State* state) { throw std::logic_error("Not implemented"); }
+  std::unique_ptr<Node> Parser::parseUnary(State* state) { throw std::logic_error("Not implemented"); }
+  std::unique_ptr<Node> Parser::parseBinary(State* state) { throw std::logic_error("Not implemented"); }
+  std::unique_ptr<Node> Parser::parseBlock(State* state) { throw std::logic_error("Not implemented"); }
+  std::unique_ptr<Node> Parser::parseIf(State* state) { throw std::logic_error("Not implemented"); }
+  std::unique_ptr<Node> Parser::parseWhile(State* state) { throw std::logic_error("Not implemented"); }
+  std::unique_ptr<Node> Parser::parseVarDecl(State* state) { throw std::logic_error("Not implemented"); }
+  std::unique_ptr<Node> Parser::parseExprStmt(State* state) { throw std::logic_error("Not implemented"); }
+  std::unique_ptr<Node> Parser::parseCall(State* state) { throw std::logic_error("Not implemented"); }
+  std::unique_ptr<Node> Parser::parseFnLiteral(State* state) { throw std::logic_error("Not implemented"); }
+  std::unique_ptr<Node> Parser::parseMemberAccess(State* state) { throw std::logic_error("Not implemented"); }
+  std::unique_ptr<Node> Parser::parseArrayLiteral(State* state) { throw std::logic_error("Not implemented"); }
+  std::unique_ptr<Node> Parser::parseReturn(State* state) { throw std::logic_error("Not implemented"); }
+  std::unique_ptr<Node> Parser::parseBreak(State* state) { throw std::logic_error("Not implemented"); }
+  std::unique_ptr<Node> Parser::parseContinue(State* state) { throw std::logic_error("Not implemented"); }
+  std::unique_ptr<Node> Parser::parseClassDecl(State* state) { throw std::logic_error("Not implemented"); }
+  std::unique_ptr<Node> Parser::parseNewExpr(State* state) { throw std::logic_error("Not implemented"); }
+  std::unique_ptr<Node> Parser::parseThisExpr(State* state) { throw std::logic_error("Not implemented"); }
+  std::unique_ptr<Node> Parser::parseSuperAccess(State* state) { throw std::logic_error("Not implemented"); }
   // clangd-format on
   // NOLINTEND
 

@@ -55,18 +55,18 @@ namespace fpar {
     std::unique_ptr<Node> parseBlock(State* state);
     std::unique_ptr<Node> parseIf(State* state);
     std::unique_ptr<Node> parseWhile(State* state);
-    std::unique_ptr<Node> parseVar_decl(State* state);
-    std::unique_ptr<Node> parseExpr_stmt(State* state);
+    std::unique_ptr<Node> parseVarDecl(State* state);
+    std::unique_ptr<Node> parseExprStmt(State* state);
     std::unique_ptr<Node> parseCall(State* state);
-    std::unique_ptr<Node> parseFn_literal(State* state);
-    std::unique_ptr<Node> parseMember_access(State* state);
-    std::unique_ptr<Node> parseArray_literal(State* state);
+    std::unique_ptr<Node> parseFnLiteral(State* state);
+    std::unique_ptr<Node> parseMemberAccess(State* state);
+    std::unique_ptr<Node> parseArrayLiteral(State* state);
     std::unique_ptr<Node> parseReturn(State* state);
     std::unique_ptr<Node> parseBreak(State* state);
     std::unique_ptr<Node> parseContinue(State* state);
-    std::unique_ptr<Node> parseClass_decl(State* state);
-    std::unique_ptr<Node> parseNew_expr(State* state);
-    std::unique_ptr<Node> parseThis_expr(State* state);
-    std::unique_ptr<Node> parseSuper_access(State* state);
+    std::unique_ptr<Node> parseClassDecl(State* state);
+    std::unique_ptr<Node> parseNewExpr(State* state);
+    std::unique_ptr<Node> parseThisExpr(State* state);
+    std::unique_ptr<Node> parseSuperAccess(State* state);
   };
 } // namespace fpar
