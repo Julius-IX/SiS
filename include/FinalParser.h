@@ -45,7 +45,7 @@ namespace fpar {
     static bool check(lex::Lexer* lexer, lex::TokenType type);
     bool expect(State* state, lex::TokenType type, std::string_view err_msg) const;
 
-    std::expected<std::optional<Path>, std::string> processIncludes(const Path& path);
+    std::expected<std::optional<Path>, std::string> checkForInclude(const Path& path);
 
     std::unique_ptr<Node> parseLiteral(State* state);
     std::unique_ptr<Node> parseIdentifier(State* state);

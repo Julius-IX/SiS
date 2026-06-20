@@ -116,7 +116,7 @@ namespace fpar {
       Path current_path = m_include_stack.back();
       m_include_stack.pop_back();
 
-      std::expected<std::optional<Path>, std::string> include_path = processIncludes(current_path);
+      std::expected<std::optional<Path>, std::string> include_path = checkForInclude(current_path);
       if (!include_path.has_value()) {
         panic(include_path.error());
         break;
