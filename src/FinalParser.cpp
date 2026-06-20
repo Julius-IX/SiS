@@ -44,7 +44,7 @@ namespace fpar { // NOTE: separate namespace stuff that is not implemented yet
 } // namespace fpar
 
 namespace fpar { // NOTE: separate namespace block for readability
-  static std::optional<std::string> fuckreadFileToString(const Path& path) {
+  static std::optional<std::string> readFileToString(const Path& path) {
     LOG_DEBUG_FLUSH("Reading file {}", path.string());
     std::ifstream file(path, std::ios::in | std::ios::binary);
     if (!file) return std::nullopt;
@@ -54,7 +54,7 @@ namespace fpar { // NOTE: separate namespace block for readability
     return buffer.str();
   }
 
-  std::string fuckformatIllegalTokenMessage(State* state, const lex::Token& token, const std::string_view msg) {
+  std::string formatIllegalTokenMessage(State* state, const lex::Token& token, const std::string_view msg) {
     std::string fmted_msg = fmt::format("Illegal token received {}:{}\n", token.line, token.column);
     if (!msg.empty()) {
       fmted_msg += msg;
@@ -70,8 +70,8 @@ namespace fpar { // NOTE: separate namespace block for readability
   }
 
   Parser::Parser() {
-    m_hooks.read_file = fuckreadFileToString;
-    m_hooks.format_error = fuckformatIllegalTokenMessage;
+    m_hooks.read_file = readFileToString;
+    m_hooks.format_error = formatIllegalTokenMessage;
   }
 } // namespace fpar
 
