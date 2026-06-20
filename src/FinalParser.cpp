@@ -13,12 +13,10 @@ static void panic(const std::string_view msg) {
 }
 
 namespace fpar {                     // NOTE: separate namespace stuff that is not implemented yet
-  void Parser::parse(State* state) { // NOLINT
-    throw std::logic_error("Not implemented");
-  }
-
   // NOLINTBEGIN
   // clangd-format off
+  std::unique_ptr<Node> parseStatement(State* state)  { throw std::logic_error("Not implemented"); }
+
   std::unique_ptr<Node> Parser::parseLiteral(State* state) { throw std::logic_error("Not implemented"); }
   std::unique_ptr<Node> Parser::parseIdentifier(State* state) { throw std::logic_error("Not implemented"); }
   std::unique_ptr<Node> Parser::parseUnary(State* state) { throw std::logic_error("Not implemented"); }
@@ -234,6 +232,25 @@ namespace fpar {
     return include_path;
   }
 } // namespace fpar
+
+namespace fpar { // NOTE: separate namespace block for readability
+  bool Parser::isAtEnd(lex::Lexer* lexer) { return check(lexer, lex::TokenType::SIS_EOF); }
+  bool Parser::parse(State* state) {
+    std::vector<std::unique_ptr<Node>> statements;
+    lex::Lexer* lexer = state->lexer.get();
+
+    while (!isAtEnd(lexer)) {
+      std::unique_ptr<Node> stmt = parseStatement(state);
+      if (!stmt) return false;
+      statements.push_back(std::move(stmt));
+    }
+
+    m_root->statements.reserve(statements.size());
+    m_root->statements.insert(m_root->statements.end(), std::make_move_iterator(statements.begin()), std::make_move_iterator(statements.end()));
+
+    return true;
+  }
+}
 
 namespace fpar { // NOTE: separate namespace block for grouping stuff that will be broken
 
