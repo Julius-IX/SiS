@@ -1,0 +1,71 @@
+#pragma once
+
+#include <Lexer.h>
+#include <ParserNodeTypes.h>
+
+#include <deque>
+#include <expected>
+#include <filesystem>
+#include <unordered_map>
+
+using namespace par; // TODO: remove after fpar completion
+
+namespace fpar {
+  typedef struct ParserState {
+    std::unique_ptr<lex::Lexer> lexer;
+    std::vector<lex::Token> tokens;
+    size_t token_idex;
+  } State;
+
+  struct ParserHooks {
+    std::function<std::optional<std::string>(const Path&)> read_file;
+    std::function<std::string(State*, const lex::Token&, std::string_view)> format_error;
+  };
+
+  class Parser {
+    public:
+    Parser();
+    ~Parser() = default;
+
+    void parseRoot(const Path& path);
+    void parse(State* state);                                                                                      // TODO: implement
+    void printTree() const;                                                                                        // TODO: refactor
+    static void printNode(const Node* node, const std::string& prefix, bool is_last, std::string_view label = ""); // TODO: refactor
+
+    protected:
+    ParserHooks m_hooks; // NOLINT
+
+    private:
+    std::unique_ptr<Block> m_root;
+    std::deque<Path> m_include_stack;
+    std::unordered_map<Path, State> m_states;
+
+    static lex::Token advance(State* state);
+    static bool match(State* state, lex::TokenType type);
+    static bool check(lex::Lexer* lexer, lex::TokenType type);
+    bool expect(State* state, lex::TokenType type, std::string_view err_msg) const;
+
+    std::expected<std::optional<Path>, std::string> processIncludes(const Path& path);
+
+    std::unique_ptr<Node> parseLiteral(State* state);
+    std::unique_ptr<Node> parseIdentifier(State* state);
+    std::unique_ptr<Node> parseUnary(State* state);
+    std::unique_ptr<Node> parseBinary(State* state);
+    std::unique_ptr<Node> parseBlock(State* state);
+    std::unique_ptr<Node> parseIf(State* state);
+    std::unique_ptr<Node> parseWhile(State* state);
+    std::unique_ptr<Node> parseVar_decl(State* state);
+    std::unique_ptr<Node> parseExpr_stmt(State* state);
+    std::unique_ptr<Node> parseCall(State* state);
+    std::unique_ptr<Node> parseFn_literal(State* state);
+    std::unique_ptr<Node> parseMember_access(State* state);
+    std::unique_ptr<Node> parseArray_literal(State* state);
+    std::unique_ptr<Node> parseReturn(State* state);
+    std::unique_ptr<Node> parseBreak(State* state);
+    std::unique_ptr<Node> parseContinue(State* state);
+    std::unique_ptr<Node> parseClass_decl(State* state);
+    std::unique_ptr<Node> parseNew_expr(State* state);
+    std::unique_ptr<Node> parseThis_expr(State* state);
+    std::unique_ptr<Node> parseSuper_access(State* state);
+  };
+} // namespace fpar
