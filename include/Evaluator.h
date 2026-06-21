@@ -61,6 +61,7 @@ namespace eval {
     Value evalIf(const par::If* node, const std::shared_ptr<Environment>& env);
     Value evalWhile(const par::While* node, const std::shared_ptr<Environment>& env);
     Value evalFor(const par::For* node, const std::shared_ptr<Environment>& env);
+    Value evalSwitch(const par::Switch* node, const std::shared_ptr<Environment>& env);
     Value evalTernary(const par::Ternary* node, const std::shared_ptr<Environment>& env);
     Value evalVarDecl(const par::VarDecl* node, const std::shared_ptr<Environment>& env);
     Value evalExprStmt(const par::ExprStmt* node, const std::shared_ptr<Environment>& env);
@@ -68,16 +69,17 @@ namespace eval {
     Value evalFnLiteral(const par::FnLiteral* node, const std::shared_ptr<Environment>& env);
     Value evalArrayLiteral(const par::ArrayLiteral* node, const std::shared_ptr<Environment>& env);
     Value evalMemberAccess(const par::MemberAccess* node, const std::shared_ptr<Environment>& env);
+    Value evalSubscript(const par::Subscript* node, const std::shared_ptr<Environment>& env);
 
     // return [expr]; throws ReturnSignal{evaluated value}, caught in
     // callFunction. Never returns normally, but has a Value return type to
     // match every other evalX so evaluate()'s switch stays uniform.
     Value evalReturn(const par::Return* node, const std::shared_ptr<Environment>& env);
 
-    // break; / continue; throw BreakSignal{} / ContinueSignal{}, caught in
-    // evalWhile. Same "never actually returns" story as evalReturn.
-    Value evalBreak(const par::Break* node, const std::shared_ptr<Environment>& env);
-    Value evalContinue(const par::Continue* node, const std::shared_ptr<Environment>& env);
+    // break; / continue; one Jump node, kind tells them apart. Throws
+    // BreakSignal{} / ContinueSignal{}, caught in evalWhile. Same "never
+    // actually returns" story as evalReturn.
+    Value evalJump(const par::Jump* node, const std::shared_ptr<Environment>& env);
 
     // class Name [extends Parent] { ... }. Builds the runtime Class
     // (resolving the parent class by name if `extends` was used, error if

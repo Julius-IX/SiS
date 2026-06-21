@@ -235,6 +235,7 @@ namespace eval {
       case par::NodeType::IF: return evalIf(static_cast<const par::If*>(node), env);
       case par::NodeType::WHILE: return evalWhile(static_cast<const par::While*>(node), env);
       case par::NodeType::FOR: return evalFor(static_cast<const par::For*>(node), env);
+      case par::NodeType::SWITCH: return evalSwitch(static_cast<const par::Switch*>(node), env);
       case par::NodeType::TERNARY: return evalTernary(static_cast<const par::Ternary*>(node), env);
       case par::NodeType::VAR_DECL: return evalVarDecl(static_cast<const par::VarDecl*>(node), env);
       case par::NodeType::EXPR_STMT: return evalExprStmt(static_cast<const par::ExprStmt*>(node), env);
@@ -244,13 +245,17 @@ namespace eval {
       case par::NodeType::ARRAY_LITERAL: return evalArrayLiteral(static_cast<const par::ArrayLiteral*>(node), env);
       case par::NodeType::SUBSCRIPT: return evalSubscript(static_cast<const par::Subscript*>(node), env);
       case par::NodeType::RETURN: return evalReturn(static_cast<const par::Return*>(node), env);
-      case par::NodeType::BREAK: return evalBreak(static_cast<const par::Break*>(node), env);
-      case par::NodeType::CONTINUE: return evalContinue(static_cast<const par::Continue*>(node), env);
       case par::NodeType::JUMP: return evalJump(static_cast<const par::Jump*>(node), env);
       case par::NodeType::CLASS_DECL: return evalClassDecl(static_cast<const par::ClassDecl*>(node), env);
       case par::NodeType::NEW_EXPR: return evalNewExpr(static_cast<const par::NewExpr*>(node), env);
-      case par::NodeType::THIS_EXPR: return evalThisExpr(static_cast<const par::ThisExpr*>(node), env);
-      case par::NodeType::SUPER_ACCESS: return evalSuperAccess(static_cast<const par::SuperAccess*>(node), env);
+      case par::NodeType::SELF:
+        // NOLINTEND
+        // Self never appears as its own statement/expression, the parser
+        // only ever produces it as the object child of a MemberAccess
+        // (this->field, super->field), handled by evalMemberAccess. Hitting
+        // this case means a bare `this`/`super` reached evaluate() directly,
+        // which the grammar doesn't allow.
+        throw std::runtime_error("Evaluator: 'this'/'super' used outside of a member access");
     }
 
     throw std::runtime_error("Evaluator: unhandled NodeType");
@@ -530,6 +535,48 @@ namespace eval {
     }
     return result;
   }
+
+  // Fall-through switch: once a matching case is found (or the default case
+  // is reached with no earlier match), every statement from there to the end
+  // of the switch runs, across case boundaries, until a BreakSignal escapes
+  // (an explicit `break;`) or the cases run out. valuesEqual is the same
+  // equality used by `==` elsewhere, so case matching has identical semantics
+  // to writing `if (subject == caseExpr)` by hand.
+  Value Evaluator::evalSwitch(const par::Switch* node, const std::shared_ptr<Environment>& env) {
+    Value subject = evaluate(node->subject.get(), env);
+    auto scope = std::make_shared<Environment>(env);
+
+    size_t start = node->cases.size(); // sentinel: no match found yet
+    size_t default_index = node->cases.size();
+    for (size_t i = 0; i < node->cases.size(); ++i) {
+      const auto& c = node->cases[i];
+      if (!c.value) {
+        default_index = i;
+        continue;
+      }
+      Value case_value = evaluate(c.value.get(), scope);
+      if (valuesEqual(subject, case_value)) {
+        start = i;
+        break;
+      }
+    }
+    if (start == node->cases.size()) {
+      start = default_index; // no case matched, fall back to default if present
+    }
+
+    Value result;
+    try {
+      for (size_t i = start; i < node->cases.size(); ++i) {
+        for (const auto& stmt : node->cases[i].body) {
+          result = evaluate(stmt.get(), scope);
+        }
+      }
+    } catch (const BreakSignal&) {
+      // explicit break inside a case, stop running further cases
+    }
+    return result;
+  }
+
   Value Evaluator::evalTernary(const par::Ternary* node, const std::shared_ptr<Environment>& env) {
     Value condition = evaluate(node->condition.get(), env);
     return condition.isTruthy() ? evaluate(node->then_expr.get(), env) : evaluate(node->else_expr.get(), env);

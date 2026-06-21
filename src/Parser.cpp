@@ -390,7 +390,7 @@ namespace par { // Base parsing loop functions
       case lex::TokenType::ELSE:
       // case lex::TokenType::FOR:
       case lex::TokenType::WHILE:
-      case lex::TokenType::SWITCH:
+      // case lex::TokenType::SWITCH:
       case lex::TokenType::CASE:
       case lex::TokenType::RETURN:
       case lex::TokenType::BREAK:
@@ -576,6 +576,7 @@ namespace par { // Complex parsing structures
       case lex::TokenType::IF: return parseIf(state);
       case lex::TokenType::WHILE: return parseWhile(state);
       case lex::TokenType::FOR: return parseFor(state);
+      case lex::TokenType::SWITCH: return parseSwitch(state);
       case lex::TokenType::PIN: return parseVarDecl(state);
       case lex::TokenType::RETURN: return parseReturn(state);
       case lex::TokenType::FN: return parseTopLevelFn(state);
@@ -859,6 +860,47 @@ namespace par { // Complex parsing structures
 
     return makeNode<For>(for_tok.line, for_tok.column, std::move(init), std::move(condition), std::move(increment), std::move(body));
   }
+
+  std::unique_ptr<Node> Parser::parseSwitch(State* state) {
+    lex::Token switch_tok = advance(state); // consume 'switch'
+    if (!expect(state, lex::TokenType::L_PAREN, "Expected '(' after 'switch'")) return nullptr;
+    auto subject = parseExpression(state, 1);
+    if (subject == nullptr) return nullptr;
+    if (!expect(state, lex::TokenType::R_PAREN, "Expected ')' after switch subject")) return nullptr;
+    if (!expect(state, lex::TokenType::L_BRACE, "Expected '{' after switch")) return nullptr;
+
+    std::vector<SwitchCase> cases;
+    bool seen_default = false;
+    while (!check(state->lexer.get(), lex::TokenType::R_BRACE) && !isAtEnd(state->lexer.get())) {
+      SwitchCase c;
+      if (match(state, lex::TokenType::CASE)) {
+        c.value = parseExpression(state, 1);
+        if (c.value == nullptr) return nullptr;
+      } else if (match(state, lex::TokenType::DEFAULT)) {
+        if (seen_default) {
+          panic(m_hooks.format_error(state, state->tokens.back(), "Duplicate 'default' in switch"));
+          return nullptr;
+        }
+        seen_default = true;
+      } else {
+        panic(m_hooks.format_error(state, state->lexer->peekToken(), "Expected 'case' or 'default' in switch body"));
+        return nullptr;
+      }
+      if (!expect(state, lex::TokenType::COLON, "Expected ':' after case label")) return nullptr;
+
+      while (!check(state->lexer.get(), lex::TokenType::CASE) && !check(state->lexer.get(), lex::TokenType::DEFAULT) && !check(state->lexer.get(), lex::TokenType::R_BRACE) &&
+             !isAtEnd(state->lexer.get())) {
+        auto stmt = parseStatement(state);
+        if (stmt == nullptr) return nullptr;
+        c.body.push_back(std::move(stmt));
+      }
+      cases.push_back(std::move(c));
+    }
+    if (!expect(state, lex::TokenType::R_BRACE, "Expected '}' after switch body")) return nullptr;
+
+    return makeNode<Switch>(switch_tok.line, switch_tok.column, std::move(subject), std::move(cases));
+  }
+
   std::unique_ptr<VarDecl> Parser::parseClassField(State* state) {
     // field declaration
     lex::Token field_pin_tok = advance(state); // consume 'pin'
