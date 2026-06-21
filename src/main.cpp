@@ -1,5 +1,6 @@
 #include <Parser.h>
 #include <print>
+#include <AstPrinter.h>
 
 int main(const int argc, const char* argv[]) {
   if (argc < 2) {
@@ -9,5 +10,5 @@ int main(const int argc, const char* argv[]) {
 
   par::Parser parser;
   parser.parseRoot(argv[1]);
-  if (argc > 2) parser.printTree();
+  if (argc > 2) printTree(&parser.peekRoot());
 }

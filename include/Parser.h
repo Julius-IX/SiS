@@ -30,8 +30,8 @@ namespace par {
 
     void parseRoot(const Path& path);
     bool parse(State* state);
-    void printTree() const;
-    static void printNode(const Node* node, const std::string& prefix, bool is_last, std::string_view label = "");
+
+    const Block& peekRoot() const { return *m_root; }
 
     protected:
     ParserHooks m_hooks; // NOLINT
