@@ -105,7 +105,7 @@ namespace fpar { // Helpers
 
 } // namespace fpar
 
-namespace fpar {
+namespace fpar { // Include resolving
 
   static Path resolveRootDirectory(const Path& path) {
     std::error_code err;
@@ -227,155 +227,274 @@ namespace fpar {
 
 } // namespace fpar
 
-  // printTree: public entry point, walks m_root and prints the parsed
-  // statements with indentation showing nesting depth.
-  void Parser::printTree() const {
-    std::print("Program\n");
-    const auto& statements = m_root->statements; // adjust if your unique_ptr<Block> access differs
-    for (size_t i = 0; i < statements.size(); ++i) {
-      printNode(statements[i].get(), "", i + 1 == statements.size());
+namespace fpar { // Base parsing loop
+  static bool isAssignmentOp(lex::TokenType type) {
+    switch (type) {
+      case lex::TokenType::ASSIGN:
+      case lex::TokenType::PLUS_ASSIGN:
+      case lex::TokenType::MINUS_ASSIGN:
+      case lex::TokenType::STAR_ASSIGN:
+      case lex::TokenType::SLASH_ASSIGN:
+      case lex::TokenType::PERCENT_ASSIGN: return true;
+      default: return false;
     }
   }
 
-  // printNode: recursive walk over a Node*, one branch per NodeType.
-  // Indentation depth is just depth * 2 spaces, nothing fancy.
-  void Parser::printNode(const Node* node, const std::string& prefix, bool is_last, std::string_view label) {
-    std::string connector = prefix + (is_last ? "\u2514\u2500\u2500 " : "\u251c\u2500\u2500 ");
-    std::string child_prefix = prefix + (is_last ? "    " : "\u2502   ");
+  int Parser::glueStrength(const lex::TokenType& type) {
+    switch (type) {
+      case lex::TokenType::ASSIGN:
+      case lex::TokenType::PLUS_ASSIGN:
+      case lex::TokenType::MINUS_ASSIGN:
+      case lex::TokenType::STAR_ASSIGN:
+      case lex::TokenType::SLASH_ASSIGN:
+      case lex::TokenType::PERCENT_ASSIGN: return 1;
 
-    if (node == nullptr) {
-      std::print("{}{}<null>\n", connector, label);
-      return;
+      case lex::TokenType::OR: return 2;
+      case lex::TokenType::AND: return 3;
+      case lex::TokenType::EQUALS:
+      case lex::TokenType::NOT_EQUALS: return 4;
+      case lex::TokenType::LESS_THAN:
+      case lex::TokenType::LESS_THAN_EQUALS:
+      case lex::TokenType::GREATER_THAN:
+      case lex::TokenType::GREATER_THAN_EQUALS: return 5;
+      case lex::TokenType::PLUS:
+      case lex::TokenType::MINUS: return 6;
+      case lex::TokenType::STAR:
+      case lex::TokenType::SLASH:
+      case lex::TokenType::PERCENT: return 7;
+      case lex::TokenType::DOT:
+      case lex::TokenType::L_BRACK:
+      case lex::TokenType::L_PAREN: return 8;
+
+      case lex::TokenType::SIS_EOF:
+      case lex::TokenType::ILLEGAL:
+      case lex::TokenType::IDENT:
+      case lex::TokenType::NUM:
+      case lex::TokenType::STRING:
+      case lex::TokenType::TRUE:
+      case lex::TokenType::FALSE:
+      case lex::TokenType::SIS_NULL:
+      case lex::TokenType::IF:
+      case lex::TokenType::ELSE:
+      case lex::TokenType::FOR:
+      case lex::TokenType::WHILE:
+      case lex::TokenType::SWITCH:
+      case lex::TokenType::CASE:
+      case lex::TokenType::RETURN:
+      case lex::TokenType::BREAK:
+      case lex::TokenType::CONTINUE:
+      case lex::TokenType::DEFAULT:
+      case lex::TokenType::FN:
+      case lex::TokenType::PIN:
+      case lex::TokenType::CLASS:
+      case lex::TokenType::EXTENDS:
+      case lex::TokenType::NEW:
+      case lex::TokenType::THIS:
+      case lex::TokenType::SUPER:
+      case lex::TokenType::INCLUDE:
+      case lex::TokenType::QUESTION_MARK:
+      case lex::TokenType::NOT:
+      case lex::TokenType::R_PAREN:
+      case lex::TokenType::L_BRACE:
+      case lex::TokenType::R_BRACE:
+      case lex::TokenType::R_BRACK:
+      case lex::TokenType::COMMA:
+      case lex::TokenType::COLON:
+      case lex::TokenType::SEMICOLON:
+      case lex::TokenType::ARROW:
+      case lex::TokenType::COMMENT: return 0;
     }
+    assert(false && "glueStrength: unnamed TokenType value");
+    return 0;
+  }
 
-    switch (node->type) {
-      case NodeType::LITERAL: {
-        const auto* lit = static_cast<const Literal*>(node);
-        std::visit(
-          [&](const auto& v) {
-            using T = std::decay_t<decltype(v)>;
-            if constexpr (std::is_same_v<T, std::monostate>) {
-              std::print("{}{}Literal(null)\n", connector, label);
-            } else if constexpr (std::is_same_v<T, bool>) {
-              std::print("{}{}Literal({})\n", connector, label, v ? "true" : "false");
-            } else {
-              std::print("{}{}Literal({})\n", connector, label, v);
-            }
-          },
-          lit->value);
-        break;
+  std::unique_ptr<Node> Parser::parseAtom(State* state) {
+    lex::Lexer* lexer = state->lexer.get();
+    lex::Token tok = lexer->peekToken();
+
+    switch (tok.type) {
+      case lex::TokenType::NUM: {
+        advance(state);
+        return std::make_unique<Literal>(std::get<double>(tok.value));
+      }
+      case lex::TokenType::STRING: {
+        advance(state);
+        return std::make_unique<Literal>(std::get<std::string>(tok.value));
+      }
+      case lex::TokenType::TRUE: {
+        advance(state);
+        return std::make_unique<Literal>(true);
+      }
+      case lex::TokenType::FALSE: {
+        advance(state);
+        return std::make_unique<Literal>(false);
+      }
+      case lex::TokenType::SIS_NULL: {
+        advance(state);
+        return std::make_unique<Literal>(std::monostate{});
       }
 
-      case NodeType::IDENTIFIER: {
-        const auto* ident = static_cast<const Identifier*>(node);
-        std::print("{}{}Identifier({})\n", connector, label, ident->name);
-        break;
-      }
-
-      case NodeType::UNARY: {
-        const auto* unary = static_cast<const Unary*>(node);
-        std::print("{}{}Unary({})\n", connector, label, lex::literalTokenToString(unary->operation));
-        printNode(unary->operand.get(), child_prefix, true);
-        break;
-      }
-
-      case NodeType::BINARY: {
-        const auto* binary = static_cast<const Binary*>(node);
-        std::print("{}{}Binary({})\n", connector, label, lex::literalTokenToString(binary->operation));
-        printNode(binary->left.get(), child_prefix, false);
-        printNode(binary->right.get(), child_prefix, true);
-        break;
-      }
-
-      case NodeType::BLOCK: {
-        const auto* block = static_cast<const Block*>(node);
-        std::print("{}{}Block\n", connector, label);
-        for (size_t i = 0; i < block->statements.size(); ++i) {
-          printNode(block->statements[i].get(), child_prefix, i + 1 == block->statements.size());
+      case lex::TokenType::IDENT: {
+        advance(state);
+        auto name = getFromVariant<std::string>(state->tokens.back());
+        if (!name) {
+          panic(m_hooks.format_error(state, state->tokens.back(), "Empty identifier name"));
+          return nullptr;
         }
-        break;
+        return std::make_unique<Identifier>(std::move(*name));
       }
 
-      case NodeType::IF: {
-        const auto* if_node = static_cast<const If*>(node);
-        std::print("{}{}If\n", connector, label);
-        bool has_else = if_node->else_branch != nullptr;
-        printNode(if_node->condition.get(), child_prefix, false, "condition: ");
-        printNode(if_node->then_branch.get(), child_prefix, !has_else, "then: ");
-        if (has_else) {
-          printNode(if_node->else_branch.get(), child_prefix, true, "else: ");
+      case lex::TokenType::NOT:
+      case lex::TokenType::MINUS: {
+        advance(state);
+        std::unique_ptr<Node> operand = parseExpression(state, 8);
+        if (!operand) return nullptr;
+        return std::make_unique<Unary>(tok.type, operand.release());
+      }
+
+      case lex::TokenType::L_PAREN: {
+        advance(state);
+        std::unique_ptr<Node> inner = parseExpression(state, 1);
+        if (!inner) return nullptr;
+        if (!expect(state, lex::TokenType::R_PAREN, "Expected ')' after expression")) return nullptr;
+        return inner;
+      }
+
+      case lex::TokenType::L_BRACK: {
+        advance(state);
+        std::vector<std::unique_ptr<Node>> elements = parseExpressionList(state, lex::TokenType::R_BRACK);
+        if (!expect(state, lex::TokenType::R_BRACK, "Expected ']' after array elements")) return nullptr;
+        return std::make_unique<ArrayLiteral>(std::move(elements));
+      }
+
+      case lex::TokenType::FN: return parseFnLiteral(state);
+      case lex::TokenType::NEW: return parseNewExpr(state);
+      case lex::TokenType::THIS: return parseThisOrSuper(state, false);
+      case lex::TokenType::SUPER: return parseThisOrSuper(state, true);
+
+      case lex::TokenType::SIS_EOF:
+      case lex::TokenType::ILLEGAL:
+      case lex::TokenType::IF:
+      case lex::TokenType::ELSE:
+      case lex::TokenType::FOR:
+      case lex::TokenType::WHILE:
+      case lex::TokenType::SWITCH:
+      case lex::TokenType::CASE:
+      case lex::TokenType::RETURN:
+      case lex::TokenType::BREAK:
+      case lex::TokenType::CONTINUE:
+      case lex::TokenType::DEFAULT:
+      case lex::TokenType::PIN:
+      case lex::TokenType::CLASS:
+      case lex::TokenType::EXTENDS:
+      case lex::TokenType::INCLUDE:
+      case lex::TokenType::PLUS:
+      case lex::TokenType::STAR:
+      case lex::TokenType::SLASH:
+      case lex::TokenType::PERCENT:
+      case lex::TokenType::QUESTION_MARK:
+      case lex::TokenType::ASSIGN:
+      case lex::TokenType::PLUS_ASSIGN:
+      case lex::TokenType::MINUS_ASSIGN:
+      case lex::TokenType::STAR_ASSIGN:
+      case lex::TokenType::SLASH_ASSIGN:
+      case lex::TokenType::PERCENT_ASSIGN:
+      case lex::TokenType::EQUALS:
+      case lex::TokenType::NOT_EQUALS:
+      case lex::TokenType::LESS_THAN:
+      case lex::TokenType::LESS_THAN_EQUALS:
+      case lex::TokenType::GREATER_THAN:
+      case lex::TokenType::GREATER_THAN_EQUALS:
+      case lex::TokenType::AND:
+      case lex::TokenType::OR:
+      case lex::TokenType::R_PAREN:
+      case lex::TokenType::L_BRACE:
+      case lex::TokenType::R_BRACE:
+      case lex::TokenType::R_BRACK:
+      case lex::TokenType::COMMA:
+      case lex::TokenType::DOT:
+      case lex::TokenType::COLON:
+      case lex::TokenType::SEMICOLON:
+      case lex::TokenType::ARROW:
+      case lex::TokenType::COMMENT: panic(m_hooks.format_error(state, tok, "Unexpected token in expression")); return nullptr;
+    }
+    assert(false && "parseAtom: unnamed TokenType value");
+    return nullptr;
+  }
+
+  // parseContinuation "led" half of Pratt.
+  // Called when we already have a left-hand expression and the next token can
+  // extend it. The token's glueStrength told the driver loop it was worth
+  // consuming; now we decide what node to build.
+  std::unique_ptr<Node> Parser::parseContinuation(State* state, std::unique_ptr<Node> left) {
+    lex::Token op = advance(state); // consume the operator / punctuation
+
+    switch (op.type) {
+      // Binary ops: left-associative, so recurse at prec+1.
+      // Assignment ops: right-associative, so recurse at same prec (1).
+      case lex::TokenType::PLUS:
+      case lex::TokenType::MINUS:
+      case lex::TokenType::STAR:
+      case lex::TokenType::SLASH:
+      case lex::TokenType::PERCENT:
+      case lex::TokenType::EQUALS:
+      case lex::TokenType::NOT_EQUALS:
+      case lex::TokenType::LESS_THAN:
+      case lex::TokenType::LESS_THAN_EQUALS:
+      case lex::TokenType::GREATER_THAN:
+      case lex::TokenType::GREATER_THAN_EQUALS:
+      case lex::TokenType::AND:
+      case lex::TokenType::OR: {
+        int prec = glueStrength(op.type);
+        std::unique_ptr<Node> right = parseExpression(state, prec + 1); // left-assoc
+        if (!right) return nullptr;
+        return std::make_unique<Binary>(op.type, std::move(left), std::move(right));
+      }
+
+      case lex::TokenType::ASSIGN:
+      case lex::TokenType::PLUS_ASSIGN:
+      case lex::TokenType::MINUS_ASSIGN:
+      case lex::TokenType::STAR_ASSIGN:
+      case lex::TokenType::SLASH_ASSIGN:
+      case lex::TokenType::PERCENT_ASSIGN: {
+        std::unique_ptr<Node> right = parseExpression(state, 1); // right-assoc: same prec
+        if (!right) return nullptr;
+        return std::make_unique<Binary>(op.type, std::move(left), std::move(right));
+      }
+
+      // obj.field consume the dot, then read the field name as an identifier
+      case lex::TokenType::DOT: {
+        lex::Token field_tok = advance(state);
+        if (field_tok.type != lex::TokenType::IDENT) {
+          panic(m_hooks.format_error(state, field_tok, "Expected field name after '.'"));
+          return nullptr;
         }
-        break;
-      }
-
-      case NodeType::WHILE: {
-        const auto* while_node = static_cast<const While*>(node);
-        std::print("{}{}While\n", connector, label);
-        printNode(while_node->condition.get(), child_prefix, false, "condition: ");
-        printNode(while_node->body.get(), child_prefix, true, "body: ");
-        break;
-      }
-
-      case NodeType::VAR_DECL: {
-        const auto* var_decl = static_cast<const VarDecl*>(node);
-        std::print("{}{}VarDecl({})\n", connector, label, var_decl->name);
-        if (var_decl->initializer) {
-          printNode(var_decl->initializer.get(), child_prefix, true);
+        auto field = getFromVariant<std::string>(state->tokens.back());
+        if (!field) {
+          panic(m_hooks.format_error(state, field_tok, "Empty field name"));
+          return nullptr;
         }
-        break;
+        return std::make_unique<MemberAccess>(std::move(left), std::move(*field));
       }
 
-      case NodeType::EXPR_STMT: {
-        const auto* expr_stmt = static_cast<const ExprStmt*>(node);
-        std::print("{}{}ExprStmt\n", connector, label);
-        printNode(expr_stmt->expr.get(), child_prefix, true);
-        break;
+      // obj[index]
+      case lex::TokenType::L_BRACK: {
+        std::unique_ptr<Node> index = parseExpression(state, 1);
+        if (!index) return nullptr;
+        if (!expect(state, lex::TokenType::R_BRACK, "Expected ']' after subscript index")) return nullptr;
+        return std::make_unique<Subscript>(std::move(left), std::move(index));
       }
 
-      case NodeType::CALL: {
-        const auto* call = static_cast<const Call*>(node);
-        std::print("{}{}Call\n", connector, label);
-        bool has_args = !call->args.empty();
-        printNode(call->callee.get(), child_prefix, !has_args, "callee: ");
-        for (size_t i = 0; i < call->args.size(); ++i) {
-          printNode(call->args[i].get(), child_prefix, i + 1 == call->args.size());
-        }
-        break;
+      // callee(args) we already consumed '(', so just parse the arg list
+      case lex::TokenType::L_PAREN: {
+        std::vector<std::unique_ptr<Node>> args = parseExpressionList(state, lex::TokenType::R_PAREN);
+        if (!expect(state, lex::TokenType::R_PAREN, "Expected ')' after call arguments")) return nullptr;
+        return std::make_unique<Call>(std::move(left), std::move(args));
       }
 
-      case NodeType::FN_LITERAL: {
-        const auto* fn = static_cast<const FnLiteral*>(node);
-        std::string params;
-        for (size_t i = 0; i < fn->params.size(); ++i) {
-          params += fn->params[i];
-          if (i + 1 < fn->params.size()) params += ", ";
-        }
-        std::print("{}{}FnLiteral({})\n", connector, label, params);
-        printNode(fn->body.get(), child_prefix, true);
-        break;
-      }
-
-      case NodeType::MEMBER_ACCESS: {
-        const auto* member = static_cast<const MemberAccess*>(node);
-        std::print("{}{}MemberAccess(.{})\n", connector, label, member->field);
-        printNode(member->object.get(), child_prefix, true);
-        break;
-      }
-
-      case NodeType::ARRAY_LITERAL: {
-        const auto* array = static_cast<const ArrayLiteral*>(node);
-        std::print("{}{}ArrayLiteral\n", connector, label);
-        for (size_t i = 0; i < array->elements.size(); ++i) {
-          printNode(array->elements[i].get(), child_prefix, i + 1 == array->elements.size());
-        }
-        break;
-      }
-
-      case NodeType::RETURN: {
-        const auto* ret = static_cast<const Return*>(node);
-        std::print("{}{}Return\n", connector, label);
-        if (ret->value) {
-          printNode(ret->value.get(), child_prefix, true);
+      default: panic(m_hooks.format_error(state, op, "Unexpected token in infix position")); return nullptr;
+    }
+  }
         }
         break;
       }
