@@ -73,6 +73,8 @@ namespace fpar {
     return std::nullopt;
   }
 
+  bool Parser::isAtEnd(lex::Lexer* lexer) { return check(lexer, lex::TokenType::SIS_EOF); }
+
   bool Parser::check(lex::Lexer* lexer, lex::TokenType type) { return lexer->peekToken().type == type; }
 
   // advance: unconditionally consume and return the next token. For when you
