@@ -6,6 +6,8 @@
 #include <deque>
 #include <expected>
 #include <filesystem>
+#include <functional>
+#include <optional>
 #include <unordered_map>
 
 using namespace par; // TODO: remove after fpar completion
@@ -53,27 +55,23 @@ namespace fpar {
 
     std::expected<std::optional<Path>, std::string> checkForInclude(const Path& path);
 
-    std::unique_ptr<Node> parseStatement(State* state);
+    // Expression parsing Pratt core
+    static int glueStrength(const lex::TokenType& type);
+    std::unique_ptr<Node> parseAtom(State* state);                                                   // nud: things that START an expression
+    std::unique_ptr<Node> parseContinuation(State* state, std::unique_ptr<Node> left);               // led: things that EXTEND an expression
+    std::unique_ptr<Node> parseExpression(State* state, int min_prec = 1);                           // driver loop
+    std::vector<std::unique_ptr<Node>> parseExpressionList(State* state, lex::TokenType terminator); // comma-sep until terminator
 
-    std::unique_ptr<Node> parseLiteral(State* state);
-    std::unique_ptr<Node> parseIdentifier(State* state);
-    std::unique_ptr<Node> parseUnary(State* state);
-    std::unique_ptr<Node> parseBinary(State* state);
+    // Statement parsing one function per distinct statement shape
+    std::unique_ptr<Node> parseStatement(State* state);
     std::unique_ptr<Node> parseBlock(State* state);
     std::unique_ptr<Node> parseIf(State* state);
     std::unique_ptr<Node> parseWhile(State* state);
     std::unique_ptr<Node> parseVarDecl(State* state);
-    std::unique_ptr<Node> parseExprStmt(State* state);
-    std::unique_ptr<Node> parseCall(State* state);
-    std::unique_ptr<Node> parseFnLiteral(State* state);
-    std::unique_ptr<Node> parseMemberAccess(State* state);
-    std::unique_ptr<Node> parseArrayLiteral(State* state);
     std::unique_ptr<Node> parseReturn(State* state);
-    std::unique_ptr<Node> parseBreak(State* state);
-    std::unique_ptr<Node> parseContinue(State* state);
+    std::unique_ptr<Node> parseFnLiteral(State* state);
     std::unique_ptr<Node> parseClassDecl(State* state);
     std::unique_ptr<Node> parseNewExpr(State* state);
-    std::unique_ptr<Node> parseThisExpr(State* state);
-    std::unique_ptr<Node> parseSuperAccess(State* state);
+    std::unique_ptr<Node> parseThisOrSuper(State* state, bool is_super);
   };
 } // namespace fpar
