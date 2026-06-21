@@ -24,7 +24,8 @@ namespace fpar { // NOTE: separate namespace block for readability
   }
 
   std::string formatIllegalTokenMessage(State* state, const lex::Token& token, const std::string_view msg) {
-    std::string fmted_msg = fmt::format("Illegal token received {}:{}\n", token.line, token.column);
+    std::string fmted_msg = token.source.has_value() ? fmt::format("Illegal token received {}:{}\nFile: {}\n", token.line, token.column, token.source.value().string())
+                                                     : fmt::format("Illegal token received {}:{}", token.line, token.column);
     if (!msg.empty()) {
       fmted_msg += msg;
       fmted_msg += "\n";
