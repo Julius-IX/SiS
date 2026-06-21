@@ -73,6 +73,16 @@ namespace fpar { // Helpers
     return std::nullopt;
   }
 
+  // makeNode: construct a Node subtype and stamp it with a source position
+  // in one expression, so node creation can stay a single `return` statement.
+  template <typename T, typename... Args>
+  static std::unique_ptr<T> makeNode(size_t line, size_t column, Args&&... args) {
+    auto node = std::make_unique<T>(std::forward<Args>(args)...);
+    node->line = line;
+    node->column = column;
+    return node;
+  }
+
   bool Parser::isAtEnd(lex::Lexer* lexer) { return check(lexer, lex::TokenType::SIS_EOF); }
 
   bool Parser::check(lex::Lexer* lexer, lex::TokenType type) { return lexer->peekToken().type == type; }
@@ -315,23 +325,23 @@ namespace fpar { // Base parsing loop
     switch (tok.type) {
       case lex::TokenType::NUM: {
         advance(state);
-        return std::make_unique<Literal>(std::get<double>(tok.value));
+        return makeNode<Literal>(tok.line, tok.column, std::get<double>(tok.value));
       }
       case lex::TokenType::STRING: {
         advance(state);
-        return std::make_unique<Literal>(std::get<std::string>(tok.value));
+        return makeNode<Literal>(tok.line, tok.column, std::get<std::string>(tok.value));
       }
       case lex::TokenType::TRUE: {
         advance(state);
-        return std::make_unique<Literal>(true);
+        return makeNode<Literal>(tok.line, tok.column, true);
       }
       case lex::TokenType::FALSE: {
         advance(state);
-        return std::make_unique<Literal>(false);
+        return makeNode<Literal>(tok.line, tok.column, false);
       }
       case lex::TokenType::SIS_NULL: {
         advance(state);
-        return std::make_unique<Literal>(std::monostate{});
+        return makeNode<Literal>(tok.line, tok.column, std::monostate{});
       }
 
       case lex::TokenType::IDENT: {
@@ -341,7 +351,7 @@ namespace fpar { // Base parsing loop
           panic(m_hooks.format_error(state, state->tokens.back(), "Empty identifier name"));
           return nullptr;
         }
-        return std::make_unique<Identifier>(std::move(*name));
+        return makeNode<Identifier>(tok.line, tok.column, std::move(*name));
       }
 
       case lex::TokenType::NOT:
@@ -349,7 +359,7 @@ namespace fpar { // Base parsing loop
         advance(state);
         std::unique_ptr<Node> operand = parseExpression(state, 8);
         if (!operand) return nullptr;
-        return std::make_unique<Unary>(tok.type, operand.release());
+        return makeNode<Unary>(tok.line, tok.column, tok.type, operand.release());
       }
 
       case lex::TokenType::L_PAREN: {
@@ -364,7 +374,7 @@ namespace fpar { // Base parsing loop
         advance(state);
         std::vector<std::unique_ptr<Node>> elements = parseExpressionList(state, lex::TokenType::R_BRACK);
         if (!expect(state, lex::TokenType::R_BRACK, "Expected ']' after array elements")) return nullptr;
-        return std::make_unique<ArrayLiteral>(std::move(elements));
+        return makeNode<ArrayLiteral>(tok.line, tok.column, std::move(elements));
       }
 
       case lex::TokenType::FN: return parseFnLiteral(state);
@@ -446,9 +456,11 @@ namespace fpar { // Base parsing loop
       case lex::TokenType::AND:
       case lex::TokenType::OR: {
         int prec = glueStrength(op.type);
+        size_t left_line = left->line;
+        size_t left_column = left->column;
         std::unique_ptr<Node> right = parseExpression(state, prec + 1); // left-assoc
         if (!right) return nullptr;
-        return std::make_unique<Binary>(op.type, std::move(left), std::move(right));
+        return makeNode<Binary>(left_line, left_column, op.type, std::move(left), std::move(right));
       }
 
       case lex::TokenType::ASSIGN:
@@ -457,13 +469,17 @@ namespace fpar { // Base parsing loop
       case lex::TokenType::STAR_ASSIGN:
       case lex::TokenType::SLASH_ASSIGN:
       case lex::TokenType::PERCENT_ASSIGN: {
+        size_t left_line = left->line;
+        size_t left_column = left->column;
         std::unique_ptr<Node> right = parseExpression(state, 1); // right-assoc: same prec
         if (!right) return nullptr;
-        return std::make_unique<Binary>(op.type, std::move(left), std::move(right));
+        return makeNode<Binary>(left_line, left_column, op.type, std::move(left), std::move(right));
       }
 
       // obj.field consume the dot, then read the field name as an identifier
       case lex::TokenType::DOT: {
+        size_t left_line = left->line;
+        size_t left_column = left->column;
         lex::Token field_tok = advance(state);
         if (field_tok.type != lex::TokenType::IDENT) {
           panic(m_hooks.format_error(state, field_tok, "Expected field name after '.'"));
@@ -474,22 +490,26 @@ namespace fpar { // Base parsing loop
           panic(m_hooks.format_error(state, field_tok, "Empty field name"));
           return nullptr;
         }
-        return std::make_unique<MemberAccess>(std::move(left), std::move(*field));
+        return makeNode<MemberAccess>(left_line, left_column, std::move(left), std::move(*field));
       }
 
       // obj[index]
       case lex::TokenType::L_BRACK: {
+        size_t left_line = left->line;
+        size_t left_column = left->column;
         std::unique_ptr<Node> index = parseExpression(state, 1);
         if (!index) return nullptr;
         if (!expect(state, lex::TokenType::R_BRACK, "Expected ']' after subscript index")) return nullptr;
-        return std::make_unique<Subscript>(std::move(left), std::move(index));
+        return makeNode<Subscript>(left_line, left_column, std::move(left), std::move(index));
       }
 
       // callee(args) we already consumed '(', so just parse the arg list
       case lex::TokenType::L_PAREN: {
+        size_t left_line = left->line;
+        size_t left_column = left->column;
         std::vector<std::unique_ptr<Node>> args = parseExpressionList(state, lex::TokenType::R_PAREN);
         if (!expect(state, lex::TokenType::R_PAREN, "Expected ')' after call arguments")) return nullptr;
-        return std::make_unique<Call>(std::move(left), std::move(args));
+        return makeNode<Call>(left_line, left_column, std::move(left), std::move(args));
       }
 
       default: panic(m_hooks.format_error(state, op, "Unexpected token in infix position")); return nullptr;
@@ -551,6 +571,7 @@ namespace fpar { // Complex parsing structures
         // This keeps the AST uniform the evaluator never needs to distinguish
         // "function statement" from "pinned function expression."
         advance(state); // consume 'fn'
+        lex::Token fn_tok = state->tokens.back();
         lex::Token name_tok = advance(state);
         if (name_tok.type != lex::TokenType::IDENT) {
           panic(m_hooks.format_error(state, name_tok, "Expected function name after 'fn'"));
@@ -582,31 +603,34 @@ namespace fpar { // Complex parsing structures
         if (!expect(state, lex::TokenType::R_PAREN, "Expected ')' after parameters")) return nullptr;
         auto body = parseBlock(state);
         if (!body) return nullptr;
-        auto fn = std::make_unique<FnLiteral>(std::move(params), std::move(body));
-        return std::make_unique<VarDecl>(std::move(*name), std::move(fn));
+        auto fn = makeNode<FnLiteral>(fn_tok.line, fn_tok.column, std::move(params), std::move(body));
+        return makeNode<VarDecl>(fn_tok.line, fn_tok.column, std::move(*name), std::move(fn));
       }
       case lex::TokenType::CLASS: return parseClassDecl(state);
       case lex::TokenType::BREAK: {
-        advance(state);
+        lex::Token break_tok = advance(state);
         if (!expect(state, lex::TokenType::SEMICOLON, "Expected ';' after 'break'")) return nullptr;
-        return std::make_unique<Jump>(JumpKind::BREAK);
+        return makeNode<Jump>(break_tok.line, break_tok.column, JumpKind::BREAK);
       }
       case lex::TokenType::CONTINUE: {
-        advance(state);
+        lex::Token continue_tok = advance(state);
         if (!expect(state, lex::TokenType::SEMICOLON, "Expected ';' after 'continue'")) return nullptr;
-        return std::make_unique<Jump>(JumpKind::CONTINUE);
+        return makeNode<Jump>(continue_tok.line, continue_tok.column, JumpKind::CONTINUE);
       }
       default: {
         // expression statement: parse an expression, demand a semicolon
         auto expr = parseExpression(state, 1);
         if (!expr) return nullptr;
         if (!expect(state, lex::TokenType::SEMICOLON, "Expected ';' after expression")) return nullptr;
-        return std::make_unique<ExprStmt>(std::move(expr));
+        size_t expr_line = expr->line;
+        size_t expr_column = expr->column;
+        return makeNode<ExprStmt>(expr_line, expr_column, std::move(expr));
       }
     }
   }
 
   std::unique_ptr<Node> Parser::parseBlock(State* state) {
+    lex::Token brace_tok = state->lexer->peekToken();
     if (!expect(state, lex::TokenType::L_BRACE, "Expected '{'")) return nullptr;
     std::vector<std::unique_ptr<Node>> stmts;
     while (!check(state->lexer.get(), lex::TokenType::R_BRACE) && !isAtEnd(state->lexer.get())) {
@@ -615,11 +639,14 @@ namespace fpar { // Complex parsing structures
       stmts.push_back(std::move(stmt));
     }
     if (!expect(state, lex::TokenType::R_BRACE, "Expected '}'")) return nullptr;
-    return std::make_unique<Block>(std::move(stmts));
+    auto node = std::make_unique<Block>(std::move(stmts));
+    node->line = brace_tok.line;
+    node->column = brace_tok.column;
+    return node;
   }
 
   std::unique_ptr<Node> Parser::parseIf(State* state) {
-    advance(state); // consume 'if'
+    lex::Token if_tok = advance(state); // consume 'if'
     if (!expect(state, lex::TokenType::L_PAREN, "Expected '(' after 'if'")) return nullptr;
     auto condition = parseExpression(state, 1);
     if (!condition) return nullptr;
@@ -636,22 +663,28 @@ namespace fpar { // Complex parsing structures
       }
       if (!else_branch) return nullptr;
     }
-    return std::make_unique<If>(std::move(condition), std::move(then_branch), std::move(else_branch));
+    auto node = std::make_unique<If>(std::move(condition), std::move(then_branch), std::move(else_branch));
+    node->line = if_tok.line;
+    node->column = if_tok.column;
+    return node;
   }
 
   std::unique_ptr<Node> Parser::parseWhile(State* state) {
-    advance(state); // consume 'while'
+    lex::Token while_tok = advance(state); // consume 'while'
     if (!expect(state, lex::TokenType::L_PAREN, "Expected '(' after 'while'")) return nullptr;
     auto condition = parseExpression(state, 1);
     if (!condition) return nullptr;
     if (!expect(state, lex::TokenType::R_PAREN, "Expected ')' after while condition")) return nullptr;
     auto body = parseBlock(state);
     if (!body) return nullptr;
-    return std::make_unique<While>(std::move(condition), std::move(body));
+    auto node = std::make_unique<While>(std::move(condition), std::move(body));
+    node->line = while_tok.line;
+    node->column = while_tok.column;
+    return node;
   }
 
   std::unique_ptr<Node> Parser::parseVarDecl(State* state) {
-    advance(state); // consume 'pin'
+    lex::Token pin_tok = advance(state); // consume 'pin'
     lex::Token name_tok = advance(state);
     if (name_tok.type != lex::TokenType::IDENT) {
       panic(m_hooks.format_error(state, name_tok, "Expected variable name after 'pin'"));
@@ -668,25 +701,31 @@ namespace fpar { // Complex parsing structures
       if (!initializer) return nullptr;
     }
     if (!expect(state, lex::TokenType::SEMICOLON, "Expected ';' after variable declaration")) return nullptr;
-    return std::make_unique<VarDecl>(std::move(*name), std::move(initializer));
+    auto node = std::make_unique<VarDecl>(std::move(*name), std::move(initializer));
+    node->line = pin_tok.line;
+    node->column = pin_tok.column;
+    return node;
   }
 
   std::unique_ptr<Node> Parser::parseReturn(State* state) {
-    advance(state); // consume 'return'
+    lex::Token return_tok = advance(state); // consume 'return'
     std::unique_ptr<Node> value;
     if (!check(state->lexer.get(), lex::TokenType::SEMICOLON)) {
       value = parseExpression(state, 1);
       if (!value) return nullptr;
     }
     if (!expect(state, lex::TokenType::SEMICOLON, "Expected ';' after return")) return nullptr;
-    return std::make_unique<Return>(std::move(value));
+    auto node = std::make_unique<Return>(std::move(value));
+    node->line = return_tok.line;
+    node->column = return_tok.column;
+    return node;
   }
 
   // parseFnLiteral called from parseAtom when 'fn' appears in expression
   // position (i.e. anonymous fn, no name). Named fns at statement level are
   // handled in parseStatement as sugar for pin name = fn(...){...};
   std::unique_ptr<Node> Parser::parseFnLiteral(State* state) {
-    advance(state); // consume 'fn'
+    lex::Token fn_tok = advance(state); // consume 'fn'
     if (!expect(state, lex::TokenType::L_PAREN, "Expected '(' after 'fn'")) return nullptr;
     std::vector<std::string> params;
     while (!check(state->lexer.get(), lex::TokenType::R_PAREN) && !isAtEnd(state->lexer.get())) {
@@ -706,11 +745,14 @@ namespace fpar { // Complex parsing structures
     if (!expect(state, lex::TokenType::R_PAREN, "Expected ')' after parameters")) return nullptr;
     auto body = parseBlock(state);
     if (!body) return nullptr;
-    return std::make_unique<FnLiteral>(std::move(params), std::move(body));
+    auto node = std::make_unique<FnLiteral>(std::move(params), std::move(body));
+    node->line = fn_tok.line;
+    node->column = fn_tok.column;
+    return node;
   }
 
   std::unique_ptr<Node> Parser::parseNewExpr(State* state) {
-    advance(state); // consume 'new'
+    lex::Token new_tok = advance(state); // consume 'new'
     lex::Token name_tok = advance(state);
     if (name_tok.type != lex::TokenType::IDENT) {
       panic(m_hooks.format_error(state, name_tok, "Expected class name after 'new'"));
@@ -724,7 +766,10 @@ namespace fpar { // Complex parsing structures
     if (!expect(state, lex::TokenType::L_PAREN, "Expected '(' after class name in 'new'")) return nullptr;
     auto args = parseExpressionList(state, lex::TokenType::R_PAREN);
     if (!expect(state, lex::TokenType::R_PAREN, "Expected ')' after constructor arguments")) return nullptr;
-    return std::make_unique<NewExpr>(std::move(*class_name), std::move(args));
+    auto node = std::make_unique<NewExpr>(std::move(*class_name), std::move(args));
+    node->line = new_tok.line;
+    node->column = new_tok.column;
+    return node;
   }
 
   // parseThisOrSuper bare `this` or `super` in expression position.
@@ -733,7 +778,7 @@ namespace fpar { // Complex parsing structures
   // NOTE: grammar uses `->` for this/super access and `.` for regular objects.
   // accessing a field method on a class REQUIRES '->' usage, `.` is not allowed.
   std::unique_ptr<Node> Parser::parseThisOrSuper(State* state, bool is_super) {
-    advance(state); // consume this/super
+    lex::Token self_tok = advance(state); // consume this/super
 
     if (!expect(state, lex::TokenType::ARROW, "Expected '->' after 'this' or 'super'")) {
       return nullptr;
@@ -751,11 +796,17 @@ namespace fpar { // Complex parsing structures
       return nullptr;
     }
 
-    return std::make_unique<MemberAccess>(std::make_unique<Self>(is_super), std::move(*member));
+    auto self = std::make_unique<Self>(is_super);
+    self->line = self_tok.line;
+    self->column = self_tok.column;
+    auto node = std::make_unique<MemberAccess>(std::move(self), std::move(*member));
+    node->line = self_tok.line;
+    node->column = self_tok.column;
+    return node;
   }
 
   std::unique_ptr<Node> Parser::parseClassDecl(State* state) { // TODO: refactor into smaller functions
-    advance(state); // consume 'class'
+    lex::Token class_tok = advance(state); // consume 'class'
     lex::Token name_tok = advance(state);
     if (name_tok.type != lex::TokenType::IDENT) {
       panic(m_hooks.format_error(state, name_tok, "Expected class name"));
@@ -791,7 +842,7 @@ namespace fpar { // Complex parsing structures
     while (!check(state->lexer.get(), lex::TokenType::R_BRACE) && !isAtEnd(state->lexer.get())) {
       if (check(state->lexer.get(), lex::TokenType::PIN)) {
         // field declaration
-        advance(state); // consume 'pin'
+        lex::Token field_pin_tok = advance(state); // consume 'pin'
         lex::Token field_tok = advance(state);
         if (field_tok.type != lex::TokenType::IDENT) {
           panic(m_hooks.format_error(state, field_tok, "Expected field name"));
@@ -808,11 +859,14 @@ namespace fpar { // Complex parsing structures
           if (!field_init) return nullptr;
         }
         if (!expect(state, lex::TokenType::SEMICOLON, "Expected ';' after field declaration")) return nullptr;
-        fields.push_back(std::make_unique<VarDecl>(std::move(*field_name), std::move(field_init)));
+        auto field_node = std::make_unique<VarDecl>(std::move(*field_name), std::move(field_init));
+        field_node->line = field_pin_tok.line;
+        field_node->column = field_pin_tok.column;
+        fields.push_back(std::move(field_node));
 
       } else if (check(state->lexer.get(), lex::TokenType::FN)) {
         // method declaration
-        advance(state); // consume 'fn'
+        lex::Token method_fn_tok = advance(state); // consume 'fn'
         lex::Token method_tok = advance(state);
         if (method_tok.type != lex::TokenType::IDENT) {
           panic(m_hooks.format_error(state, method_tok, "Expected method name"));
@@ -843,7 +897,10 @@ namespace fpar { // Complex parsing structures
         auto body = parseBlock(state);
         if (!body) return nullptr;
         method_names.push_back(std::move(*method_name));
-        methods.push_back(std::make_unique<FnLiteral>(std::move(params), std::move(body)));
+        auto method_node = std::make_unique<FnLiteral>(std::move(params), std::move(body));
+        method_node->line = method_fn_tok.line;
+        method_node->column = method_fn_tok.column;
+        methods.push_back(std::move(method_node));
       } else {
         panic(m_hooks.format_error(state, state->lexer->peekToken(), "Expected 'pin' or 'fn' in class body"));
         return nullptr;
@@ -851,7 +908,10 @@ namespace fpar { // Complex parsing structures
     }
 
     if (!expect(state, lex::TokenType::R_BRACE, "Expected '}' after class body")) return nullptr;
-    return std::make_unique<ClassDecl>(std::move(*name), std::move(parent_name), std::move(fields), std::move(methods), std::move(method_names));
+    auto node = std::make_unique<ClassDecl>(std::move(*name), std::move(parent_name), std::move(fields), std::move(methods), std::move(method_names));
+    node->line = class_tok.line;
+    node->column = class_tok.column;
+    return node;
   }
 
 } // namespace fpar
