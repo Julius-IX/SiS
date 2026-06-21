@@ -28,7 +28,7 @@ namespace par {
     Parser();
     ~Parser() = default;
 
-    void parseRoot(const Path& path);
+    bool parseRoot(const Path& path);
     bool parse(State* state);
 
     const Block& peekRoot() const { return *m_root; }
@@ -66,11 +66,14 @@ namespace par {
     std::unique_ptr<Node> parseIf(State* state);
     std::unique_ptr<Node> parseWhile(State* state);
     std::unique_ptr<Node> parseVarDecl(State* state);
+    std::unique_ptr<Node> parseVarDeclNoSemicolon(State* state);
     std::unique_ptr<Node> parseReturn(State* state);
     std::unique_ptr<Node> parseFnLiteral(State* state);
     std::unique_ptr<Node> parseTopLevelFn(State* state);
     std::unique_ptr<Node> parseNewExpr(State* state);
     std::unique_ptr<Node> parseThisOrSuper(State* state, bool is_super);
+    std::unique_ptr<Node> parseFor(State* state);
+    std::unique_ptr<Node> parseSwitch(State* state);
 
     // dedicated section for classes
     std::unique_ptr<Node> parseClassDecl(State* state);

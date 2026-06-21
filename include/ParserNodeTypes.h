@@ -24,7 +24,12 @@ namespace par {
     ARRAY_LITERAL,
     SUBSCRIPT,
     RETURN,
+    BREAK,
+    CONTINUE,
     JUMP, // break / continue same zero-data shape, kind tells them apart
+    FOR,
+    SWITCH,
+    TERNARY,
     SELF, // this / super both are self-references, is_super tells them apart
     NEW_EXPR,
     CLASS_DECL,
@@ -248,5 +253,52 @@ namespace par {
         fields(std::move(fields)),
         methods(std::move(methods)),
         method_names(std::move(method_names)) {}
+  };
+
+  // for (init; condition; increment) body
+  // Any of init/condition/increment may be null (for(;;) is valid).
+  struct For final : Node {
+    static constexpr NodeType TYPE = NodeType::FOR;
+    std::unique_ptr<Node> init;      // VarDecl or ExprStmt, nullptr if omitted
+    std::unique_ptr<Node> condition; // nullptr means "always true"
+    std::unique_ptr<Node> increment; // nullptr if omitted
+    std::unique_ptr<Node> body;
+    For(std::unique_ptr<Node> init, std::unique_ptr<Node> condition, std::unique_ptr<Node> increment, std::unique_ptr<Node> body)
+      : Node(TYPE),
+        init(std::move(init)),
+        condition(std::move(condition)),
+        increment(std::move(increment)),
+        body(std::move(body)) {}
+  };
+
+  // switch (subject) { case expr: stmts... case expr: stmts... default: stmts... }
+  // Each SwitchCase holds its own statement list; `value == nullptr` marks the
+  // default case (at most one allowed, parser's job to enforce that).
+  struct SwitchCase {
+    std::unique_ptr<Node> value; // nullptr for 'default'
+    std::vector<std::unique_ptr<Node>> body;
+  };
+
+  struct Switch final : Node {
+    static constexpr NodeType TYPE = NodeType::SWITCH;
+    std::unique_ptr<Node> subject;
+    std::vector<SwitchCase> cases;
+    Switch(std::unique_ptr<Node> subject, std::vector<SwitchCase> cases)
+      : Node(TYPE),
+        subject(std::move(subject)),
+        cases(std::move(cases)) {}
+  };
+
+  // condition ? then_expr : else_expr
+  struct Ternary final : Node {
+    static constexpr NodeType TYPE = NodeType::TERNARY;
+    std::unique_ptr<Node> condition;
+    std::unique_ptr<Node> then_expr;
+    std::unique_ptr<Node> else_expr;
+    Ternary(std::unique_ptr<Node> condition, std::unique_ptr<Node> then_expr, std::unique_ptr<Node> else_expr)
+      : Node(TYPE),
+        condition(std::move(condition)),
+        then_expr(std::move(then_expr)),
+        else_expr(std::move(else_expr)) {}
   };
 } // namespace par

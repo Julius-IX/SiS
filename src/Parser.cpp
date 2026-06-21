@@ -155,7 +155,7 @@ namespace par { // Include resolving
     return true;
   }
 
-  void Parser::parseRoot(const Path& path) {
+  bool Parser::parseRoot(const Path& path) {
     Path full_root_path = resolveRootDirectory(path);
     LOG_DEBUG_FLUSH("Full root path: {}", full_root_path.string());
 
@@ -188,6 +188,8 @@ namespace par { // Include resolving
       m_include_stack.push_back(current_path);
       m_include_stack.push_back(include_path.value().value());
     }
+
+    return !std::ranges::contains(m_root->statements, nullptr);
   }
 
   std::expected<std::optional<Path>, std::string> Parser::checkForInclude(const Path& path) {
@@ -252,6 +254,7 @@ namespace par { // Base parsing loop functions
 
   int Parser::bindingPower(const lex::TokenType& type) {
     switch (type) {
+      case lex::TokenType::QUESTION_MARK:
       case lex::TokenType::ASSIGN:
       case lex::TokenType::PLUS_ASSIGN:
       case lex::TokenType::MINUS_ASSIGN:
@@ -302,7 +305,6 @@ namespace par { // Base parsing loop functions
       case lex::TokenType::THIS:
       case lex::TokenType::SUPER:
       case lex::TokenType::INCLUDE:
-      case lex::TokenType::QUESTION_MARK:
       case lex::TokenType::NOT:
       case lex::TokenType::R_PAREN:
       case lex::TokenType::L_BRACE:
@@ -314,7 +316,7 @@ namespace par { // Base parsing loop functions
       case lex::TokenType::ARROW:
       case lex::TokenType::COMMENT: return 0;
     }
-    assert(false && "glueStrength: unnamed TokenType value");
+    assert(false && "bindingPower: unnamed TokenType value");
     return 0;
   }
 
@@ -386,9 +388,9 @@ namespace par { // Base parsing loop functions
       case lex::TokenType::ILLEGAL:
       case lex::TokenType::IF:
       case lex::TokenType::ELSE:
-      case lex::TokenType::FOR:
+      // case lex::TokenType::FOR:
       case lex::TokenType::WHILE:
-      case lex::TokenType::SWITCH:
+      // case lex::TokenType::SWITCH:
       case lex::TokenType::CASE:
       case lex::TokenType::RETURN:
       case lex::TokenType::BREAK:
@@ -474,6 +476,17 @@ namespace par { // Base parsing loop functions
         std::unique_ptr<Node> right = parseExpression(state, 1); // right-assoc: same prec
         if (right == nullptr) return nullptr;
         return makeNode<Binary>(left_line, left_column, op.type, std::move(left), std::move(right));
+      }
+
+      case lex::TokenType::QUESTION_MARK: {
+        size_t left_line = left->line;
+        size_t left_column = left->column;
+        std::unique_ptr<Node> then_expr = parseExpression(state, 1);
+        if (then_expr == nullptr) return nullptr;
+        if (!expect(state, lex::TokenType::COLON, "Expected ':' in ternary expression")) return nullptr;
+        std::unique_ptr<Node> else_expr = parseExpression(state, 1);
+        if (else_expr == nullptr) return nullptr;
+        return makeNode<Ternary>(left_line, left_column, std::move(left), std::move(then_expr), std::move(else_expr));
       }
 
       // obj.field consume the dot, then read the field name as an identifier
@@ -562,6 +575,8 @@ namespace par { // Complex parsing structures
       case lex::TokenType::L_BRACE: return parseBlock(state);
       case lex::TokenType::IF: return parseIf(state);
       case lex::TokenType::WHILE: return parseWhile(state);
+      case lex::TokenType::FOR: return parseFor(state);
+      case lex::TokenType::SWITCH: return parseSwitch(state);
       case lex::TokenType::PIN: return parseVarDecl(state);
       case lex::TokenType::RETURN: return parseReturn(state);
       case lex::TokenType::FN: return parseTopLevelFn(state);
@@ -642,7 +657,9 @@ namespace par { // Complex parsing structures
     return node;
   }
 
-  std::unique_ptr<Node> Parser::parseVarDecl(State* state) {
+  // Shared by parseVarDecl (which demands a trailing ';') and parseFor's
+  // init clause (which doesn't, the for-loop's own ';' covers it).
+  std::unique_ptr<Node> Parser::parseVarDeclNoSemicolon(State* state) {
     lex::Token pin_tok = advance(state); // consume 'pin'
     lex::Token name_tok = advance(state);
     if (name_tok.type != lex::TokenType::IDENT) {
@@ -659,10 +676,16 @@ namespace par { // Complex parsing structures
       initializer = parseExpression(state, 1);
       if (initializer == nullptr) return nullptr;
     }
-    if (!expect(state, lex::TokenType::SEMICOLON, "Expected ';' after variable declaration")) return nullptr;
     auto node = std::make_unique<VarDecl>(std::move(*name), std::move(initializer));
     node->line = pin_tok.line;
     node->column = pin_tok.column;
+    return node;
+  }
+
+  std::unique_ptr<Node> Parser::parseVarDecl(State* state) {
+    auto node = parseVarDeclNoSemicolon(state);
+    if (node == nullptr) return nullptr;
+    if (!expect(state, lex::TokenType::SEMICOLON, "Expected ';' after variable declaration")) return nullptr;
     return node;
   }
 
@@ -807,6 +830,77 @@ namespace par { // Complex parsing structures
     return node;
   }
 
+  std::unique_ptr<Node> Parser::parseFor(State* state) {
+    lex::Token for_tok = advance(state); // consume 'for'
+    if (!expect(state, lex::TokenType::L_PAREN, "Expected '(' after 'for'")) return nullptr;
+
+    std::unique_ptr<Node> init;
+    if (!check(state->lexer.get(), lex::TokenType::SEMICOLON)) {
+      init = check(state->lexer.get(), lex::TokenType::PIN) ? parseVarDeclNoSemicolon(state) : parseExpression(state, 1);
+      if (init == nullptr) return nullptr;
+    }
+    if (!expect(state, lex::TokenType::SEMICOLON, "Expected ';' after for-loop initializer")) return nullptr;
+
+    std::unique_ptr<Node> condition;
+    if (!check(state->lexer.get(), lex::TokenType::SEMICOLON)) {
+      condition = parseExpression(state, 1);
+      if (condition == nullptr) return nullptr;
+    }
+    if (!expect(state, lex::TokenType::SEMICOLON, "Expected ';' after for-loop condition")) return nullptr;
+
+    std::unique_ptr<Node> increment;
+    if (!check(state->lexer.get(), lex::TokenType::R_PAREN)) {
+      increment = parseExpression(state, 1);
+      if (increment == nullptr) return nullptr;
+    }
+    if (!expect(state, lex::TokenType::R_PAREN, "Expected ')' after for-loop clauses")) return nullptr;
+
+    auto body = parseBlock(state);
+    if (body == nullptr) return nullptr;
+
+    return makeNode<For>(for_tok.line, for_tok.column, std::move(init), std::move(condition), std::move(increment), std::move(body));
+  }
+
+  std::unique_ptr<Node> Parser::parseSwitch(State* state) {
+    lex::Token switch_tok = advance(state); // consume 'switch'
+    if (!expect(state, lex::TokenType::L_PAREN, "Expected '(' after 'switch'")) return nullptr;
+    auto subject = parseExpression(state, 1);
+    if (subject == nullptr) return nullptr;
+    if (!expect(state, lex::TokenType::R_PAREN, "Expected ')' after switch subject")) return nullptr;
+    if (!expect(state, lex::TokenType::L_BRACE, "Expected '{' after switch")) return nullptr;
+
+    std::vector<SwitchCase> cases;
+    bool seen_default = false;
+    while (!check(state->lexer.get(), lex::TokenType::R_BRACE) && !isAtEnd(state->lexer.get())) {
+      SwitchCase c;
+      if (match(state, lex::TokenType::CASE)) {
+        c.value = parseExpression(state, 1);
+        if (c.value == nullptr) return nullptr;
+      } else if (match(state, lex::TokenType::DEFAULT)) {
+        if (seen_default) {
+          panic(m_hooks.format_error(state, state->tokens.back(), "Duplicate 'default' in switch"));
+          return nullptr;
+        }
+        seen_default = true;
+      } else {
+        panic(m_hooks.format_error(state, state->lexer->peekToken(), "Expected 'case' or 'default' in switch body"));
+        return nullptr;
+      }
+      if (!expect(state, lex::TokenType::COLON, "Expected ':' after case label")) return nullptr;
+
+      while (!check(state->lexer.get(), lex::TokenType::CASE) && !check(state->lexer.get(), lex::TokenType::DEFAULT) && !check(state->lexer.get(), lex::TokenType::R_BRACE) &&
+             !isAtEnd(state->lexer.get())) {
+        auto stmt = parseStatement(state);
+        if (stmt == nullptr) return nullptr;
+        c.body.push_back(std::move(stmt));
+      }
+      cases.push_back(std::move(c));
+    }
+    if (!expect(state, lex::TokenType::R_BRACE, "Expected '}' after switch body")) return nullptr;
+
+    return makeNode<Switch>(switch_tok.line, switch_tok.column, std::move(subject), std::move(cases));
+  }
+
   std::unique_ptr<VarDecl> Parser::parseClassField(State* state) {
     // field declaration
     lex::Token field_pin_tok = advance(state); // consume 'pin'
@@ -909,7 +1003,10 @@ namespace par { // Complex parsing structures
     return true;
   }
 
-  bool Parser::parseClassBody(State* state, std::vector<std::unique_ptr<VarDecl>>* out_fields, std::vector<std::unique_ptr<FnLiteral>>* out_methods, std::vector<std::string>* out_method_names) {
+  bool Parser::parseClassBody(State* state,
+                              std::vector<std::unique_ptr<VarDecl>>* out_fields,
+                              std::vector<std::unique_ptr<FnLiteral>>* out_methods,
+                              std::vector<std::string>* out_method_names) {
     while (!check(state->lexer.get(), lex::TokenType::R_BRACE) && !isAtEnd(state->lexer.get())) {
       if (check(state->lexer.get(), lex::TokenType::PIN)) {
         auto field_node = parseClassField(state);

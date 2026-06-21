@@ -22,7 +22,6 @@ namespace lex {
     table['|'] = {{'\0', ILLEGAL}, {'|', OR}};
     table['&'] = {{'\0', ILLEGAL}, {'&', AND}};
     table['!'] = {{'\0', NOT}, {'=', NOT_EQUALS}};
-    table[':'] = {{'\0', COLON}};
     table['/'] = {{'\0', SLASH}, {'=', SLASH_ASSIGN}};
 
     return table;
@@ -298,6 +297,7 @@ namespace lex {
       case '.': tvp = {DOT, {}}; break;
       case ';': tvp = {SEMICOLON, {}}; break;
       case '?': tvp = {QUESTION_MARK, {}}; break;
+      case ':': tvp = {COLON, {}}; break;
 
       // 1-2 char long tokens
       case '+':
@@ -310,8 +310,7 @@ namespace lex {
       case '|':
       case '&':
       case '!':
-      case '/':
-      case ':': tvp = parsePossiblePair(current_char); break;
+      case '/': tvp = parsePossiblePair(current_char); break;
 
       // Special tokens
       case '"': tvp = parseString(); break;
