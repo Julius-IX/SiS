@@ -54,7 +54,7 @@ namespace par {
     std::expected<std::optional<Path>, std::string> checkForInclude(const Path& path);
 
     // Expression parsing Pratt core
-    static int glueStrength(const lex::TokenType& type);
+    static int bindingPower(const lex::TokenType& type);
     std::unique_ptr<Node> parseAtom(State* state);                                                   // nud: things that START an expression
     std::unique_ptr<Node> parseContinuation(State* state, std::unique_ptr<Node> left);               // led: things that EXTEND an expression
     std::unique_ptr<Node> parseExpression(State* state, int min_prec = 1);                           // driver loop
