@@ -225,8 +225,7 @@ namespace par { // Include resolving
 namespace par { // Base parsing loop functions
   bool Parser::parse(State* state) {
     std::vector<std::unique_ptr<Node>> statements;
-    lex::Lexer* lexer = state->lexer.get();
-    while (!isAtEnd(lexer)) {
+    while (!isAtEnd(state->lexer.get())) {
       std::unique_ptr<Node> stmt = parseStatement(state);
       if (!stmt) return false;
       statements.push_back(std::move(stmt));
