@@ -225,6 +225,7 @@ namespace par { // Include resolving
 namespace par { // Base parsing loop functions
   bool Parser::parse(State* state) {
     std::vector<std::unique_ptr<Node>> statements;
+
     while (!isAtEnd(state->lexer.get())) {
       std::unique_ptr<Node> stmt = parseStatement(state);
       if (stmt == nullptr) return false;
@@ -554,7 +555,7 @@ namespace par { // Complex parsing structures
   // parseStatement dispatch table for statement-level grammar.
   // Keyword-led statements get their own function. Anything else
   // is an expression used as a statement (x = 5; / foo();).
-  std::unique_ptr<Node> Parser::parseStatement(State* state) { // TODO: refactor into smaller functions
+  std::unique_ptr<Node> Parser::parseStatement(State* state) {
     lex::TokenType next = state->lexer->peekToken().type;
 
     switch (next) {
@@ -563,48 +564,7 @@ namespace par { // Complex parsing structures
       case lex::TokenType::WHILE: return parseWhile(state);
       case lex::TokenType::PIN: return parseVarDecl(state);
       case lex::TokenType::RETURN: return parseReturn(state);
-      case lex::TokenType::FN: {
-        // fn at statement level = named fn decl stored as pin
-        // fn name(...) {} is syntactic sugar for: pin name = fn(...) {};
-        // We parse it here as a VarDecl whose initializer is a FnLiteral.
-        // This keeps the AST uniform the evaluator never needs to distinguish
-        // "function statement" from "pinned function expression."
-        advance(state); // consume 'fn'
-        lex::Token fn_tok = state->tokens.back();
-        lex::Token name_tok = advance(state);
-        if (name_tok.type != lex::TokenType::IDENT) {
-          panic(m_hooks.format_error(state, name_tok, "Expected function name after 'fn'"));
-          return nullptr;
-        }
-        auto name = getFromVariant<std::string>(state->tokens.back());
-        if (!name) {
-          panic(m_hooks.format_error(state, name_tok, "Empty function name"));
-          return nullptr;
-        }
-        // Now parse the rest as if we saw fn without consuming the name
-        // We need the '(' next
-        if (!expect(state, lex::TokenType::L_PAREN, "Expected '(' after function name")) return nullptr;
-        std::vector<std::string> params;
-        while (!check(state->lexer.get(), lex::TokenType::R_PAREN) && !isAtEnd(state->lexer.get())) {
-          lex::Token param_tok = advance(state);
-          if (param_tok.type != lex::TokenType::IDENT) {
-            panic(m_hooks.format_error(state, param_tok, "Expected parameter name"));
-            return nullptr;
-          }
-          auto param = getFromVariant<std::string>(state->tokens.back());
-          if (!param) {
-            panic(m_hooks.format_error(state, param_tok, "Empty parameter name"));
-            return nullptr;
-          }
-          params.push_back(std::move(*param));
-          if (!match(state, lex::TokenType::COMMA)) break;
-        }
-        if (!expect(state, lex::TokenType::R_PAREN, "Expected ')' after parameters")) return nullptr;
-        auto body = parseBlock(state);
-        if (body == nullptr) return nullptr;
-        auto fn = makeNode<FnLiteral>(fn_tok.line, fn_tok.column, std::move(params), std::move(body));
-        return makeNode<VarDecl>(fn_tok.line, fn_tok.column, std::move(*name), std::move(fn));
-      }
+      case lex::TokenType::FN: return parseTopLevelFn(state);
       case lex::TokenType::CLASS: return parseClassDecl(state);
       case lex::TokenType::BREAK: {
         lex::Token break_tok = advance(state);
@@ -748,6 +708,49 @@ namespace par { // Complex parsing structures
     node->line = fn_tok.line;
     node->column = fn_tok.column;
     return node;
+  }
+
+  // fn at statement level = named fn decl stored as pin
+  // fn name(...) {} is syntactic sugar for: pin name = fn(...) {};
+  // We parse it here as a VarDecl whose initializer is a FnLiteral.
+  // This keeps the AST uniform the evaluator never needs to distinguish
+  // "function statement" from "pinned function expression."
+  std::unique_ptr<Node> Parser::parseTopLevelFn(State* state) {
+    advance(state); // consume 'fn'
+    lex::Token fn_tok = state->tokens.back();
+    lex::Token name_tok = advance(state);
+    if (name_tok.type != lex::TokenType::IDENT) {
+      panic(m_hooks.format_error(state, name_tok, "Expected function name after 'fn'"));
+      return nullptr;
+    }
+    auto name = getFromVariant<std::string>(state->tokens.back());
+    if (!name) {
+      panic(m_hooks.format_error(state, name_tok, "Empty function name"));
+      return nullptr;
+    }
+    // Now parse the rest as if we saw fn without consuming the name
+    // We need the '(' next
+    if (!expect(state, lex::TokenType::L_PAREN, "Expected '(' after function name")) return nullptr;
+    std::vector<std::string> params;
+    while (!check(state->lexer.get(), lex::TokenType::R_PAREN) && !isAtEnd(state->lexer.get())) {
+      lex::Token param_tok = advance(state);
+      if (param_tok.type != lex::TokenType::IDENT) {
+        panic(m_hooks.format_error(state, param_tok, "Expected parameter name"));
+        return nullptr;
+      }
+      auto param = getFromVariant<std::string>(state->tokens.back());
+      if (!param) {
+        panic(m_hooks.format_error(state, param_tok, "Empty parameter name"));
+        return nullptr;
+      }
+      params.push_back(std::move(*param));
+      if (!match(state, lex::TokenType::COMMA)) break;
+    }
+    if (!expect(state, lex::TokenType::R_PAREN, "Expected ')' after parameters")) return nullptr;
+    auto body = parseBlock(state);
+    if (body == nullptr) return nullptr;
+    auto fn = makeNode<FnLiteral>(fn_tok.line, fn_tok.column, std::move(params), std::move(body));
+    return makeNode<VarDecl>(fn_tok.line, fn_tok.column, std::move(*name), std::move(fn));
   }
 
   std::unique_ptr<Node> Parser::parseNewExpr(State* state) {
