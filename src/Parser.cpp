@@ -807,17 +807,86 @@ namespace par { // Complex parsing structures
     return node;
   }
 
-  std::unique_ptr<Node> Parser::parseClassDecl(State* state) { // TODO: refactor into smaller functions
-    lex::Token class_tok = advance(state);                     // consume 'class'
+  std::unique_ptr<VarDecl> Parser::parseClassField(State* state) {
+    // field declaration
+    lex::Token field_pin_tok = advance(state); // consume 'pin'
+    lex::Token field_tok = advance(state);
+    if (field_tok.type != lex::TokenType::IDENT) {
+      panic(m_hooks.format_error(state, field_tok, "Expected field name"));
+      return nullptr;
+    }
+    auto field_name = getFromVariant<std::string>(state->tokens.back());
+    if (!field_name) {
+      panic(m_hooks.format_error(state, field_tok, "Empty field name"));
+      return nullptr;
+    }
+    std::unique_ptr<Node> field_init;
+    if (match(state, lex::TokenType::ASSIGN)) {
+      field_init = parseExpression(state, 1);
+      if (field_init == nullptr) return nullptr;
+    }
+    if (!expect(state, lex::TokenType::SEMICOLON, "Expected ';' after field declaration")) return nullptr;
+    auto field_node = std::make_unique<VarDecl>(std::move(*field_name), std::move(field_init));
+    field_node->line = field_pin_tok.line;
+    field_node->column = field_pin_tok.column;
+    return field_node;
+  }
+
+  std::optional<std::vector<std::string>> Parser::parseClassMethodParams(State* state) {
+    if (!expect(state, lex::TokenType::L_PAREN, "Expected '(' after method name")) return std::nullopt;
+    std::vector<std::string> params;
+    while (!check(state->lexer.get(), lex::TokenType::R_PAREN) && !isAtEnd(state->lexer.get())) {
+      lex::Token param_tok = advance(state);
+      if (param_tok.type != lex::TokenType::IDENT) {
+        panic(m_hooks.format_error(state, param_tok, "Expected parameter name"));
+        return std::nullopt;
+      }
+      auto param = getFromVariant<std::string>(state->tokens.back());
+      if (!param) {
+        panic(m_hooks.format_error(state, param_tok, "Empty parameter name"));
+        return std::nullopt;
+      }
+      params.push_back(std::move(*param));
+      if (!match(state, lex::TokenType::COMMA)) break;
+    }
+    if (!expect(state, lex::TokenType::R_PAREN, "Expected ')' after method parameters")) return std::nullopt;
+    return params;
+  }
+
+  std::unique_ptr<FnLiteral> Parser::parseClassMethod(State* state, std::string* out_name) {
+    // method declaration
+    lex::Token method_fn_tok = advance(state); // consume 'fn'
+    lex::Token method_tok = advance(state);
+    if (method_tok.type != lex::TokenType::IDENT) {
+      panic(m_hooks.format_error(state, method_tok, "Expected method name"));
+      return nullptr;
+    }
+    auto method_name = getFromVariant<std::string>(state->tokens.back());
+    if (!method_name) {
+      panic(m_hooks.format_error(state, method_tok, "Empty method name"));
+      return nullptr;
+    }
+    auto params = parseClassMethodParams(state);
+    if (!params) return nullptr;
+    auto body = parseBlock(state);
+    if (body == nullptr) return nullptr;
+    *out_name = std::move(*method_name);
+    auto method_node = std::make_unique<FnLiteral>(std::move(*params), std::move(body));
+    method_node->line = method_fn_tok.line;
+    method_node->column = method_fn_tok.column;
+    return method_node;
+  }
+
+  bool Parser::parseClassHeader(State* state, std::string* out_name, std::string* out_parent_name) const {
     lex::Token name_tok = advance(state);
     if (name_tok.type != lex::TokenType::IDENT) {
       panic(m_hooks.format_error(state, name_tok, "Expected class name"));
-      return nullptr;
+      return false;
     }
     auto name = getFromVariant<std::string>(state->tokens.back());
     if (!name) {
       panic(m_hooks.format_error(state, name_tok, "Empty class name"));
-      return nullptr;
+      return false;
     }
 
     std::string parent_name;
@@ -825,92 +894,58 @@ namespace par { // Complex parsing structures
       lex::Token parent_tok = advance(state);
       if (parent_tok.type != lex::TokenType::IDENT) {
         panic(m_hooks.format_error(state, parent_tok, "Expected parent class name after 'extends'"));
-        return nullptr;
+        return false;
       }
       auto pname = getFromVariant<std::string>(state->tokens.back());
       if (!pname) {
         panic(m_hooks.format_error(state, parent_tok, "Empty parent class name"));
-        return nullptr;
+        return false;
       }
       parent_name = std::move(*pname);
     }
+
+    *out_name = std::move(*name);
+    *out_parent_name = std::move(parent_name);
+    return true;
+  }
+
+  bool Parser::parseClassBody(State* state, std::vector<std::unique_ptr<VarDecl>>* out_fields, std::vector<std::unique_ptr<FnLiteral>>* out_methods, std::vector<std::string>* out_method_names) {
+    while (!check(state->lexer.get(), lex::TokenType::R_BRACE) && !isAtEnd(state->lexer.get())) {
+      if (check(state->lexer.get(), lex::TokenType::PIN)) {
+        auto field_node = parseClassField(state);
+        if (field_node == nullptr) return false;
+        out_fields->push_back(std::move(field_node));
+
+      } else if (check(state->lexer.get(), lex::TokenType::FN)) {
+        std::string method_name;
+        auto method_node = parseClassMethod(state, &method_name);
+        if (method_node == nullptr) return false;
+        out_method_names->push_back(std::move(method_name));
+        out_methods->push_back(std::move(method_node));
+      } else {
+        panic(m_hooks.format_error(state, state->lexer->peekToken(), "Expected 'pin' or 'fn' in class body"));
+        return false;
+      }
+    }
+    return true;
+  }
+
+  std::unique_ptr<Node> Parser::parseClassDecl(State* state) {
+    lex::Token class_tok = advance(state); // consume 'class'
+
+    std::string name;
+    std::string parent_name;
+    if (!parseClassHeader(state, &name, &parent_name)) return nullptr;
 
     if (!expect(state, lex::TokenType::L_BRACE, "Expected '{' after class declaration")) return nullptr;
 
     std::vector<std::unique_ptr<VarDecl>> fields;
     std::vector<std::unique_ptr<FnLiteral>> methods;
     std::vector<std::string> method_names;
-
-    while (!check(state->lexer.get(), lex::TokenType::R_BRACE) && !isAtEnd(state->lexer.get())) {
-      if (check(state->lexer.get(), lex::TokenType::PIN)) {
-        // field declaration
-        lex::Token field_pin_tok = advance(state); // consume 'pin'
-        lex::Token field_tok = advance(state);
-        if (field_tok.type != lex::TokenType::IDENT) {
-          panic(m_hooks.format_error(state, field_tok, "Expected field name"));
-          return nullptr;
-        }
-        auto field_name = getFromVariant<std::string>(state->tokens.back());
-        if (!field_name) {
-          panic(m_hooks.format_error(state, field_tok, "Empty field name"));
-          return nullptr;
-        }
-        std::unique_ptr<Node> field_init;
-        if (match(state, lex::TokenType::ASSIGN)) {
-          field_init = parseExpression(state, 1);
-          if (field_init == nullptr) return nullptr;
-        }
-        if (!expect(state, lex::TokenType::SEMICOLON, "Expected ';' after field declaration")) return nullptr;
-        auto field_node = std::make_unique<VarDecl>(std::move(*field_name), std::move(field_init));
-        field_node->line = field_pin_tok.line;
-        field_node->column = field_pin_tok.column;
-        fields.push_back(std::move(field_node));
-
-      } else if (check(state->lexer.get(), lex::TokenType::FN)) {
-        // method declaration
-        lex::Token method_fn_tok = advance(state); // consume 'fn'
-        lex::Token method_tok = advance(state);
-        if (method_tok.type != lex::TokenType::IDENT) {
-          panic(m_hooks.format_error(state, method_tok, "Expected method name"));
-          return nullptr;
-        }
-        auto method_name = getFromVariant<std::string>(state->tokens.back());
-        if (!method_name) {
-          panic(m_hooks.format_error(state, method_tok, "Empty method name"));
-          return nullptr;
-        }
-        if (!expect(state, lex::TokenType::L_PAREN, "Expected '(' after method name")) return nullptr;
-        std::vector<std::string> params;
-        while (!check(state->lexer.get(), lex::TokenType::R_PAREN) && !isAtEnd(state->lexer.get())) {
-          lex::Token param_tok = advance(state);
-          if (param_tok.type != lex::TokenType::IDENT) {
-            panic(m_hooks.format_error(state, param_tok, "Expected parameter name"));
-            return nullptr;
-          }
-          auto param = getFromVariant<std::string>(state->tokens.back());
-          if (!param) {
-            panic(m_hooks.format_error(state, param_tok, "Empty parameter name"));
-            return nullptr;
-          }
-          params.push_back(std::move(*param));
-          if (!match(state, lex::TokenType::COMMA)) break;
-        }
-        if (!expect(state, lex::TokenType::R_PAREN, "Expected ')' after method parameters")) return nullptr;
-        auto body = parseBlock(state);
-        if (body == nullptr) return nullptr;
-        method_names.push_back(std::move(*method_name));
-        auto method_node = std::make_unique<FnLiteral>(std::move(params), std::move(body));
-        method_node->line = method_fn_tok.line;
-        method_node->column = method_fn_tok.column;
-        methods.push_back(std::move(method_node));
-      } else {
-        panic(m_hooks.format_error(state, state->lexer->peekToken(), "Expected 'pin' or 'fn' in class body"));
-        return nullptr;
-      }
-    }
+    if (!parseClassBody(state, &fields, &methods, &method_names)) return nullptr;
 
     if (!expect(state, lex::TokenType::R_BRACE, "Expected '}' after class body")) return nullptr;
-    auto node = std::make_unique<ClassDecl>(std::move(*name), std::move(parent_name), std::move(fields), std::move(methods), std::move(method_names));
+    auto node = std::make_unique<ClassDecl>(std::move(name), std::move(parent_name), std::move(fields), std::move(methods), std::move(method_names));
     node->line = class_tok.line;
     node->column = class_tok.column;
     return node;

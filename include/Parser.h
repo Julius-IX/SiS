@@ -69,8 +69,18 @@ namespace par {
     std::unique_ptr<Node> parseReturn(State* state);
     std::unique_ptr<Node> parseFnLiteral(State* state);
     std::unique_ptr<Node> parseTopLevelFn(State* state);
-    std::unique_ptr<Node> parseClassDecl(State* state);
     std::unique_ptr<Node> parseNewExpr(State* state);
     std::unique_ptr<Node> parseThisOrSuper(State* state, bool is_super);
+
+    // dedicated section for classes
+    std::unique_ptr<Node> parseClassDecl(State* state);
+    bool parseClassHeader(State* state, std::string* out_name, std::string* out_parent_name) const;
+    bool parseClassBody(State* state,
+                        std::vector<std::unique_ptr<VarDecl>>* out_fields,
+                        std::vector<std::unique_ptr<FnLiteral>>* out_methods,
+                        std::vector<std::string>* out_method_names);
+    std::unique_ptr<VarDecl> parseClassField(State* state);
+    std::unique_ptr<FnLiteral> parseClassMethod(State* state, std::string* out_name);
+    std::optional<std::vector<std::string>> parseClassMethodParams(State* state);
   };
 } // namespace par
