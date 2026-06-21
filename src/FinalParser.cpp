@@ -12,36 +12,6 @@ static void panic(const std::string_view msg) {
   std::exit(1);
 }
 
-namespace fpar {                     // NOTE: separate namespace stuff that is not implemented yet
-  // NOLINTBEGIN
-  // clangd-format off
-  std::unique_ptr<Node> parseStatement(State* state)  { throw std::logic_error("Not implemented"); }
-
-  std::unique_ptr<Node> Parser::parseLiteral(State* state) { throw std::logic_error("Not implemented"); }
-  std::unique_ptr<Node> Parser::parseIdentifier(State* state) { throw std::logic_error("Not implemented"); }
-  std::unique_ptr<Node> Parser::parseUnary(State* state) { throw std::logic_error("Not implemented"); }
-  std::unique_ptr<Node> Parser::parseBinary(State* state) { throw std::logic_error("Not implemented"); }
-  std::unique_ptr<Node> Parser::parseBlock(State* state) { throw std::logic_error("Not implemented"); }
-  std::unique_ptr<Node> Parser::parseIf(State* state) { throw std::logic_error("Not implemented"); }
-  std::unique_ptr<Node> Parser::parseWhile(State* state) { throw std::logic_error("Not implemented"); }
-  std::unique_ptr<Node> Parser::parseVarDecl(State* state) { throw std::logic_error("Not implemented"); }
-  std::unique_ptr<Node> Parser::parseExprStmt(State* state) { throw std::logic_error("Not implemented"); }
-  std::unique_ptr<Node> Parser::parseCall(State* state) { throw std::logic_error("Not implemented"); }
-  std::unique_ptr<Node> Parser::parseFnLiteral(State* state) { throw std::logic_error("Not implemented"); }
-  std::unique_ptr<Node> Parser::parseMemberAccess(State* state) { throw std::logic_error("Not implemented"); }
-  std::unique_ptr<Node> Parser::parseArrayLiteral(State* state) { throw std::logic_error("Not implemented"); }
-  std::unique_ptr<Node> Parser::parseReturn(State* state) { throw std::logic_error("Not implemented"); }
-  std::unique_ptr<Node> Parser::parseBreak(State* state) { throw std::logic_error("Not implemented"); }
-  std::unique_ptr<Node> Parser::parseContinue(State* state) { throw std::logic_error("Not implemented"); }
-  std::unique_ptr<Node> Parser::parseClassDecl(State* state) { throw std::logic_error("Not implemented"); }
-  std::unique_ptr<Node> Parser::parseNewExpr(State* state) { throw std::logic_error("Not implemented"); }
-  std::unique_ptr<Node> Parser::parseThisExpr(State* state) { throw std::logic_error("Not implemented"); }
-  std::unique_ptr<Node> Parser::parseSuperAccess(State* state) { throw std::logic_error("Not implemented"); }
-  // clangd-format on
-  // NOLINTEND
-
-} // namespace fpar
-
 namespace fpar { // NOTE: separate namespace block for readability
   static std::optional<std::string> readFileToString(const Path& path) {
     LOG_DEBUG_FLUSH("Reading file {}", path.string());
