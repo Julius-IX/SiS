@@ -1,6 +1,7 @@
+#include <Token.h>
 #include <gtest/gtest.h>
 
-#include "Lexer.h"
+#include <Lexer.h>
 
 /* I'm using weird helper functions bc I barely know how Google Test works.
  * Many of the MATCHERS.* automatically print values passed to them upon failure.
@@ -15,14 +16,17 @@ static std::string tokenVariantToString(const lex::Token& token) {
   lex::TokenVariant tok_var = token.value;
   if (std::holds_alternative<std::monostate>(tok_var)) {
     return "std::monostate";
+  }
 
-  } else if (std::holds_alternative<double>(tok_var)) {
+  if (std::holds_alternative<double>(tok_var)) {
     return std::to_string(std::get<double>(tok_var));
+  }
 
-  } else if (std::holds_alternative<bool>(tok_var)) {
+  if (std::holds_alternative<bool>(tok_var)) {
     return std::to_string(std::get<bool>(tok_var));
+  }
 
-  } else if (std::holds_alternative<std::string>(tok_var)) {
+  if (std::holds_alternative<std::string>(tok_var)) {
     return std::get<std::string>(tok_var);
   }
 
@@ -165,7 +169,7 @@ TEST(Lexer, CanDiscernValidInvalidIdentifier) {
 
 TEST(Lexer, ReturnIllegalOnUnknownChar) {
   std::string input = "@ beans & |\n"
-                      "~ ` ? pin\n"
+                      "~ ` ^ pin\n"
                       "for $ in\n";
 
   // clang-format off
@@ -176,7 +180,7 @@ TEST(Lexer, ReturnIllegalOnUnknownChar) {
     {.type = lex::ILLEGAL, .value = "|",     .line = 1, .column = 11 },
     {.type = lex::ILLEGAL, .value = "~",     .line = 2, .column = 1  },
     {.type = lex::ILLEGAL, .value = "`",     .line = 2, .column = 3  },
-    {.type = lex::ILLEGAL, .value = "?",     .line = 2, .column = 5  },
+    {.type = lex::ILLEGAL, .value = "^",     .line = 2, .column = 5  },
     {.type = lex::PIN,     .value = {},      .line = 2, .column = 7  },
     {.type = lex::FOR,     .value = {},      .line = 3, .column = 1  },
     {.type = lex::ILLEGAL, .value = "$",     .line = 3, .column = 5  },
@@ -339,18 +343,22 @@ TEST(Lexer, SplitsTokensCorretly) {
     {.type = lex::R_BRACE       , .value = {}              , .line = 16 , .column = 18 },
     {.type = lex::SEMICOLON     , .value = {}              , .line = 16 , .column = 19 },
 
-    {.type = lex::HASH          , .value = {}              , .line = 17 , .column = 1  },
+    {.type = lex::ILLEGAL       , .value = {"#"}           , .line = 17 , .column = 1  }, // TODO: add support for later
     {.type = lex::INCLUDE       , .value = {}              , .line = 17 , .column = 2  },
     {.type = lex::STRING        , .value = "this is a string literal", .line = 17 , .column = 10 },
 
     {.type = lex::IDENT         , .value = "num"           , .line = 18 , .column = 1  },
-    {.type = lex::PLUS_PLUS     , .value = {}              , .line = 18 , .column = 4  },
-    {.type = lex::PLUS_PLUS     , .value = {}              , .line = 18 , .column = 7  },
+    {.type = lex::PLUS          , .value = {}              , .line = 18 , .column = 4  }, // TODO: add support for later SHOULD BE '++'
+    {.type = lex::PLUS          , .value = {}              , .line = 18 , .column = 5  }, // PART OF '++'
+    {.type = lex::PLUS          , .value = {}              , .line = 18 , .column = 7  }, // TODO: add support for later
+    {.type = lex::PLUS          , .value = {}              , .line = 18 , .column = 8  }, // PART OF '++'
     {.type = lex::IDENT         , .value = "num"           , .line = 18 , .column = 9  },
-    {.type = lex::MINUS_MINUS   , .value = {}              , .line = 18 , .column = 13 },
+    {.type = lex::MINUS         , .value = {}              , .line = 18 , .column = 13 }, // TODO: add support for later SHOULD BE '--'
+    {.type = lex::MINUS         , .value = {}              , .line = 18 , .column = 14 }, // PART OF '--'
     {.type = lex::IDENT         , .value = "num"           , .line = 18 , .column = 15 },
     {.type = lex::IDENT         , .value = "num"           , .line = 18 , .column = 19 },
-    {.type = lex::MINUS_MINUS   , .value = {}              , .line = 18 , .column = 22 },
+    {.type = lex::MINUS         , .value = {}              , .line = 18 , .column = 22 }, // TODO: add support for later SHOULD BE '--'
+    {.type = lex::MINUS         , .value = {}              , .line = 18 , .column = 23 }, // PART OF '--'
 
     {.type = lex::STAR          , .value = {}              , .line = 19 , .column = 1  },
     {.type = lex::SLASH         , .value = {}              , .line = 19 , .column = 3  },
@@ -385,7 +393,8 @@ TEST(Lexer, SplitsTokensCorretly) {
     {.type = lex::COMMA         , .value = {}              , .line = 23 , .column = 1  },
     {.type = lex::DOT           , .value = {}              , .line = 23 , .column = 3  },
     {.type = lex::COLON         , .value = {}              , .line = 23 , .column = 5  },
-    {.type = lex::SCOPE_RES     , .value = {}              , .line = 23 , .column = 7  },
+    {.type = lex::COLON         , .value = {}              , .line = 23 , .column = 7  }, // TODO: add support for later SHOULD BE '::'
+    {.type = lex::COLON         , .value = {}              , .line = 23 , .column = 8  }, // PART OF '::'
     {.type = lex::SEMICOLON     , .value = {}              , .line = 23 , .column = 10 },
     {.type = lex::ARROW         , .value = {}              , .line = 23 , .column = 12 },
 

@@ -12,8 +12,8 @@ namespace lex {
   DoubleSymbolTable Lexer::initSymbolTable() {
     DoubleSymbolTable table;
 
-    table['+'] = {{'\0', PLUS}, {'+', PLUS_PLUS}, {'=', PLUS_ASSIGN}};
-    table['-'] = {{'\0', MINUS}, {'-', MINUS_MINUS}, {'=', MINUS_ASSIGN}, {'>', ARROW}};
+    table['+'] = {{'\0', PLUS}, {'=', PLUS_ASSIGN}};
+    table['-'] = {{'\0', MINUS}, {'=', MINUS_ASSIGN}, {'>', ARROW}};
     table['*'] = {{'\0', STAR}, {'=', STAR_ASSIGN}};
     table['%'] = {{'\0', PERCENT}, {'=', PERCENT_ASSIGN}};
     table['='] = {{'\0', ASSIGN}, {'=', EQUALS}};
@@ -22,7 +22,7 @@ namespace lex {
     table['|'] = {{'\0', ILLEGAL}, {'|', OR}};
     table['&'] = {{'\0', ILLEGAL}, {'&', AND}};
     table['!'] = {{'\0', NOT}, {'=', NOT_EQUALS}};
-    table[':'] = {{'\0', COLON}, {':', SCOPE_RES}};
+    table[':'] = {{'\0', COLON}};
     table['/'] = {{'\0', SLASH}, {'=', SLASH_ASSIGN}};
 
     return table;
@@ -273,9 +273,6 @@ namespace lex {
     str.resize(write_index);
   }
 
-  /* TODO: assign error code for ILLEGAL token type
-   * TODO: log ILLEGAL tokens
-   */
   void Lexer::fillBuffer() {
     consumeSpace();
 
@@ -300,7 +297,7 @@ namespace lex {
       case ',': tvp = {COMMA, {}}; break;
       case '.': tvp = {DOT, {}}; break;
       case ';': tvp = {SEMICOLON, {}}; break;
-      case '#': tvp = {HASH, {}}; break;
+      case '?': tvp = {QUESTION_MARK, {}}; break;
 
       // 1-2 char long tokens
       case '+':
@@ -334,7 +331,16 @@ namespace lex {
 
     size_t length = (this->m_state.pos - start_pos) + 1;
     advanceState();
-    this->m_buffer.append(Token{.type = tvp.first, .value = tvp.second, .line = line, .column = column, .length = length});
+    // clang-format off
+    this->m_buffer.append(Token{
+      .source = this->m_source_path,
+      .type = tvp.first,
+      .value = tvp.second,
+      .line = line,
+      .column = column,
+      .length = length,
+    });
+    // clang-format on
   }
 
   Token Lexer::nextToken() {

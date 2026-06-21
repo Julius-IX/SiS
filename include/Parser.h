@@ -2,105 +2,85 @@
 
 #include <Lexer.h>
 #include <ParserNodeTypes.h>
-#include <set>
-#include <string>
+
+#include <deque>
+#include <expected>
+#include <filesystem>
+#include <functional>
+#include <optional>
+#include <unordered_map>
 
 namespace par {
-  class Parser {
-    public:
-    ~Parser() = default;
+  typedef struct ParserState {
+    std::unique_ptr<lex::Lexer> lexer;
+    std::vector<lex::Token> tokens;
+    size_t token_idex;
+  } State;
 
-    // Parses an entire input as a sequence of top level statements.
-    // Returns true on success, false if any parseX call failed along the way.
-    // The resulting tree is stored in m_root and can be read with getRoot()
-    // or printed with printTree().
-    //
-    // Before any tokenizing happens, the raw source behind `lexer` is run
-    // through preprocessIncludes() (see Parser.cpp), which textually splices
-    // in the contents of every `include "path";` statement, recursively,
-    // skipping any path already included earlier in the chain (so it behaves
-    // like #pragma once rather than raw C-style #include). The Lexer this
-    // function is handed should be constructed with that expanded source, or
-    // pass the original source via parseFile()/parseSource() helpers below
-    // which do the expansion for you.
-    bool parse(lex::Lexer* lexer);
-
-    // Convenience entry point: reads `path`, expands includes, lexes and
-    // parses the result. Prefer this over parse() when starting from a file
-    // on disk, since parse() alone assumes include-expansion already
-    // happened to whatever string the Lexer was built from.
-    bool parseFile(const std::string& path);
-
-    [[nodiscard]] const Block* const getRoot() const { return m_root.get(); }
-
-    // Prints the parsed tree to stdout. Only useful after a successful parse() call.
-    void printTree() const;
-
-    private:
-    std::vector<lex::Token> m_tokens;
-    std::unique_ptr<Block> m_root = nullptr;
-
-    static std::string formatIllegalTokenMessage(lex::Lexer* lexer, const lex::Token& token, std::string_view msg = "");
-
-    static void printNode(const Node* node, const std::string& prefix, bool is_last, std::string_view label = "");
-
-    static bool check(lex::Lexer* lexer, lex::TokenType type);
-    static bool isAtEnd(lex::Lexer* lexer);
-    bool expect(lex::Lexer* lexer, lex::TokenType type, std::string_view err_msg);
-    bool match(lex::Lexer* lexer, lex::TokenType type);
-    bool matchAny(lex::Lexer* lexer, std::initializer_list<lex::TokenType> types);
-    lex::Token advance(lex::Lexer* lexer);
-
-    std::unique_ptr<Node> parseLiteral(lex::Lexer* lexer);
-    std::unique_ptr<Node> parseIdentifier(lex::Lexer* lexer);
-    std::unique_ptr<Node> parseUnary(lex::Lexer* lexer);
-    std::unique_ptr<Node> parseBinary(lex::Lexer* lexer, int min_prec);
-    std::unique_ptr<Node> parseAssignment(lex::Lexer* lexer);
-    std::unique_ptr<Node> parsePostfix(lex::Lexer* lexer);
-    std::unique_ptr<Node> parsePrimary(lex::Lexer* lexer);
-    std::unique_ptr<Node> parseBlock(lex::Lexer* lexer);
-    std::unique_ptr<Node> parseStatement(lex::Lexer* lexer);
-    std::unique_ptr<Node> parseIf(lex::Lexer* lexer);
-    std::unique_ptr<Node> parseWhile(lex::Lexer* lexer);
-    std::unique_ptr<Node> parseVarDecl(lex::Lexer* lexer);
-    std::unique_ptr<Node> parseExprStmt(lex::Lexer* lexer);
-    std::unique_ptr<Node> parseCall(lex::Lexer* lexer, std::unique_ptr<Node> callee);
-    std::unique_ptr<Node> parseFnLiteral(lex::Lexer* lexer);
-    std::unique_ptr<Node> parseExpression(lex::Lexer* lexer);
-    std::unique_ptr<Node> parseArrayLiteral(lex::Lexer* lexer);
-
-    // return [expr] ;   |   break ;   |   continue ;
-    std::unique_ptr<Node> parseReturn(lex::Lexer* lexer);
-    std::unique_ptr<Node> parseBreak(lex::Lexer* lexer);
-    std::unique_ptr<Node> parseContinue(lex::Lexer* lexer);
-
-    // class Name [extends Parent] { (pin field [= init];)* (fn name(...) {...})* }
-    std::unique_ptr<Node> parseClassDecl(lex::Lexer* lexer);
-
-    // new ClassName(args)
-    std::unique_ptr<Node> parseNewExpr(lex::Lexer* lexer);
-
-    // Handles a leading `this` or `super` primary token. Builds a ThisExpr
-    // (bare `this`) or, when followed by ARROW, a SuperAccess/MemberAccess
-    // for `this->field` / `super->field`. `is_super` tells it which keyword
-    // was consumed. ARROW chains after the first access (this->a->b) recurse
-    // through parsePostfix's normal '.'/'(' handling on top of the node this
-    // returns, ARROW is only special for the FIRST hop off this/super.
-    std::unique_ptr<Node> parseThisOrSuper(lex::Lexer* lexer, bool is_super);
+  struct ParserHooks {
+    std::function<std::optional<std::string>(const Path&)> read_file;
+    std::function<std::string(State*, const lex::Token&, std::string_view)> format_error;
+    std::function<std::optional<Path>(const Path& root, const Path& file)> resolve_file;
   };
 
-  // Reads the file at `path`, returns its contents, or an empty optional if
-  // it couldn't be opened. Exposed (not static-in-cpp) so it can be reused
-  // by tooling/tests that want the same file-reading behavior as the parser.
-  [[nodiscard]] std::optional<std::string> readFileToString(const std::string& path);
+  class Parser {
+    public:
+    Parser();
+    ~Parser() = default;
 
-  // Expands every `include "relative/path";` statement found in `source`
-  // (which was itself read from `source_path`, used to resolve relative
-  // includes against the including file's own directory) by replacing the
-  // statement with the target file's fully expanded contents, recursively.
-  // `already_included` tracks resolved absolute paths seen so far in this
-  // expansion chain so a file is never spliced in twice (#pragma once
-  // semantics), whether that's a diamond include or an accidental cycle.
-  [[nodiscard]] std::string preprocessIncludes(const std::string& source, const std::string& source_path, std::set<std::string>& already_included);
+    void parseRoot(const Path& path);
+    bool parse(State* state);
 
+    const Block& peekRoot() const { return *m_root; }
+
+    protected:
+    ParserHooks m_hooks; // NOLINT
+
+    private:
+    std::unique_ptr<Block> m_root = std::make_unique<Block>(std::vector<std::unique_ptr<Node>>{});
+    std::deque<Path> m_include_stack;
+    std::unordered_map<Path, State> m_states;
+
+    void initRootState(const Path& full_root_path, const Path& original_path);
+    void parseCurrentFile(const Path& current_path);
+    bool loadIncludeSource(const Path& include_path);
+
+    static lex::Token advance(State* state);
+    static bool match(State* state, lex::TokenType type);
+    static bool check(lex::Lexer* lexer, lex::TokenType type);
+    static bool isAtEnd(lex::Lexer* lexer);
+    bool expect(State* state, lex::TokenType type, std::string_view err_msg) const;
+
+    std::expected<std::optional<Path>, std::string> checkForInclude(const Path& path);
+
+    // Expression parsing Pratt core
+    static int bindingPower(const lex::TokenType& type);
+    std::unique_ptr<Node> parseAtom(State* state);                                                   // nud: things that START an expression
+    std::unique_ptr<Node> parseContinuation(State* state, std::unique_ptr<Node> left);               // led: things that EXTEND an expression
+    std::unique_ptr<Node> parseExpression(State* state, int min_prec = 1);                           // driver loop
+    std::vector<std::unique_ptr<Node>> parseExpressionList(State* state, lex::TokenType terminator); // comma-sep until terminator
+
+    // Statement parsing one function per distinct statement shape
+    std::unique_ptr<Node> parseStatement(State* state);
+    std::unique_ptr<Node> parseBlock(State* state);
+    std::unique_ptr<Node> parseIf(State* state);
+    std::unique_ptr<Node> parseWhile(State* state);
+    std::unique_ptr<Node> parseVarDecl(State* state);
+    std::unique_ptr<Node> parseReturn(State* state);
+    std::unique_ptr<Node> parseFnLiteral(State* state);
+    std::unique_ptr<Node> parseTopLevelFn(State* state);
+    std::unique_ptr<Node> parseNewExpr(State* state);
+    std::unique_ptr<Node> parseThisOrSuper(State* state, bool is_super);
+
+    // dedicated section for classes
+    std::unique_ptr<Node> parseClassDecl(State* state);
+    bool parseClassHeader(State* state, std::string* out_name, std::string* out_parent_name) const;
+    bool parseClassBody(State* state,
+                        std::vector<std::unique_ptr<VarDecl>>* out_fields,
+                        std::vector<std::unique_ptr<FnLiteral>>* out_methods,
+                        std::vector<std::string>* out_method_names);
+    std::unique_ptr<VarDecl> parseClassField(State* state);
+    std::unique_ptr<FnLiteral> parseClassMethod(State* state, std::string* out_name);
+    std::optional<std::vector<std::string>> parseClassMethodParams(State* state);
+  };
 } // namespace par
