@@ -1,5 +1,5 @@
-#include <FinalParser.h>
 #include <Logging.h>
+#include <Parser.h>
 
 #include <algorithm>
 #include <filesystem>
@@ -12,7 +12,7 @@ static void panic(const std::string_view msg) {
   std::exit(1);
 }
 
-namespace fpar { // Hooks
+namespace par { // Hooks
   static std::optional<std::string> readFileToString(const Path& path) {
     LOG_DEBUG_FLUSH("Reading file {}", path.string());
     std::ifstream file(path, std::ios::in | std::ios::binary);
@@ -61,9 +61,9 @@ namespace fpar { // Hooks
     m_hooks.format_error = formatIllegalTokenMessage;
     m_hooks.resolve_file = resolveFile;
   }
-} // namespace fpar
+} // namespace par
 
-namespace fpar { // Helpers
+namespace par { // Helpers
 
   template <typename T>
   static std::optional<T> getFromVariant(const lex::Token& token) {
@@ -113,9 +113,9 @@ namespace fpar { // Helpers
     return true;
   }
 
-} // namespace fpar
+} // namespace par
 
-namespace fpar { // Include resolving
+namespace par { // Include resolving
 
   static Path resolveRootDirectory(const Path& path) {
     std::error_code err;
@@ -235,9 +235,9 @@ namespace fpar { // Include resolving
     return true;
   }
 
-} // namespace fpar
+} // namespace par
 
-namespace fpar { // Base parsing loop
+namespace par { // Base parsing loop
   static bool isAssignmentOp(lex::TokenType type) {
     switch (type) {
       case lex::TokenType::ASSIGN:
@@ -548,9 +548,9 @@ namespace fpar { // Base parsing loop
     return list;
   }
 
-} // namespace fpar
+} // namespace par
 
-namespace fpar { // Complex parsing structures
+namespace par { // Complex parsing structures
 
   // parseStatement dispatch table for statement-level grammar.
   // Keyword-led statements get their own function. Anything else
@@ -806,7 +806,7 @@ namespace fpar { // Complex parsing structures
   }
 
   std::unique_ptr<Node> Parser::parseClassDecl(State* state) { // TODO: refactor into smaller functions
-    lex::Token class_tok = advance(state); // consume 'class'
+    lex::Token class_tok = advance(state);                     // consume 'class'
     lex::Token name_tok = advance(state);
     if (name_tok.type != lex::TokenType::IDENT) {
       panic(m_hooks.format_error(state, name_tok, "Expected class name"));
@@ -914,9 +914,9 @@ namespace fpar { // Complex parsing structures
     return node;
   }
 
-} // namespace fpar
+} // namespace par
 
-namespace fpar { // Tree-drawing (debugging only don't expect direct access to this)
+namespace par { // Tree-drawing (debugging only don't expect direct access to this)
   namespace {
     constexpr std::string_view BRANCH = "├── ";
     constexpr std::string_view LAST_BRANCH = "└── ";
@@ -1149,4 +1149,4 @@ namespace fpar { // Tree-drawing (debugging only don't expect direct access to t
     printNode(m_root.get(), "", true);
   }
 
-} // namespace fpar
+} // namespace par

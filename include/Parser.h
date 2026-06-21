@@ -10,9 +10,7 @@
 #include <optional>
 #include <unordered_map>
 
-using namespace par; // TODO: remove after fpar completion
-
-namespace fpar {
+namespace par {
   typedef struct ParserState {
     std::unique_ptr<lex::Lexer> lexer;
     std::vector<lex::Token> tokens;
@@ -74,4 +72,4 @@ namespace fpar {
     std::unique_ptr<Node> parseNewExpr(State* state);
     std::unique_ptr<Node> parseThisOrSuper(State* state, bool is_super);
   };
-} // namespace fpar
+} // namespace par
