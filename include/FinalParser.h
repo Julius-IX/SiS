@@ -37,7 +37,7 @@ namespace fpar {
     ParserHooks m_hooks; // NOLINT
 
     private:
-    std::unique_ptr<Block> m_root;
+    std::unique_ptr<Block> m_root = std::make_unique<Block>(std::vector<std::unique_ptr<Node>>{});
     std::deque<Path> m_include_stack;
     std::unordered_map<Path, State> m_states;
 
