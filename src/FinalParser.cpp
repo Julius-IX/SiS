@@ -529,56 +529,564 @@ namespace fpar { // Base parsing loop
   }
 
 } // namespace fpar
+
+namespace fpar { // Complex parsing structures
+
+  // parseStatement dispatch table for statement-level grammar.
+  // Keyword-led statements get their own function. Anything else
+  // is an expression used as a statement (x = 5; / foo();).
+  std::unique_ptr<Node> Parser::parseStatement(State* state) { // TODO: refactor into smaller functions
+    lex::TokenType next = state->lexer->peekToken().type;
+
+    switch (next) {
+      case lex::TokenType::L_BRACE: return parseBlock(state);
+      case lex::TokenType::IF: return parseIf(state);
+      case lex::TokenType::WHILE: return parseWhile(state);
+      case lex::TokenType::PIN: return parseVarDecl(state);
+      case lex::TokenType::RETURN: return parseReturn(state);
+      case lex::TokenType::FN: {
+        // fn at statement level = named fn decl stored as pin
+        // fn name(...) {} is syntactic sugar for: pin name = fn(...) {};
+        // We parse it here as a VarDecl whose initializer is a FnLiteral.
+        // This keeps the AST uniform the evaluator never needs to distinguish
+        // "function statement" from "pinned function expression."
+        advance(state); // consume 'fn'
+        lex::Token name_tok = advance(state);
+        if (name_tok.type != lex::TokenType::IDENT) {
+          panic(m_hooks.format_error(state, name_tok, "Expected function name after 'fn'"));
+          return nullptr;
         }
-        break;
-      }
-
-      case NodeType::BREAK: {
-        std::print("{}{}Break\n", connector, label);
-        break;
-      }
-
-      case NodeType::CONTINUE: {
-        std::print("{}{}Continue\n", connector, label);
-        break;
-      }
-
-      case NodeType::THIS_EXPR: {
-        std::print("{}{}This\n", connector, label);
-        break;
-      }
-
-      case NodeType::SUPER_ACCESS: {
-        const auto* super_access = static_cast<const SuperAccess*>(node);
-        std::print("{}{}{}(->{})\n", connector, label, super_access->is_super ? "Super" : "This", super_access->field);
-        break;
-      }
-
-      case NodeType::NEW_EXPR: {
-        const auto* new_expr = static_cast<const NewExpr*>(node);
-        std::print("{}{}New({})\n", connector, label, new_expr->class_name);
-        for (size_t i = 0; i < new_expr->args.size(); ++i) {
-          printNode(new_expr->args[i].get(), child_prefix, i + 1 == new_expr->args.size());
+        auto name = getFromVariant<std::string>(state->tokens.back());
+        if (!name) {
+          panic(m_hooks.format_error(state, name_tok, "Empty function name"));
+          return nullptr;
         }
-        break;
+        // Now parse the rest as if we saw fn without consuming the name
+        // We need the '(' next
+        if (!expect(state, lex::TokenType::L_PAREN, "Expected '(' after function name")) return nullptr;
+        std::vector<std::string> params;
+        while (!check(state->lexer.get(), lex::TokenType::R_PAREN) && !isAtEnd(state->lexer.get())) {
+          lex::Token param_tok = advance(state);
+          if (param_tok.type != lex::TokenType::IDENT) {
+            panic(m_hooks.format_error(state, param_tok, "Expected parameter name"));
+            return nullptr;
+          }
+          auto param = getFromVariant<std::string>(state->tokens.back());
+          if (!param) {
+            panic(m_hooks.format_error(state, param_tok, "Empty parameter name"));
+            return nullptr;
+          }
+          params.push_back(std::move(*param));
+          if (!match(state, lex::TokenType::COMMA)) break;
+        }
+        if (!expect(state, lex::TokenType::R_PAREN, "Expected ')' after parameters")) return nullptr;
+        auto body = parseBlock(state);
+        if (!body) return nullptr;
+        auto fn = std::make_unique<FnLiteral>(std::move(params), std::move(body));
+        return std::make_unique<VarDecl>(std::move(*name), std::move(fn));
       }
-
-      case NodeType::CLASS_DECL: {
-        const auto* class_decl = static_cast<const ClassDecl*>(node);
-        std::print("{}{}Class({}{})\n", connector, label, class_decl->name, class_decl->parent_name.empty() ? "" : (" extends " + class_decl->parent_name));
-        size_t total = class_decl->fields.size() + class_decl->methods.size();
-        size_t i = 0;
-        for (const auto& field : class_decl->fields) {
-          ++i;
-          printNode(field.get(), child_prefix, i == total, "field: ");
-        }
-        for (size_t m = 0; m < class_decl->methods.size(); ++m) {
-          ++i;
-          printNode(class_decl->methods[m].get(), child_prefix, i == total, "method " + class_decl->method_names[m] + ": ");
-        }
-        break;
+      case lex::TokenType::CLASS: return parseClassDecl(state);
+      case lex::TokenType::BREAK: {
+        advance(state);
+        if (!expect(state, lex::TokenType::SEMICOLON, "Expected ';' after 'break'")) return nullptr;
+        return std::make_unique<Jump>(JumpKind::BREAK);
+      }
+      case lex::TokenType::CONTINUE: {
+        advance(state);
+        if (!expect(state, lex::TokenType::SEMICOLON, "Expected ';' after 'continue'")) return nullptr;
+        return std::make_unique<Jump>(JumpKind::CONTINUE);
+      }
+      default: {
+        // expression statement: parse an expression, demand a semicolon
+        auto expr = parseExpression(state, 1);
+        if (!expr) return nullptr;
+        if (!expect(state, lex::TokenType::SEMICOLON, "Expected ';' after expression")) return nullptr;
+        return std::make_unique<ExprStmt>(std::move(expr));
       }
     }
+  }
+
+  std::unique_ptr<Node> Parser::parseBlock(State* state) {
+    if (!expect(state, lex::TokenType::L_BRACE, "Expected '{'")) return nullptr;
+    std::vector<std::unique_ptr<Node>> stmts;
+    while (!check(state->lexer.get(), lex::TokenType::R_BRACE) && !isAtEnd(state->lexer.get())) {
+      auto stmt = parseStatement(state);
+      if (!stmt) return nullptr;
+      stmts.push_back(std::move(stmt));
+    }
+    if (!expect(state, lex::TokenType::R_BRACE, "Expected '}'")) return nullptr;
+    return std::make_unique<Block>(std::move(stmts));
+  }
+
+  std::unique_ptr<Node> Parser::parseIf(State* state) {
+    advance(state); // consume 'if'
+    if (!expect(state, lex::TokenType::L_PAREN, "Expected '(' after 'if'")) return nullptr;
+    auto condition = parseExpression(state, 1);
+    if (!condition) return nullptr;
+    if (!expect(state, lex::TokenType::R_PAREN, "Expected ')' after if condition")) return nullptr;
+    auto then_branch = parseBlock(state);
+    if (!then_branch) return nullptr;
+    std::unique_ptr<Node> else_branch;
+    if (match(state, lex::TokenType::ELSE)) {
+      // else if or else block
+      if (check(state->lexer.get(), lex::TokenType::IF)) {
+        else_branch = parseIf(state);
+      } else {
+        else_branch = parseBlock(state);
+      }
+      if (!else_branch) return nullptr;
+    }
+    return std::make_unique<If>(std::move(condition), std::move(then_branch), std::move(else_branch));
+  }
+
+  std::unique_ptr<Node> Parser::parseWhile(State* state) {
+    advance(state); // consume 'while'
+    if (!expect(state, lex::TokenType::L_PAREN, "Expected '(' after 'while'")) return nullptr;
+    auto condition = parseExpression(state, 1);
+    if (!condition) return nullptr;
+    if (!expect(state, lex::TokenType::R_PAREN, "Expected ')' after while condition")) return nullptr;
+    auto body = parseBlock(state);
+    if (!body) return nullptr;
+    return std::make_unique<While>(std::move(condition), std::move(body));
+  }
+
+  std::unique_ptr<Node> Parser::parseVarDecl(State* state) {
+    advance(state); // consume 'pin'
+    lex::Token name_tok = advance(state);
+    if (name_tok.type != lex::TokenType::IDENT) {
+      panic(m_hooks.format_error(state, name_tok, "Expected variable name after 'pin'"));
+      return nullptr;
+    }
+    auto name = getFromVariant<std::string>(state->tokens.back());
+    if (!name) {
+      panic(m_hooks.format_error(state, name_tok, "Empty variable name"));
+      return nullptr;
+    }
+    std::unique_ptr<Node> initializer;
+    if (match(state, lex::TokenType::ASSIGN)) {
+      initializer = parseExpression(state, 1);
+      if (!initializer) return nullptr;
+    }
+    if (!expect(state, lex::TokenType::SEMICOLON, "Expected ';' after variable declaration")) return nullptr;
+    return std::make_unique<VarDecl>(std::move(*name), std::move(initializer));
+  }
+
+  std::unique_ptr<Node> Parser::parseReturn(State* state) {
+    advance(state); // consume 'return'
+    std::unique_ptr<Node> value;
+    if (!check(state->lexer.get(), lex::TokenType::SEMICOLON)) {
+      value = parseExpression(state, 1);
+      if (!value) return nullptr;
+    }
+    if (!expect(state, lex::TokenType::SEMICOLON, "Expected ';' after return")) return nullptr;
+    return std::make_unique<Return>(std::move(value));
+  }
+
+  // parseFnLiteral called from parseAtom when 'fn' appears in expression
+  // position (i.e. anonymous fn, no name). Named fns at statement level are
+  // handled in parseStatement as sugar for pin name = fn(...){...};
+  std::unique_ptr<Node> Parser::parseFnLiteral(State* state) {
+    advance(state); // consume 'fn'
+    if (!expect(state, lex::TokenType::L_PAREN, "Expected '(' after 'fn'")) return nullptr;
+    std::vector<std::string> params;
+    while (!check(state->lexer.get(), lex::TokenType::R_PAREN) && !isAtEnd(state->lexer.get())) {
+      lex::Token param_tok = advance(state);
+      if (param_tok.type != lex::TokenType::IDENT) {
+        panic(m_hooks.format_error(state, param_tok, "Expected parameter name"));
+        return nullptr;
+      }
+      auto param = getFromVariant<std::string>(state->tokens.back());
+      if (!param) {
+        panic(m_hooks.format_error(state, param_tok, "Empty parameter name"));
+        return nullptr;
+      }
+      params.push_back(std::move(*param));
+      if (!match(state, lex::TokenType::COMMA)) break;
+    }
+    if (!expect(state, lex::TokenType::R_PAREN, "Expected ')' after parameters")) return nullptr;
+    auto body = parseBlock(state);
+    if (!body) return nullptr;
+    return std::make_unique<FnLiteral>(std::move(params), std::move(body));
+  }
+
+  std::unique_ptr<Node> Parser::parseNewExpr(State* state) {
+    advance(state); // consume 'new'
+    lex::Token name_tok = advance(state);
+    if (name_tok.type != lex::TokenType::IDENT) {
+      panic(m_hooks.format_error(state, name_tok, "Expected class name after 'new'"));
+      return nullptr;
+    }
+    auto class_name = getFromVariant<std::string>(state->tokens.back());
+    if (!class_name) {
+      panic(m_hooks.format_error(state, name_tok, "Empty class name"));
+      return nullptr;
+    }
+    if (!expect(state, lex::TokenType::L_PAREN, "Expected '(' after class name in 'new'")) return nullptr;
+    auto args = parseExpressionList(state, lex::TokenType::R_PAREN);
+    if (!expect(state, lex::TokenType::R_PAREN, "Expected ')' after constructor arguments")) return nullptr;
+    return std::make_unique<NewExpr>(std::move(*class_name), std::move(args));
+  }
+
+  // parseThisOrSuper bare `this` or `super` in expression position.
+  // The following ->field or ->method() becomes a MemberAccess/Call wrapped
+  // around this Self node, handled automatically by parseContinuation's DOT case.
+  // NOTE: grammar uses `->` for this/super access and `.` for regular objects.
+  // accessing a field method on a class REQUIRES '->' usage, `.` is not allowed.
+  std::unique_ptr<Node> Parser::parseThisOrSuper(State* state, bool is_super) {
+    advance(state); // consume this/super
+
+    if (!expect(state, lex::TokenType::ARROW, "Expected '->' after 'this' or 'super'")) {
+      return nullptr;
+    }
+
+    lex::Token member_tok = advance(state);
+    if (member_tok.type != lex::TokenType::IDENT) {
+      panic(m_hooks.format_error(state, member_tok, "Expected member name after '->'"));
+      return nullptr;
+    }
+
+    auto member = getFromVariant<std::string>(state->tokens.back());
+    if (!member) {
+      panic(m_hooks.format_error(state, member_tok, "Empty member name"));
+      return nullptr;
+    }
+
+    return std::make_unique<MemberAccess>(std::make_unique<Self>(is_super), std::move(*member));
+  }
+
+  std::unique_ptr<Node> Parser::parseClassDecl(State* state) { // TODO: refactor into smaller functions
+    advance(state); // consume 'class'
+    lex::Token name_tok = advance(state);
+    if (name_tok.type != lex::TokenType::IDENT) {
+      panic(m_hooks.format_error(state, name_tok, "Expected class name"));
+      return nullptr;
+    }
+    auto name = getFromVariant<std::string>(state->tokens.back());
+    if (!name) {
+      panic(m_hooks.format_error(state, name_tok, "Empty class name"));
+      return nullptr;
+    }
+
+    std::string parent_name;
+    if (match(state, lex::TokenType::EXTENDS)) {
+      lex::Token parent_tok = advance(state);
+      if (parent_tok.type != lex::TokenType::IDENT) {
+        panic(m_hooks.format_error(state, parent_tok, "Expected parent class name after 'extends'"));
+        return nullptr;
+      }
+      auto pname = getFromVariant<std::string>(state->tokens.back());
+      if (!pname) {
+        panic(m_hooks.format_error(state, parent_tok, "Empty parent class name"));
+        return nullptr;
+      }
+      parent_name = std::move(*pname);
+    }
+
+    if (!expect(state, lex::TokenType::L_BRACE, "Expected '{' after class declaration")) return nullptr;
+
+    std::vector<std::unique_ptr<VarDecl>> fields;
+    std::vector<std::unique_ptr<FnLiteral>> methods;
+    std::vector<std::string> method_names;
+
+    while (!check(state->lexer.get(), lex::TokenType::R_BRACE) && !isAtEnd(state->lexer.get())) {
+      if (check(state->lexer.get(), lex::TokenType::PIN)) {
+        // field declaration
+        advance(state); // consume 'pin'
+        lex::Token field_tok = advance(state);
+        if (field_tok.type != lex::TokenType::IDENT) {
+          panic(m_hooks.format_error(state, field_tok, "Expected field name"));
+          return nullptr;
+        }
+        auto field_name = getFromVariant<std::string>(state->tokens.back());
+        if (!field_name) {
+          panic(m_hooks.format_error(state, field_tok, "Empty field name"));
+          return nullptr;
+        }
+        std::unique_ptr<Node> field_init;
+        if (match(state, lex::TokenType::ASSIGN)) {
+          field_init = parseExpression(state, 1);
+          if (!field_init) return nullptr;
+        }
+        if (!expect(state, lex::TokenType::SEMICOLON, "Expected ';' after field declaration")) return nullptr;
+        fields.push_back(std::make_unique<VarDecl>(std::move(*field_name), std::move(field_init)));
+
+      } else if (check(state->lexer.get(), lex::TokenType::FN)) {
+        // method declaration
+        advance(state); // consume 'fn'
+        lex::Token method_tok = advance(state);
+        if (method_tok.type != lex::TokenType::IDENT) {
+          panic(m_hooks.format_error(state, method_tok, "Expected method name"));
+          return nullptr;
+        }
+        auto method_name = getFromVariant<std::string>(state->tokens.back());
+        if (!method_name) {
+          panic(m_hooks.format_error(state, method_tok, "Empty method name"));
+          return nullptr;
+        }
+        if (!expect(state, lex::TokenType::L_PAREN, "Expected '(' after method name")) return nullptr;
+        std::vector<std::string> params;
+        while (!check(state->lexer.get(), lex::TokenType::R_PAREN) && !isAtEnd(state->lexer.get())) {
+          lex::Token param_tok = advance(state);
+          if (param_tok.type != lex::TokenType::IDENT) {
+            panic(m_hooks.format_error(state, param_tok, "Expected parameter name"));
+            return nullptr;
+          }
+          auto param = getFromVariant<std::string>(state->tokens.back());
+          if (!param) {
+            panic(m_hooks.format_error(state, param_tok, "Empty parameter name"));
+            return nullptr;
+          }
+          params.push_back(std::move(*param));
+          if (!match(state, lex::TokenType::COMMA)) break;
+        }
+        if (!expect(state, lex::TokenType::R_PAREN, "Expected ')' after method parameters")) return nullptr;
+        auto body = parseBlock(state);
+        if (!body) return nullptr;
+        method_names.push_back(std::move(*method_name));
+        methods.push_back(std::make_unique<FnLiteral>(std::move(params), std::move(body)));
+      } else {
+        panic(m_hooks.format_error(state, state->lexer->peekToken(), "Expected 'pin' or 'fn' in class body"));
+        return nullptr;
+      }
+    }
+
+    if (!expect(state, lex::TokenType::R_BRACE, "Expected '}' after class body")) return nullptr;
+    return std::make_unique<ClassDecl>(std::move(*name), std::move(parent_name), std::move(fields), std::move(methods), std::move(method_names));
+  }
+
+} // namespace fpar
+
+namespace fpar { // Tree-drawing (debugging only don't expect direct access to this)
+  namespace {
+    constexpr std::string_view BRANCH = "├── ";
+    constexpr std::string_view LAST_BRANCH = "└── ";
+    constexpr std::string_view PIPE_CONT = "│   ";
+    constexpr std::string_view SPACE_CONT = "    ";
+
+    // One (label, node) pair to print as a child. label may be empty.
+    struct Child {
+      std::string_view label;
+      const Node* node;
+    };
+
+    std::string literalToString(const LiteralType& value) {
+      return std::visit(
+        [](auto&& val) -> std::string {
+          using T = std::decay_t<decltype(val)>;
+          if constexpr (std::is_same_v<T, std::monostate>) {
+            return "null";
+          } else if constexpr (std::is_same_v<T, bool>) {
+            return val ? "true" : "false";
+          } else if constexpr (std::is_same_v<T, double>) {
+            return std::to_string(val);
+          } else { // std::string
+            return "\"" + val + "\"";
+          }
+        },
+        value);
+    }
+
+    // Short, single-line summary printed next to the node's type name,
+    // e.g. "IDENTIFIER (x)" or "BINARY (+)".
+    std::string nodeSummary(const Node* node) {
+      switch (node->type) {
+        case NodeType::LITERAL: return literalToString(static_cast<const Literal*>(node)->value);
+        case NodeType::IDENTIFIER: return static_cast<const Identifier*>(node)->name;
+        case NodeType::UNARY: return lex::literalTokenToString(static_cast<const Unary*>(node)->operation);
+        case NodeType::BINARY: return lex::literalTokenToString(static_cast<const Binary*>(node)->operation);
+        case NodeType::VAR_DECL: return static_cast<const VarDecl*>(node)->name;
+        case NodeType::MEMBER_ACCESS: return "." + static_cast<const MemberAccess*>(node)->field;
+        case NodeType::FN_LITERAL: {
+          const auto* fn = static_cast<const FnLiteral*>(node);
+          std::string params;
+          for (size_t i = 0; i < fn->params.size(); ++i) {
+            if (i) params += ", ";
+            params += fn->params[i];
+          }
+          return "(" + params + ")";
+        }
+        case NodeType::NEW_EXPR: return static_cast<const NewExpr*>(node)->class_name;
+        case NodeType::CLASS_DECL: {
+          const auto* cls = static_cast<const ClassDecl*>(node);
+          return cls->parent_name.empty() ? cls->name : cls->name + " extends " + cls->parent_name;
+        }
+        case NodeType::JUMP: return static_cast<const Jump*>(node)->kind == JumpKind::BREAK ? "break" : "continue";
+        case NodeType::SELF: return static_cast<const Self*>(node)->is_super ? "super" : "this";
+        default: return "";
+      }
+    }
+
+    // Children of a node, each with a descriptive label. Built fresh per
+    // call since most nodes own their children via unique_ptr.
+    std::vector<Child> nodeChildren(const Node* node) {
+      std::vector<Child> out;
+
+      switch (node->type) {
+        case NodeType::UNARY: {
+          const auto* n = static_cast<const Unary*>(node);
+          out.push_back({.label = "operand", .node = n->operand.get()});
+          break;
+        }
+        case NodeType::BINARY: {
+          const auto* n = static_cast<const Binary*>(node);
+          out.push_back({.label = "left", .node = n->left.get()});
+          out.push_back({.label = "right", .node = n->right.get()});
+          break;
+        }
+        case NodeType::BLOCK: {
+          const auto* n = static_cast<const Block*>(node);
+          for (const auto& stmt : n->statements) {
+            out.push_back({.label = "", .node = stmt.get()});
+          }
+          break;
+        }
+        case NodeType::IF: {
+          const auto* n = static_cast<const If*>(node);
+          out.push_back({.label = "condition", .node = n->condition.get()});
+          out.push_back({.label = "then", .node = n->then_branch.get()});
+          if (n->else_branch) out.push_back({.label = "else", .node = n->else_branch.get()});
+          break;
+        }
+        case NodeType::WHILE: {
+          const auto* n = static_cast<const While*>(node);
+          out.push_back({.label = "condition", .node = n->condition.get()});
+          out.push_back({.label = "body", .node = n->body.get()});
+          break;
+        }
+        case NodeType::VAR_DECL: {
+          const auto* n = static_cast<const VarDecl*>(node);
+          if (n->initializer) out.push_back({.label = "init", .node = n->initializer.get()});
+          break;
+        }
+        case NodeType::EXPR_STMT: {
+          const auto* n = static_cast<const ExprStmt*>(node);
+          out.push_back({.label = "", .node = n->expr.get()});
+          break;
+        }
+        case NodeType::CALL: {
+          const auto* n = static_cast<const Call*>(node);
+          out.push_back({.label = "callee", .node = n->callee.get()});
+          for (const auto& arg : n->args) {
+            out.push_back({.label = "arg", .node = arg.get()});
+          }
+          break;
+        }
+        case NodeType::FN_LITERAL: {
+          const auto* n = static_cast<const FnLiteral*>(node);
+          out.push_back({.label = "body", .node = n->body.get()});
+          break;
+        }
+        case NodeType::MEMBER_ACCESS: {
+          const auto* n = static_cast<const MemberAccess*>(node);
+          out.push_back({.label = "object", .node = n->object.get()});
+          break;
+        }
+        case NodeType::ARRAY_LITERAL: {
+          const auto* n = static_cast<const ArrayLiteral*>(node);
+          for (const auto& el : n->elements) {
+            out.push_back({.label = "", .node = el.get()});
+          }
+          break;
+        }
+        case NodeType::SUBSCRIPT: {
+          const auto* n = static_cast<const Subscript*>(node);
+          out.push_back({.label = "object", .node = n->object.get()});
+          out.push_back({.label = "index", .node = n->index.get()});
+          break;
+        }
+        case NodeType::RETURN: {
+          const auto* n = static_cast<const Return*>(node);
+          if (n->value) out.push_back({.label = "value", .node = n->value.get()});
+          break;
+        }
+        case NodeType::NEW_EXPR: {
+          const auto* n = static_cast<const NewExpr*>(node);
+          for (const auto& arg : n->args) {
+            out.push_back({.label = "arg", .node = arg.get()});
+          }
+          break;
+        }
+        case NodeType::CLASS_DECL: {
+          const auto* n = static_cast<const ClassDecl*>(node);
+          for (const auto& field : n->fields) {
+            out.push_back({.label = "field", .node = field.get()});
+          }
+          for (size_t i = 0; i < n->methods.size(); ++i) {
+            out.push_back({.label = n->method_names[i], .node = n->methods[i].get()});
+          }
+          break;
+        }
+        // LITERAL, IDENTIFIER, JUMP, SELF have no children.
+        default: break;
+      }
+
+      return out;
+    }
+
+    std::string_view nodeTypeName(NodeType type) {
+      switch (type) {
+        case NodeType::LITERAL: return "LITERAL";
+        case NodeType::IDENTIFIER: return "IDENTIFIER";
+        case NodeType::UNARY: return "UNARY";
+        case NodeType::BINARY: return "BINARY";
+        case NodeType::BLOCK: return "BLOCK";
+        case NodeType::IF: return "IF";
+        case NodeType::WHILE: return "WHILE";
+        case NodeType::VAR_DECL: return "VAR_DECL";
+        case NodeType::EXPR_STMT: return "EXPR_STMT";
+        case NodeType::CALL: return "CALL";
+        case NodeType::FN_LITERAL: return "FN_LITERAL";
+        case NodeType::MEMBER_ACCESS: return "MEMBER_ACCESS";
+        case NodeType::ARRAY_LITERAL: return "ARRAY_LITERAL";
+        case NodeType::SUBSCRIPT: return "SUBSCRIPT";
+        case NodeType::RETURN: return "RETURN";
+        case NodeType::JUMP: return "JUMP";
+        case NodeType::SELF: return "SELF";
+        case NodeType::NEW_EXPR: return "NEW_EXPR";
+        case NodeType::CLASS_DECL: return "CLASS_DECL";
+      }
+      return "UNKNOWN";
+    }
+  } // namespace
+
+  // -----------------------------------------------------------------------
+  // Parser::printNode / Parser::printTree
+  // -----------------------------------------------------------------------
+  void Parser::printNode(const Node* node, const std::string& prefix, bool is_last, std::string_view label) {
+    if (node == nullptr) {
+      std::print("{}{}{}null\n", prefix, is_last ? LAST_BRANCH : BRANCH, label.empty() ? "" : std::string(label) + ": ");
+      return;
+    }
+
+    const std::string_view branch = is_last ? LAST_BRANCH : BRANCH;
+    const std::string summary = nodeSummary(node);
+
+    std::print("{}{}{}{}{}{}{} ({}:{})\n",
+               prefix,
+               branch,
+               label.empty() ? "" : std::string(label) + ": ",
+               nodeTypeName(node->type),
+               summary.empty() ? "" : " ",
+               summary.empty() ? "" : "[" + summary + "]",
+               "",
+               node->line,
+               node->column);
+
+    const std::vector<Child> children = nodeChildren(node);
+    const std::string child_prefix = prefix + std::string(is_last ? SPACE_CONT : PIPE_CONT);
+
+    for (size_t i = 0; i < children.size(); ++i) {
+      const bool child_is_last = (i + 1 == children.size());
+      printNode(children[i].node, child_prefix, child_is_last, children[i].label);
+    }
+  }
+
+  void Parser::printTree() const {
+    if (!m_root) {
+      std::print("(empty tree)\n");
+      return;
+    }
+    printNode(m_root.get(), "", true);
   }
 
 } // namespace fpar
