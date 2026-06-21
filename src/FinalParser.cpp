@@ -495,6 +495,40 @@ namespace fpar { // Base parsing loop
       default: panic(m_hooks.format_error(state, op, "Unexpected token in infix position")); return nullptr;
     }
   }
+
+  // parseExpression the Pratt driver loop.
+  // Start with an atom (nud), then keep extending it (led) as long as what
+  // follows binds tightly enough. min_prec controls how tightly: call with 1
+  // to parse a full expression, with 8 for unary operands (so -a.b = -(a.b)).
+  std::unique_ptr<Node> Parser::parseExpression(State* state, int min_prec) {
+    std::unique_ptr<Node> left = parseAtom(state);
+    if (!left) return nullptr;
+
+    while (glueStrength(state->lexer->peekToken().type) >= min_prec) {
+      left = parseContinuation(state, std::move(left));
+      if (!left) return nullptr;
+    }
+
+    return left;
+  }
+
+  // parseExpressionList shared helper for comma-separated expression lists.
+  // Used by array literals, call args, and new() args. Stops when it sees
+  // `terminator` (doesn't consume, it's caller is responsible for that).
+  std::vector<std::unique_ptr<Node>> Parser::parseExpressionList(State* state, lex::TokenType terminator) {
+    std::vector<std::unique_ptr<Node>> list;
+    if (check(state->lexer.get(), terminator)) return list; // empty list
+
+    while (true) {
+      auto expr = parseExpression(state, 1);
+      if (!expr) return {};
+      list.push_back(std::move(expr));
+      if (!match(state, lex::TokenType::COMMA)) break;
+    }
+    return list;
+  }
+
+} // namespace fpar
         }
         break;
       }
