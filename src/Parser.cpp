@@ -227,7 +227,7 @@ namespace par { // Base parsing loop functions
     std::vector<std::unique_ptr<Node>> statements;
     while (!isAtEnd(state->lexer.get())) {
       std::unique_ptr<Node> stmt = parseStatement(state);
-      if (!stmt) return false;
+      if (stmt == nullptr) return false;
       statements.push_back(std::move(stmt));
     }
 
@@ -357,14 +357,14 @@ namespace par { // Base parsing loop functions
       case lex::TokenType::MINUS: {
         advance(state);
         std::unique_ptr<Node> operand = parseExpression(state, 8);
-        if (!operand) return nullptr;
+        if (operand == nullptr) return nullptr;
         return makeNode<Unary>(tok.line, tok.column, tok.type, operand.release());
       }
 
       case lex::TokenType::L_PAREN: {
         advance(state);
         std::unique_ptr<Node> inner = parseExpression(state, 1);
-        if (!inner) return nullptr;
+        if (inner == nullptr) return nullptr;
         if (!expect(state, lex::TokenType::R_PAREN, "Expected ')' after expression")) return nullptr;
         return inner;
       }
@@ -458,7 +458,7 @@ namespace par { // Base parsing loop functions
         size_t left_line = left->line;
         size_t left_column = left->column;
         std::unique_ptr<Node> right = parseExpression(state, prec + 1); // left-assoc
-        if (!right) return nullptr;
+        if (right == nullptr) return nullptr;
         return makeNode<Binary>(left_line, left_column, op.type, std::move(left), std::move(right));
       }
 
@@ -471,7 +471,7 @@ namespace par { // Base parsing loop functions
         size_t left_line = left->line;
         size_t left_column = left->column;
         std::unique_ptr<Node> right = parseExpression(state, 1); // right-assoc: same prec
-        if (!right) return nullptr;
+        if (right == nullptr) return nullptr;
         return makeNode<Binary>(left_line, left_column, op.type, std::move(left), std::move(right));
       }
 
@@ -497,7 +497,7 @@ namespace par { // Base parsing loop functions
         size_t left_line = left->line;
         size_t left_column = left->column;
         std::unique_ptr<Node> index = parseExpression(state, 1);
-        if (!index) return nullptr;
+        if (index == nullptr) return nullptr;
         if (!expect(state, lex::TokenType::R_BRACK, "Expected ']' after subscript index")) return nullptr;
         return makeNode<Subscript>(left_line, left_column, std::move(left), std::move(index));
       }
@@ -521,11 +521,11 @@ namespace par { // Base parsing loop functions
   // to parse a full expression, with 8 for unary operands (so -a.b = -(a.b)).
   std::unique_ptr<Node> Parser::parseExpression(State* state, int min_prec) {
     std::unique_ptr<Node> left = parseAtom(state);
-    if (!left) return nullptr;
+    if (left == nullptr) return nullptr;
 
     while (glueStrength(state->lexer->peekToken().type) >= min_prec) {
       left = parseContinuation(state, std::move(left));
-      if (!left) return nullptr;
+      if (left == nullptr) return nullptr;
     }
 
     return left;
@@ -601,7 +601,7 @@ namespace par { // Complex parsing structures
         }
         if (!expect(state, lex::TokenType::R_PAREN, "Expected ')' after parameters")) return nullptr;
         auto body = parseBlock(state);
-        if (!body) return nullptr;
+        if (body == nullptr) return nullptr;
         auto fn = makeNode<FnLiteral>(fn_tok.line, fn_tok.column, std::move(params), std::move(body));
         return makeNode<VarDecl>(fn_tok.line, fn_tok.column, std::move(*name), std::move(fn));
       }
@@ -619,7 +619,7 @@ namespace par { // Complex parsing structures
       default: {
         // expression statement: parse an expression, demand a semicolon
         auto expr = parseExpression(state, 1);
-        if (!expr) return nullptr;
+        if (expr == nullptr) return nullptr;
         if (!expect(state, lex::TokenType::SEMICOLON, "Expected ';' after expression")) return nullptr;
         size_t expr_line = expr->line;
         size_t expr_column = expr->column;
@@ -634,7 +634,7 @@ namespace par { // Complex parsing structures
     std::vector<std::unique_ptr<Node>> stmts;
     while (!check(state->lexer.get(), lex::TokenType::R_BRACE) && !isAtEnd(state->lexer.get())) {
       auto stmt = parseStatement(state);
-      if (!stmt) return nullptr;
+      if (stmt == nullptr) return nullptr;
       stmts.push_back(std::move(stmt));
     }
     if (!expect(state, lex::TokenType::R_BRACE, "Expected '}'")) return nullptr;
@@ -648,10 +648,10 @@ namespace par { // Complex parsing structures
     lex::Token if_tok = advance(state); // consume 'if'
     if (!expect(state, lex::TokenType::L_PAREN, "Expected '(' after 'if'")) return nullptr;
     auto condition = parseExpression(state, 1);
-    if (!condition) return nullptr;
+    if (condition == nullptr) return nullptr;
     if (!expect(state, lex::TokenType::R_PAREN, "Expected ')' after if condition")) return nullptr;
     auto then_branch = parseBlock(state);
-    if (!then_branch) return nullptr;
+    if (then_branch == nullptr) return nullptr;
     std::unique_ptr<Node> else_branch;
     if (match(state, lex::TokenType::ELSE)) {
       // else if or else block
@@ -660,7 +660,7 @@ namespace par { // Complex parsing structures
       } else {
         else_branch = parseBlock(state);
       }
-      if (!else_branch) return nullptr;
+      if (else_branch == nullptr) return nullptr;
     }
     auto node = std::make_unique<If>(std::move(condition), std::move(then_branch), std::move(else_branch));
     node->line = if_tok.line;
@@ -672,10 +672,10 @@ namespace par { // Complex parsing structures
     lex::Token while_tok = advance(state); // consume 'while'
     if (!expect(state, lex::TokenType::L_PAREN, "Expected '(' after 'while'")) return nullptr;
     auto condition = parseExpression(state, 1);
-    if (!condition) return nullptr;
+    if (condition == nullptr) return nullptr;
     if (!expect(state, lex::TokenType::R_PAREN, "Expected ')' after while condition")) return nullptr;
     auto body = parseBlock(state);
-    if (!body) return nullptr;
+    if (body == nullptr) return nullptr;
     auto node = std::make_unique<While>(std::move(condition), std::move(body));
     node->line = while_tok.line;
     node->column = while_tok.column;
@@ -697,7 +697,7 @@ namespace par { // Complex parsing structures
     std::unique_ptr<Node> initializer;
     if (match(state, lex::TokenType::ASSIGN)) {
       initializer = parseExpression(state, 1);
-      if (!initializer) return nullptr;
+      if (initializer == nullptr) return nullptr;
     }
     if (!expect(state, lex::TokenType::SEMICOLON, "Expected ';' after variable declaration")) return nullptr;
     auto node = std::make_unique<VarDecl>(std::move(*name), std::move(initializer));
@@ -711,7 +711,7 @@ namespace par { // Complex parsing structures
     std::unique_ptr<Node> value;
     if (!check(state->lexer.get(), lex::TokenType::SEMICOLON)) {
       value = parseExpression(state, 1);
-      if (!value) return nullptr;
+      if (value == nullptr) return nullptr;
     }
     if (!expect(state, lex::TokenType::SEMICOLON, "Expected ';' after return")) return nullptr;
     auto node = std::make_unique<Return>(std::move(value));
@@ -743,7 +743,7 @@ namespace par { // Complex parsing structures
     }
     if (!expect(state, lex::TokenType::R_PAREN, "Expected ')' after parameters")) return nullptr;
     auto body = parseBlock(state);
-    if (!body) return nullptr;
+    if (body == nullptr) return nullptr;
     auto node = std::make_unique<FnLiteral>(std::move(params), std::move(body));
     node->line = fn_tok.line;
     node->column = fn_tok.column;
@@ -855,7 +855,7 @@ namespace par { // Complex parsing structures
         std::unique_ptr<Node> field_init;
         if (match(state, lex::TokenType::ASSIGN)) {
           field_init = parseExpression(state, 1);
-          if (!field_init) return nullptr;
+          if (field_init == nullptr) return nullptr;
         }
         if (!expect(state, lex::TokenType::SEMICOLON, "Expected ';' after field declaration")) return nullptr;
         auto field_node = std::make_unique<VarDecl>(std::move(*field_name), std::move(field_init));
@@ -894,7 +894,7 @@ namespace par { // Complex parsing structures
         }
         if (!expect(state, lex::TokenType::R_PAREN, "Expected ')' after method parameters")) return nullptr;
         auto body = parseBlock(state);
-        if (!body) return nullptr;
+        if (body == nullptr) return nullptr;
         method_names.push_back(std::move(*method_name));
         auto method_node = std::make_unique<FnLiteral>(std::move(params), std::move(body));
         method_node->line = method_fn_tok.line;
