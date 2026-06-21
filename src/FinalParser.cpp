@@ -219,7 +219,7 @@ namespace fpar {
       statements.push_back(std::move(stmt));
     }
 
-    m_root->statements.reserve(statements.size());
+    m_root->statements.reserve(m_root->statements.size() + statements.size());
     m_root->statements.insert(m_root->statements.end(), std::make_move_iterator(statements.begin()), std::make_move_iterator(statements.end()));
 
     return true;
