@@ -74,92 +74,86 @@ namespace eval {
   // themselves.
   // ---------------------------------------------------------------------
   void Evaluator::registerBuiltins(const std::shared_ptr<Environment>& env) {
-    env->define(
-      "print", Value(NativeFunction{
-                 .name = "print",
-                 .fn =
-                   [](std::vector<Value>& args) -> Value {
-                     for (size_t i = 0; i < args.size(); ++i) {
-                       std::print("{}", args[i].toString());
-                       if (i + 1 < args.size()) std::print(" ");
-                     }
-                     std::print("\n");
-                     return Value{};
-                   },
-               }));
+    env->define("print",
+                Value(NativeFunction{
+                  .name = "print",
+                  .fn = [](std::vector<Value>& args) -> Value {
+                    for (size_t i = 0; i < args.size(); ++i) {
+                      std::print("{}", args[i].toString());
+                      if (i + 1 < args.size()) std::print(" ");
+                    }
+                    std::print("\n");
+                    return Value{};
+                  },
+                }));
 
-    env->define(
-      "len", Value(NativeFunction{
-               .name = "len",
-               .fn =
-                 [](std::vector<Value>& args) -> Value {
-                   if (args.size() != 1) {
-                     throw std::runtime_error("len() expects exactly 1 argument, got " + std::to_string(args.size()));
-                   }
-                   if (const auto* arr = std::get_if<Array>(&args[0].data)) {
-                     return Value(static_cast<double>((*arr)->size()));
-                   }
-                   if (const auto* str = std::get_if<std::string>(&args[0].data)) {
-                     return Value(static_cast<double>(str->size()));
-                   }
-                   throw std::runtime_error("len() expects an array or string, got " + args[0].typeName());
-                 },
-             }));
+    env->define("len",
+                Value(NativeFunction{
+                  .name = "len",
+                  .fn = [](std::vector<Value>& args) -> Value {
+                    if (args.size() != 1) {
+                      throw std::runtime_error("len() expects exactly 1 argument, got " + std::to_string(args.size()));
+                    }
+                    if (const auto* arr = std::get_if<Array>(&args[0].data)) {
+                      return Value(static_cast<double>((*arr)->size()));
+                    }
+                    if (const auto* str = std::get_if<std::string>(&args[0].data)) {
+                      return Value(static_cast<double>(str->size()));
+                    }
+                    throw std::runtime_error("len() expects an array or string, got " + args[0].typeName());
+                  },
+                }));
 
-    env->define(
-      "type", Value(NativeFunction{
-                .name = "type",
-                .fn =
-                  [](std::vector<Value>& args) -> Value {
+    env->define("type",
+                Value(NativeFunction{
+                  .name = "type",
+                  .fn = [](std::vector<Value>& args) -> Value {
                     if (args.size() != 1) {
                       throw std::runtime_error("type() expects exactly 1 argument, got " + std::to_string(args.size()));
                     }
                     return Value(args[0].typeName());
                   },
-              }));
+                }));
 
-    env->define(
-      "str", Value(NativeFunction{
-               .name = "str",
-               .fn =
-                 [](std::vector<Value>& args) -> Value {
-                   if (args.size() != 1) {
-                     throw std::runtime_error("str() expects exactly 1 argument, got " + std::to_string(args.size()));
-                   }
-                   return Value(args[0].toString());
-                 },
-             }));
+    env->define("str",
+                Value(NativeFunction{
+                  .name = "str",
+                  .fn = [](std::vector<Value>& args) -> Value {
+                    if (args.size() != 1) {
+                      throw std::runtime_error("str() expects exactly 1 argument, got " + std::to_string(args.size()));
+                    }
+                    return Value(args[0].toString());
+                  },
+                }));
 
-    env->define(
-      "num", Value(NativeFunction{
-               .name = "num",
-               .fn =
-                 [](std::vector<Value>& args) -> Value {
-                   if (args.size() != 1) {
-                     throw std::runtime_error("num() expects exactly 1 argument, got " + std::to_string(args.size()));
-                   }
-                   if (const auto* d = std::get_if<double>(&args[0].data)) {
-                     return Value(*d);
-                   }
-                   if (const auto* s = std::get_if<std::string>(&args[0].data)) {
-                     try {
-                       return Value(std::stod(*s));
-                     } catch (const std::exception&) {
-                       throw std::runtime_error("num(): could not convert string '" + *s + "' to a number");
-                     }
-                   }
-                   if (const auto* b = std::get_if<bool>(&args[0].data)) {
-                     return Value(*b ? 1.0 : 0.0);
-                   }
-                   throw std::runtime_error("num() cannot convert a value of type " + args[0].typeName());
-                 },
-             }));
+    env->define("num",
+                Value(NativeFunction{
+                  .name = "num",
+                  .fn = [](std::vector<Value>& args) -> Value {
+                    if (args.size() != 1) {
+                      throw std::runtime_error("num() expects exactly 1 argument, got " + std::to_string(args.size()));
+                    }
+                    if (const auto* d = std::get_if<double>(&args[0].data)) {
+                      return Value(*d);
+                    }
+                    if (const auto* s = std::get_if<std::string>(&args[0].data)) {
+                      try {
+                        return Value(std::stod(*s));
+                      } catch (const std::exception&) {
+                        throw std::runtime_error("num(): could not convert string '" + *s + "' to a number");
+                      }
+                    }
+                    if (const auto* b = std::get_if<bool>(&args[0].data)) {
+                      return Value(*b ? 1.0 : 0.0);
+                    }
+                    throw std::runtime_error("num() cannot convert a value of type " + args[0].typeName());
+                  },
+                }));
 
-    env->define(
-      "push", Value(NativeFunction{
-                .name = "push",
-                .fn =
-                  [](std::vector<Value>& args) -> Value {
+    env->define("push",
+                Value(NativeFunction{
+                  .name = "push",
+                  .fn = [](std::vector<Value>& args) -> Value {
                     if (args.size() != 2) {
                       throw std::runtime_error("push() expects exactly 2 arguments (array, value), got " + std::to_string(args.size()));
                     }
@@ -170,42 +164,40 @@ namespace eval {
                     (*arr)->push_back(args[1]);
                     return args[0];
                   },
-              }));
+                }));
 
-    env->define(
-      "pop", Value(NativeFunction{
-               .name = "pop",
-               .fn =
-                 [](std::vector<Value>& args) -> Value {
-                   if (args.size() != 1) {
-                     throw std::runtime_error("pop() expects exactly 1 argument, got " + std::to_string(args.size()));
-                   }
-                   const auto* arr = std::get_if<Array>(&args[0].data);
-                   if (!arr || !*arr || (*arr)->empty()) {
-                     throw std::runtime_error("pop() expects a non-empty array");
-                   }
-                   Value back = (*arr)->back();
-                   (*arr)->pop_back();
-                   return back;
-                 },
-             }));
+    env->define("pop",
+                Value(NativeFunction{
+                  .name = "pop",
+                  .fn = [](std::vector<Value>& args) -> Value {
+                    if (args.size() != 1) {
+                      throw std::runtime_error("pop() expects exactly 1 argument, got " + std::to_string(args.size()));
+                    }
+                    const auto* arr = std::get_if<Array>(&args[0].data);
+                    if (!arr || !*arr || (*arr)->empty()) {
+                      throw std::runtime_error("pop() expects a non-empty array");
+                    }
+                    Value back = (*arr)->back();
+                    (*arr)->pop_back();
+                    return back;
+                  },
+                }));
 
-    env->define(
-      "read", Value(NativeFunction{
-                 .name = "read",
-                 .fn =
-                   [](std::vector<Value>& args) -> Value {
-                     if (args.size() > 1) {
-                       throw std::runtime_error("read() expects at most 1 argument, got " + std::to_string(args.size()));
-                     }
-                     if (args.size() == 1) {
-                       std::print("{}", args[0].toString());
-                     }
-                     std::string input;
-                     std::getline(std::cin, input);
-                     return Value{input};
-                   },
-               }));
+    env->define("read",
+                Value(NativeFunction{
+                  .name = "read",
+                  .fn = [](std::vector<Value>& args) -> Value {
+                    if (args.size() > 1) {
+                      throw std::runtime_error("read() expects at most 1 argument, got " + std::to_string(args.size()));
+                    }
+                    if (args.size() == 1) {
+                      std::print("{}", args[0].toString());
+                    }
+                    std::string input;
+                    std::getline(std::cin, input);
+                    return Value{input};
+                  },
+                }));
   }
 
   Evaluator::Evaluator()
@@ -213,9 +205,7 @@ namespace eval {
     registerBuiltins(m_global);
   }
 
-  Value Evaluator::run(const par::Block& program) {
-    return evalBlock(&program, m_global);
-  }
+  Value Evaluator::run(const par::Block& program) { return evalBlock(&program, m_global); }
 
   // Central dispatch. Every parseX function in the parser has a matching
   // evalX function here, same shape as Parser::printNode, switch on
@@ -392,19 +382,22 @@ namespace eval {
     }
   }
 
-  // Handles =, +=, -=, *=, /=, %=. Three kinds of targets:
-  //   - Identifier:    plain variable, resolved/updated through `env`.
-  //   - MemberAccess:  instance->field via '.' syntax (obj.field = ...),
-  //                    mutates the instance's own field map directly.
-  //   - SuperAccess:   this->field = ... (super->field = ... is rejected,
-  //                    same as in most languages, you can write to your own
-  //                    fields but "assigning into the parent" doesn't mean
-  //                    anything since fields aren't per-class, they're per-
-  //                    instance, this->field and super->field refer to the
-  //                    SAME storage slot, only method lookup differs).
+  // Handles =, +=, -=, *=, /=, %=. Two kinds of targets:
+  //   - Identifier:   plain variable, resolved/updated through `env`.
+  //   - MemberAccess: instance.field = ... via '.' syntax, OR this->field =
+  //                   ... (super->field = ... is rejected, same as in most
+  //                   languages, you can write to your own fields but
+  //                   "assigning into the parent" doesn't mean anything
+  //                   since fields aren't per-class, they're per-instance,
+  //                   this->field and super->field refer to the SAME
+  //                   storage slot, only method lookup differs). Both forms
+  //                   mutate the instance's own field map directly, they're
+  //                   told apart by whether the MemberAccess's object child
+  //                   is a Self node.
   Value Evaluator::evalAssignment(const par::Binary* node, const std::shared_ptr<Environment>& env) {
     // Plain identifier target, e.g. x = 5; x += 1;
-    if (const auto* target = par::as<par::Identifier>(node->left.get())) {
+    if (node->left->type == par::NodeType::IDENTIFIER) {
+      const auto* target = static_cast<const par::Identifier*>(node->left.get());
       Value new_value;
       if (node->operation == lex::TokenType::ASSIGN) {
         new_value = evaluate(node->right.get(), env);
@@ -422,9 +415,25 @@ namespace eval {
       return new_value;
     }
 
-    // instance.field = ... / instance.field += ...
-    if (const auto* member = par::as<par::MemberAccess>(node->left.get())) {
-      Value object = evaluate(member->object.get(), env);
+    // instance.field = ... / this->field = ... (both MemberAccess targets)
+    if (node->left->type == par::NodeType::MEMBER_ACCESS) {
+      const auto* member = static_cast<const par::MemberAccess*>(node->left.get());
+
+      Value object;
+      if (member->object->type == par::NodeType::SELF) {
+        const auto* self_node = static_cast<const par::Self*>(member->object.get());
+        if (self_node->is_super) {
+          throw std::runtime_error("Cannot assign through 'super->...', fields belong to the instance, assign via 'this->" + member->field + "' instead");
+        }
+        auto this_val = env->get("this");
+        if (!this_val) {
+          throw std::runtime_error("'this' is not defined here (assignment outside of a method body)");
+        }
+        object = *this_val;
+      } else {
+        object = evaluate(member->object.get(), env);
+      }
+
       const auto* instance = std::get_if<Instance>(&object.data);
       if (!instance) {
         throw std::runtime_error("Cannot assign to a field on a non-instance value (" + object.typeName() + ")");
@@ -443,37 +452,6 @@ namespace eval {
       }
 
       (*instance->fields)[member->field] = new_value;
-      return new_value;
-    }
-
-    // this->field = ... / this->field += ...   (super->field = ... rejected below)
-    if (const auto* super_access = par::as<par::SuperAccess>(node->left.get())) {
-      if (super_access->is_super) {
-        throw std::runtime_error("Cannot assign through 'super->...', fields belong to the instance, assign via 'this->" + super_access->field + "' instead");
-      }
-
-      auto this_val = env->get("this");
-      if (!this_val) {
-        throw std::runtime_error("'this' is not defined here (assignment outside of a method body)");
-      }
-      const auto* instance = std::get_if<Instance>(&this_val->data);
-      if (!instance) {
-        throw std::runtime_error("'this' is not an instance");
-      }
-
-      Value new_value;
-      if (node->operation == lex::TokenType::ASSIGN) {
-        new_value = evaluate(node->right.get(), env);
-      } else {
-        auto it = instance->fields->find(super_access->field);
-        if (it == instance->fields->end()) {
-          throw std::runtime_error("Undefined field '" + super_access->field + "' on instance of " + instance->klass->name);
-        }
-        Value rhs = evaluate(node->right.get(), env);
-        new_value = applyCompoundOp(node->operation, it->second, rhs);
-      }
-
-      (*instance->fields)[super_access->field] = new_value;
       return new_value;
     }
 
@@ -619,9 +597,7 @@ namespace eval {
     throw std::runtime_error("Attempted to call a non-function value (" + callee.typeName() + ")");
   }
 
-  Value Evaluator::evalFnLiteral(const par::FnLiteral* node, const std::shared_ptr<Environment>& env) {
-    return Value(Function{.declaration = node, .closure = env});
-  }
+  Value Evaluator::evalFnLiteral(const par::FnLiteral* node, const std::shared_ptr<Environment>& env) { return Value(Function{.declaration = node, .closure = env}); }
 
   Value Evaluator::evalArrayLiteral(const par::ArrayLiteral* node, const std::shared_ptr<Environment>& env) {
     auto elements = std::make_shared<std::vector<Value>>();
@@ -632,9 +608,79 @@ namespace eval {
     return Value(elements);
   }
 
+  // obj[index]. Arrays index by number (truncated to size_t, bounds
+  // checked), strings index by number too and return a one-character
+  // string. Nothing else supports subscripting yet.
+  Value Evaluator::evalSubscript(const par::Subscript* node, const std::shared_ptr<Environment>& env) {
+    Value object = evaluate(node->object.get(), env);
+    Value index = evaluate(node->index.get(), env);
+
+    const auto* idx = std::get_if<double>(&index.data);
+    if (!idx) {
+      throw std::runtime_error("Subscript index must be a number, got " + index.typeName());
+    }
+    if (*idx < 0) {
+      throw std::runtime_error("Subscript index cannot be negative");
+    }
+    auto i = static_cast<size_t>(*idx);
+
+    if (const auto* arr = std::get_if<Array>(&object.data)) {
+      if (!*arr || i >= (*arr)->size()) {
+        throw std::runtime_error("Array index " + std::to_string(i) + " out of bounds (size " + std::to_string(*arr ? (*arr)->size() : 0) + ")");
+      }
+      return (**arr)[i];
+    }
+    if (const auto* str = std::get_if<std::string>(&object.data)) {
+      if (i >= str->size()) {
+        throw std::runtime_error("String index " + std::to_string(i) + " out of bounds (length " + std::to_string(str->size()) + ")");
+      }
+      return Value(std::string(1, (*str)[i]));
+    }
+
+    throw std::runtime_error("Subscript is not supported on a value of type " + object.typeName());
+  }
+
+  // obj.field, and this->field / super->field once the parser's MemberAccess
+  // wrapping is unwound below. A Self object child (par::Self) means this
+  // node came from `this->...`/`super->...` syntax rather than plain `.`, so
+  // it gets routed to evalSelfMemberAccess instead of being evaluated as an
+  // ordinary expression (a bare Self has no Value of its own to evaluate to).
   Value Evaluator::evalMemberAccess(const par::MemberAccess* node, const std::shared_ptr<Environment>& env) {
+    if (node->object->type == par::NodeType::SELF) {
+      const auto* self_node = static_cast<const par::Self*>(node->object.get());
+      return evalSelfMemberAccess(self_node, node->field, node, env);
+    }
     Value object = evaluate(node->object.get(), env);
     return resolveMember(object, node->field, node);
+  }
+
+  // this->field / super->field. `this` resolves `field` starting at the
+  // instance's own runtime class. `super` resolves it starting at the parent
+  // of whichever class the CURRENTLY EXECUTING method was defined on (the
+  // "__class__" entry callFunction stashes in the call scope), not the
+  // parent of the instance's runtime class, that distinction is what makes
+  // multi-level inheritance chains resolve super-> to the right generation
+  // instead of looping back on themselves.
+  Value Evaluator::evalSelfMemberAccess(const par::Self* self_node, const std::string& field, const par::Node* node, const std::shared_ptr<Environment>& env) {
+    auto this_val = env->get("this");
+    if (!this_val) {
+      throw std::runtime_error("'this'/'super' used outside of a method body");
+    }
+
+    if (!self_node->is_super) {
+      return resolveMember(*this_val, field, node);
+    }
+
+    auto defining_class_val = env->get("__class__");
+    if (!defining_class_val) {
+      throw std::runtime_error("'super' used outside of a method body");
+    }
+    const auto* defining_class = std::get_if<std::shared_ptr<Class>>(&defining_class_val->data);
+    if (!defining_class || !*defining_class || !(*defining_class)->parent) {
+      throw std::runtime_error("'super' used in a class with no parent (no 'extends')");
+    }
+
+    return resolveMember(*this_val, field, node, (*defining_class)->parent);
   }
 
   // Shared field/method resolution for '.' access. `search_class` lets
@@ -706,9 +752,6 @@ namespace eval {
     throw ReturnSignal{std::move(value)};
   }
 
-  Value Evaluator::evalBreak(const par::Break* /*node*/, const std::shared_ptr<Environment>& /*env*/) { throw BreakSignal{}; }
-
-  Value Evaluator::evalContinue(const par::Continue* /*node*/, const std::shared_ptr<Environment>& /*env*/) { throw ContinueSignal{}; }
   // break; / continue; one Jump node, kind tells them apart.
   Value Evaluator::evalJump(const par::Jump* node, const std::shared_ptr<Environment>& /*env*/) {
     switch (node->kind) {
@@ -823,54 +866,6 @@ namespace eval {
     return instance_value;
   }
 
-  Value Evaluator::evalThisExpr(const par::ThisExpr* /*node*/, const std::shared_ptr<Environment>& env) {
-    auto this_val = env->get("this");
-    if (!this_val) {
-      throw std::runtime_error("'this' is not defined here (used outside of a method body)");
-    }
-    return *this_val;
-  }
-
-  // this->field / super->field (and, when the SuperAccess sits in callee
-  // position of a Call, the method-bound-Function path below handles
-  // this->method(...) / super->method(...) too, since evalCall just calls
-  // evaluate() on the callee node first and gets back whatever this
-  // function returns, a bound Function in the method case).
-  //
-  // The "__class__" lookup is the key piece that makes super-> resolve to
-  // the right class instead of either infinite-looping back to itself or
-  // skipping a generation: it's set by callFunction to whichever class's
-  // method body is CURRENTLY executing (lexical, "where was this code
-  // written", not "what's the runtime type of this"), so super->whatever
-  // always means "search starting one level above the class this method
-  // text lives in", regardless of how deep the actual instance's class
-  // hierarchy goes below that point.
-  Value Evaluator::evalSuperAccess(const par::SuperAccess* node, const std::shared_ptr<Environment>& env) {
-    auto this_val = env->get("this");
-    if (!this_val) {
-      throw std::runtime_error("'this'/'super' used outside of a method body");
-    }
-
-    if (!node->is_super) {
-      // this->field
-      return resolveMember(*this_val, node->field, node);
-    }
-
-    // super->field: search starts at the parent of the class the CURRENTLY
-    // EXECUTING method was defined on, not the parent of the instance's own
-    // runtime class.
-    auto defining_class_val = env->get("__class__");
-    if (!defining_class_val) {
-      throw std::runtime_error("'super' used outside of a method body");
-    }
-    const auto* defining_class = std::get_if<std::shared_ptr<Class>>(&defining_class_val->data);
-    if (!defining_class || !*defining_class || !(*defining_class)->parent) {
-      throw std::runtime_error("'super' used in a class with no parent (no 'extends')");
-    }
-
-    return resolveMember(*this_val, node->field, node, (*defining_class)->parent);
-  }
-
   // Binds args to params in a fresh scope whose parent is the closure (NOT
   // the call site), then evaluates the body. Catches ReturnSignal so a
   // return statement unwinds cleanly back here, that's the function-call
@@ -883,11 +878,9 @@ namespace eval {
   // the fresh call scope alongside the regular parameters, using the exact
   // same Environment mechanism, no special-casing needed elsewhere.
   Value Evaluator::callFunction(
-    const Function& fn, std::vector<Value> args, const par::Node* /*call_node*/, const std::optional<Value>& bound_this,
-    const std::shared_ptr<Class>& defining_class) {
+    const Function& fn, std::vector<Value> args, const par::Node* /*call_node*/, const std::optional<Value>& bound_this, const std::shared_ptr<Class>& defining_class) {
     if (args.size() != fn.declaration->params.size()) {
-      throw std::runtime_error(
-        "Expected " + std::to_string(fn.declaration->params.size()) + " arguments but got " + std::to_string(args.size()));
+      throw std::runtime_error("Expected " + std::to_string(fn.declaration->params.size()) + " arguments but got " + std::to_string(args.size()));
     }
 
     auto call_env = std::make_shared<Environment>(fn.closure);
