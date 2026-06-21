@@ -1,7 +1,7 @@
 Shit Script (SiS)
 <!-- (/.__.)/ \(.__.\) -->
 
-# TODO
+## TODO
 - [ ] Add proper README
 - [ ] Stop being lazy and add proper Tests
 - [ ] Add more passable flags
