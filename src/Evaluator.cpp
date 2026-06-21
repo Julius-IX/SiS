@@ -235,12 +235,14 @@ namespace eval {
       case par::NodeType::IF: return evalIf(static_cast<const par::If*>(node), env);
       case par::NodeType::WHILE: return evalWhile(static_cast<const par::While*>(node), env);
       case par::NodeType::FOR: return evalFor(static_cast<const par::For*>(node), env);
+      case par::NodeType::TERNARY: return evalTernary(static_cast<const par::Ternary*>(node), env);
       case par::NodeType::VAR_DECL: return evalVarDecl(static_cast<const par::VarDecl*>(node), env);
       case par::NodeType::EXPR_STMT: return evalExprStmt(static_cast<const par::ExprStmt*>(node), env);
       case par::NodeType::CALL: return evalCall(static_cast<const par::Call*>(node), env);
       case par::NodeType::FN_LITERAL: return evalFnLiteral(static_cast<const par::FnLiteral*>(node), env);
       case par::NodeType::MEMBER_ACCESS: return evalMemberAccess(static_cast<const par::MemberAccess*>(node), env);
       case par::NodeType::ARRAY_LITERAL: return evalArrayLiteral(static_cast<const par::ArrayLiteral*>(node), env);
+      case par::NodeType::SUBSCRIPT: return evalSubscript(static_cast<const par::Subscript*>(node), env);
       case par::NodeType::RETURN: return evalReturn(static_cast<const par::Return*>(node), env);
       case par::NodeType::BREAK: return evalBreak(static_cast<const par::Break*>(node), env);
       case par::NodeType::CONTINUE: return evalContinue(static_cast<const par::Continue*>(node), env);
@@ -528,6 +530,11 @@ namespace eval {
     }
     return result;
   }
+  Value Evaluator::evalTernary(const par::Ternary* node, const std::shared_ptr<Environment>& env) {
+    Value condition = evaluate(node->condition.get(), env);
+    return condition.isTruthy() ? evaluate(node->then_expr.get(), env) : evaluate(node->else_expr.get(), env);
+  }
+
   Value Evaluator::evalVarDecl(const par::VarDecl* node, const std::shared_ptr<Environment>& env) {
     Value value = node->initializer ? evaluate(node->initializer.get(), env) : Value{};
     env->define(node->name, value);

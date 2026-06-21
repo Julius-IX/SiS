@@ -254,6 +254,7 @@ namespace par { // Base parsing loop functions
 
   int Parser::bindingPower(const lex::TokenType& type) {
     switch (type) {
+      case lex::TokenType::QUESTION_MARK:
       case lex::TokenType::ASSIGN:
       case lex::TokenType::PLUS_ASSIGN:
       case lex::TokenType::MINUS_ASSIGN:
@@ -304,7 +305,6 @@ namespace par { // Base parsing loop functions
       case lex::TokenType::THIS:
       case lex::TokenType::SUPER:
       case lex::TokenType::INCLUDE:
-      case lex::TokenType::QUESTION_MARK:
       case lex::TokenType::NOT:
       case lex::TokenType::R_PAREN:
       case lex::TokenType::L_BRACE:
@@ -476,6 +476,17 @@ namespace par { // Base parsing loop functions
         std::unique_ptr<Node> right = parseExpression(state, 1); // right-assoc: same prec
         if (right == nullptr) return nullptr;
         return makeNode<Binary>(left_line, left_column, op.type, std::move(left), std::move(right));
+      }
+
+      case lex::TokenType::QUESTION_MARK: {
+        size_t left_line = left->line;
+        size_t left_column = left->column;
+        std::unique_ptr<Node> then_expr = parseExpression(state, 1);
+        if (then_expr == nullptr) return nullptr;
+        if (!expect(state, lex::TokenType::COLON, "Expected ':' in ternary expression")) return nullptr;
+        std::unique_ptr<Node> else_expr = parseExpression(state, 1);
+        if (else_expr == nullptr) return nullptr;
+        return makeNode<Ternary>(left_line, left_column, std::move(left), std::move(then_expr), std::move(else_expr));
       }
 
       // obj.field consume the dot, then read the field name as an identifier

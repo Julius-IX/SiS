@@ -26,6 +26,7 @@ namespace par {
     RETURN,
     JUMP, // break / continue same zero-data shape, kind tells them apart
     FOR,
+    TERNARY,
     SELF, // this / super both are self-references, is_super tells them apart
     NEW_EXPR,
     CLASS_DECL,
@@ -265,5 +266,17 @@ namespace par {
         condition(std::move(condition)),
         increment(std::move(increment)),
         body(std::move(body)) {}
+  };
+  // condition ? then_expr : else_expr
+  struct Ternary final : Node {
+    static constexpr NodeType TYPE = NodeType::TERNARY;
+    std::unique_ptr<Node> condition;
+    std::unique_ptr<Node> then_expr;
+    std::unique_ptr<Node> else_expr;
+    Ternary(std::unique_ptr<Node> condition, std::unique_ptr<Node> then_expr, std::unique_ptr<Node> else_expr)
+      : Node(TYPE),
+        condition(std::move(condition)),
+        then_expr(std::move(then_expr)),
+        else_expr(std::move(else_expr)) {}
   };
 } // namespace par

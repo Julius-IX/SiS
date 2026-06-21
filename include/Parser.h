@@ -66,6 +66,7 @@ namespace par {
     std::unique_ptr<Node> parseIf(State* state);
     std::unique_ptr<Node> parseWhile(State* state);
     std::unique_ptr<Node> parseVarDecl(State* state);
+    std::unique_ptr<Node> parseVarDeclNoSemicolon(State* state);
     std::unique_ptr<Node> parseReturn(State* state);
     std::unique_ptr<Node> parseFnLiteral(State* state);
     std::unique_ptr<Node> parseTopLevelFn(State* state);

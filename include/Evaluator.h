@@ -61,6 +61,7 @@ namespace eval {
     Value evalIf(const par::If* node, const std::shared_ptr<Environment>& env);
     Value evalWhile(const par::While* node, const std::shared_ptr<Environment>& env);
     Value evalFor(const par::For* node, const std::shared_ptr<Environment>& env);
+    Value evalTernary(const par::Ternary* node, const std::shared_ptr<Environment>& env);
     Value evalVarDecl(const par::VarDecl* node, const std::shared_ptr<Environment>& env);
     Value evalExprStmt(const par::ExprStmt* node, const std::shared_ptr<Environment>& env);
     Value evalCall(const par::Call* node, const std::shared_ptr<Environment>& env);
@@ -93,46 +94,45 @@ namespace eval {
     // if the class (or an ancestor) defines one.
     Value evalNewExpr(const par::NewExpr* node, const std::shared_ptr<Environment>& env);
 
-    // Bare `this`. Only valid where the call scope chain has a "this"
-    // variable bound (i.e. inside a method body), errors otherwise.
-    Value evalThisExpr(const par::ThisExpr* node, const std::shared_ptr<Environment>& env);
-
     // this->field / super->field, and (when wrapped in a Call by evalCall)
-    // this->method(...) / super->method(...). For `this`, looks up `field`
-    // starting at the instance's own class. For `super`, looks up `field`
-    // starting at the PARENT of the class the currently-executing method was
-    // defined on (not the parent of the instance's runtime class, that
-    // distinction matters for multi-level inheritance: a grandchild calling
-    // an overridden method that itself calls super-> should resolve to the
-    // grandparent, not loop back to itself). That "which class is the
+    // this->method(...) / super->method(...). The parser always wraps a bare
+    // `this`/`super` in a MemberAccess (see par::Self), so this is reached
+    // from evalMemberAccess whenever its object child is a Self node rather
+    // than getting its own NodeType dispatch case. For `this`, looks up
+    // `field` starting at the instance's own class. For `super`, looks up
+    // `field` starting at the PARENT of the class the currently-executing
+    // method was defined on (not the parent of the instance's runtime class,
+    // that distinction matters for multi-level inheritance: a grandchild
+    // calling an overridden method that itself calls super-> should resolve
+    // to the grandparent, not loop back to itself). That "which class is the
     // current method defined on" context is threaded through via a
     // "__class__" entry placed in the call environment by callFunction.
-    Value evalSuperAccess(const par::SuperAccess* node, const std::shared_ptr<Environment>& env);
+    Value evalSelfMemberAccess(const par::Self* self_node, const std::string& field, const par::Node* node, const std::shared_ptr<Environment>& env);
 
     // Handles the case where node->operation is an assignment operator
     // (=, +=, -=, etc). Called from evalBinary, which checks this first
-    // before falling into normal arithmetic/comparison handling. Now also
-    // handles MemberAccess and SuperAccess targets (instance->field = ...,
-    // this->field = ...) in addition to plain identifiers.
+    // before falling into normal arithmetic/comparison handling. Targets can
+    // be a plain Identifier, a MemberAccess (instance.field = ...), or a
+    // MemberAccess whose object is Self (this->field = ...).
     Value evalAssignment(const par::Binary* node, const std::shared_ptr<Environment>& env);
 
     // Invokes a Function value with already evaluated arguments. Builds a
     // fresh Environment whose parent is the closure (not the call site),
     // that's what makes scoping lexical instead of dynamic. If `bound_this`
     // is set, it's defined as "this" in that fresh scope (method call), and
-    // `defining_class` (when set) is stashed as "__class__" so evalSuperAccess
-    // knows which class's parent to start searching from.
+    // `defining_class` (when set) is stashed as "__class__" so
+    // evalSelfMemberAccess knows which class's parent to start searching from.
     Value callFunction(
       const Function& fn, std::vector<Value> args, const par::Node* call_node, const std::optional<Value>& bound_this = std::nullopt,
       const std::shared_ptr<Class>& defining_class = nullptr);
 
-    // Shared implementation behind evalMemberAccess and the this->/super->
-    // paths in evalSuperAccess: given an already-evaluated `object` Value
-    // and a field name, returns the field's value, a bound method (a
-    // Function whose closure has "this" pre-defined), or array .length.
-    // `search_class` overrides which class's method table to search instead
-    // of the instance's own runtime class, used by super-> to skip past the
-    // current class straight to its parent.
+    // Shared implementation behind evalMemberAccess and evalSelfMemberAccess:
+    // given an already-evaluated `object` Value and a field name, returns the
+    // field's value, a bound method (a Function whose closure has "this"
+    // pre-defined), or array/string .length. `search_class` overrides which
+    // class's method table to search instead of the instance's own runtime
+    // class, used by super-> to skip past the current class straight to its
+    // parent.
     Value resolveMember(const Value& object, const std::string& field, const par::Node* node, const std::shared_ptr<Class>& search_class = nullptr);
   };
 } // namespace eval
