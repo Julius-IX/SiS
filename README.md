@@ -1,10 +1,12 @@
 Shit Script (SiS)
 <!-- (/.__.)/ \(.__.\) -->
 
-## Dependencies
+# TODO
+- [ ] Add proper README
+- [ ] Stop being lazy and add proper Tests
+- [ ] Add more passable flags
 
-#### Runtime Dependencies  
-- **[cxxopts](https://github.com/jarro2783/cxxopts)** (MIT License)
+## Dependencies
 
 #### Development / Test Dependencies  
 - **[Google Test](https://github.com/google/googletest)** (BSD-3-Clause License)
