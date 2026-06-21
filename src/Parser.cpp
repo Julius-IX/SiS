@@ -220,6 +220,9 @@ namespace par { // Include resolving
     return include_path;
   }
 
+} // namespace par
+
+namespace par { // Base parsing loop functions
   bool Parser::parse(State* state) {
     std::vector<std::unique_ptr<Node>> statements;
     lex::Lexer* lexer = state->lexer.get();
@@ -235,9 +238,6 @@ namespace par { // Include resolving
     return true;
   }
 
-} // namespace par
-
-namespace par { // Base parsing loop
   static bool isAssignmentOp(lex::TokenType type) {
     switch (type) {
       case lex::TokenType::ASSIGN:
