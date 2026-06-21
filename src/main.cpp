@@ -1,7 +1,5 @@
 #include <Evaluator.h>
-#include <Lexer.h>
 #include <Parser.h>
-#include <Token.h>
 #include <print>
 
 int main(const int argc, const char* argv[]) {
@@ -11,10 +9,10 @@ int main(const int argc, const char* argv[]) {
   }
 
   par::Parser parser;
-  if (!parser.parseFile(argv[1])) return 1;
+  if (!parser.parseRoot(argv[1])) return 1;
 
   eval::Evaluator evaluator;
-  evaluator.run(*parser.getRoot());
+  evaluator.run(parser.peekRoot());
 
   return 0;
 }
