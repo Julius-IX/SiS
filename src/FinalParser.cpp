@@ -162,6 +162,7 @@ namespace fpar {
         break;
       }
       m_include_stack.push_back(current_path);
+      m_include_stack.push_back(include_path.value().value());
     }
   }
 
