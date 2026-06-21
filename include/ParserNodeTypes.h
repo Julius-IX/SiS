@@ -35,8 +35,8 @@ namespace par {
 
   struct Node {
     const NodeType type; // NOLINT
-    size_t line;
-    size_t column;
+    size_t line = 0;
+    size_t column = 0;
 
     Node(const Node&) = default;
     Node(Node&&) = delete;
