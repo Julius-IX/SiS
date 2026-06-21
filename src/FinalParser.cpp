@@ -12,7 +12,7 @@ static void panic(const std::string_view msg) {
   std::exit(1);
 }
 
-namespace fpar { // NOTE: separate namespace block for readability
+namespace fpar { // Hooks
   static std::optional<std::string> readFileToString(const Path& path) {
     LOG_DEBUG_FLUSH("Reading file {}", path.string());
     std::ifstream file(path, std::ios::in | std::ios::binary);
@@ -63,7 +63,7 @@ namespace fpar { // NOTE: separate namespace block for readability
   }
 } // namespace fpar
 
-namespace fpar {
+namespace fpar { // Helpers
 
   template <typename T>
   static std::optional<T> getFromVariant(const lex::Token& token) {
@@ -92,6 +92,20 @@ namespace fpar {
     state->tokens.push_back(state->lexer->nextToken());
     return true;
   }
+
+  // expect: consumes the next token if it matches `type`, panics + returns false otherwise.
+  bool Parser::expect(State* state, lex::TokenType type, std::string_view err_msg) const {
+    if (state->lexer->peekToken().type != type) {
+      panic(m_hooks.format_error(state, state->lexer->peekToken(), err_msg));
+      return false;
+    }
+    state->tokens.push_back(state->lexer->nextToken());
+    return true;
+  }
+
+} // namespace fpar
+
+namespace fpar {
 
   static Path resolveRootDirectory(const Path& path) {
     std::error_code err;
@@ -166,16 +180,6 @@ namespace fpar {
     }
   }
 
-  // expect: consumes the next token if it matches `type`, panics + returns false otherwise.
-  bool Parser::expect(State* state, lex::TokenType type, std::string_view err_msg) const {
-    if (state->lexer->peekToken().type != type) {
-      panic(m_hooks.format_error(state, state->lexer->peekToken(), err_msg));
-      return false;
-    }
-    state->tokens.push_back(state->lexer->nextToken());
-    return true;
-  }
-
   std::expected<std::optional<Path>, std::string> Parser::checkForInclude(const Path& path) {
     lex::Lexer* lexer = m_states[path].lexer.get();
     if (!check(lexer, lex::TokenType::INCLUDE)) {
@@ -205,14 +209,10 @@ namespace fpar {
 
     return include_path;
   }
-} // namespace fpar
 
-namespace fpar { // NOTE: separate namespace block for readability
-  bool Parser::isAtEnd(lex::Lexer* lexer) { return check(lexer, lex::TokenType::SIS_EOF); }
   bool Parser::parse(State* state) {
     std::vector<std::unique_ptr<Node>> statements;
     lex::Lexer* lexer = state->lexer.get();
-
     while (!isAtEnd(lexer)) {
       std::unique_ptr<Node> stmt = parseStatement(state);
       if (!stmt) return false;
@@ -224,9 +224,8 @@ namespace fpar { // NOTE: separate namespace block for readability
 
     return true;
   }
-}
 
-namespace fpar { // NOTE: separate namespace block for grouping stuff that will be broken
+} // namespace fpar
 
   // printTree: public entry point, walks m_root and prints the parsed
   // statements with indentation showing nesting depth.
