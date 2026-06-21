@@ -72,6 +72,8 @@ namespace par {
     std::unique_ptr<Node> parseTopLevelFn(State* state);
     std::unique_ptr<Node> parseNewExpr(State* state);
     std::unique_ptr<Node> parseThisOrSuper(State* state, bool is_super);
+    std::unique_ptr<Node> parseFor(State* state);
+    std::unique_ptr<Node> parseSwitch(State* state);
 
     // dedicated section for classes
     std::unique_ptr<Node> parseClassDecl(State* state);
