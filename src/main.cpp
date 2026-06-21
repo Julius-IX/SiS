@@ -7,7 +7,7 @@ int main(const int argc, const char* argv[]) {
     return 1;
   }
 
-  fpar::Parser parser;
+  par::Parser parser;
   parser.parseRoot(argv[1]);
   if (argc > 2) parser.printTree();
 }
