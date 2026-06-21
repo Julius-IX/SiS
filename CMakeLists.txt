@@ -13,6 +13,14 @@ else()
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -g")
 endif()
 
+option(LOGGING_DISABLED "Disable logging" OFF)
+
+if (LOGGING_DISABLED)
+    add_compile_definitions(LOGGING_DISABLED)
+endif()
+
+option(DEFAULT_LOGGER_NAME "Default logger name" "SiS")
+
 # Fetch external dependencies
 add_subdirectory(external)
 find_package(Threads REQUIRED)
