@@ -249,7 +249,7 @@ namespace par { // Base parsing loop functions
     }
   }
 
-  int Parser::glueStrength(const lex::TokenType& type) {
+  int Parser::bindingPower(const lex::TokenType& type) {
     switch (type) {
       case lex::TokenType::ASSIGN:
       case lex::TokenType::PLUS_ASSIGN:
@@ -454,7 +454,7 @@ namespace par { // Base parsing loop functions
       case lex::TokenType::GREATER_THAN_EQUALS:
       case lex::TokenType::AND:
       case lex::TokenType::OR: {
-        int prec = glueStrength(op.type);
+        int prec = bindingPower(op.type);
         size_t left_line = left->line;
         size_t left_column = left->column;
         std::unique_ptr<Node> right = parseExpression(state, prec + 1); // left-assoc
@@ -523,7 +523,7 @@ namespace par { // Base parsing loop functions
     std::unique_ptr<Node> left = parseAtom(state);
     if (left == nullptr) return nullptr;
 
-    while (glueStrength(state->lexer->peekToken().type) >= min_prec) {
+    while (bindingPower(state->lexer->peekToken().type) >= min_prec) {
       left = parseContinuation(state, std::move(left));
       if (left == nullptr) return nullptr;
     }
