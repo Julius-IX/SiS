@@ -15,7 +15,7 @@ namespace eval {
     Value value;
   };
 
-  // Same idea for loop control: evalBreak/evalContinue throw these,
+  // Same idea for loop control: evalJump throws these (one per JumpKind),
   // evalWhile is what catches them. Anything nested inside the loop body
   // (if-statements, nested blocks) just lets the exception fly through.
   struct BreakSignal {};
@@ -60,6 +60,7 @@ namespace eval {
     Value evalBinary(const par::Binary* node, const std::shared_ptr<Environment>& env);
     Value evalIf(const par::If* node, const std::shared_ptr<Environment>& env);
     Value evalWhile(const par::While* node, const std::shared_ptr<Environment>& env);
+    Value evalFor(const par::For* node, const std::shared_ptr<Environment>& env);
     Value evalVarDecl(const par::VarDecl* node, const std::shared_ptr<Environment>& env);
     Value evalExprStmt(const par::ExprStmt* node, const std::shared_ptr<Environment>& env);
     Value evalCall(const par::Call* node, const std::shared_ptr<Environment>& env);

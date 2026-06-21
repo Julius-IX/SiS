@@ -316,7 +316,7 @@ namespace par { // Base parsing loop functions
       case lex::TokenType::ARROW:
       case lex::TokenType::COMMENT: return 0;
     }
-    assert(false && "glueStrength: unnamed TokenType value");
+    assert(false && "bindingPower: unnamed TokenType value");
     return 0;
   }
 
@@ -388,7 +388,7 @@ namespace par { // Base parsing loop functions
       case lex::TokenType::ILLEGAL:
       case lex::TokenType::IF:
       case lex::TokenType::ELSE:
-      case lex::TokenType::FOR:
+      // case lex::TokenType::FOR:
       case lex::TokenType::WHILE:
       case lex::TokenType::SWITCH:
       case lex::TokenType::CASE:
@@ -564,6 +564,7 @@ namespace par { // Complex parsing structures
       case lex::TokenType::L_BRACE: return parseBlock(state);
       case lex::TokenType::IF: return parseIf(state);
       case lex::TokenType::WHILE: return parseWhile(state);
+      case lex::TokenType::FOR: return parseFor(state);
       case lex::TokenType::PIN: return parseVarDecl(state);
       case lex::TokenType::RETURN: return parseReturn(state);
       case lex::TokenType::FN: return parseTopLevelFn(state);
@@ -644,7 +645,9 @@ namespace par { // Complex parsing structures
     return node;
   }
 
-  std::unique_ptr<Node> Parser::parseVarDecl(State* state) {
+  // Shared by parseVarDecl (which demands a trailing ';') and parseFor's
+  // init clause (which doesn't, the for-loop's own ';' covers it).
+  std::unique_ptr<Node> Parser::parseVarDeclNoSemicolon(State* state) {
     lex::Token pin_tok = advance(state); // consume 'pin'
     lex::Token name_tok = advance(state);
     if (name_tok.type != lex::TokenType::IDENT) {
@@ -661,10 +664,16 @@ namespace par { // Complex parsing structures
       initializer = parseExpression(state, 1);
       if (initializer == nullptr) return nullptr;
     }
-    if (!expect(state, lex::TokenType::SEMICOLON, "Expected ';' after variable declaration")) return nullptr;
     auto node = std::make_unique<VarDecl>(std::move(*name), std::move(initializer));
     node->line = pin_tok.line;
     node->column = pin_tok.column;
+    return node;
+  }
+
+  std::unique_ptr<Node> Parser::parseVarDecl(State* state) {
+    auto node = parseVarDeclNoSemicolon(state);
+    if (node == nullptr) return nullptr;
+    if (!expect(state, lex::TokenType::SEMICOLON, "Expected ';' after variable declaration")) return nullptr;
     return node;
   }
 
@@ -809,6 +818,36 @@ namespace par { // Complex parsing structures
     return node;
   }
 
+  std::unique_ptr<Node> Parser::parseFor(State* state) {
+    lex::Token for_tok = advance(state); // consume 'for'
+    if (!expect(state, lex::TokenType::L_PAREN, "Expected '(' after 'for'")) return nullptr;
+
+    std::unique_ptr<Node> init;
+    if (!check(state->lexer.get(), lex::TokenType::SEMICOLON)) {
+      init = check(state->lexer.get(), lex::TokenType::PIN) ? parseVarDeclNoSemicolon(state) : parseExpression(state, 1);
+      if (init == nullptr) return nullptr;
+    }
+    if (!expect(state, lex::TokenType::SEMICOLON, "Expected ';' after for-loop initializer")) return nullptr;
+
+    std::unique_ptr<Node> condition;
+    if (!check(state->lexer.get(), lex::TokenType::SEMICOLON)) {
+      condition = parseExpression(state, 1);
+      if (condition == nullptr) return nullptr;
+    }
+    if (!expect(state, lex::TokenType::SEMICOLON, "Expected ';' after for-loop condition")) return nullptr;
+
+    std::unique_ptr<Node> increment;
+    if (!check(state->lexer.get(), lex::TokenType::R_PAREN)) {
+      increment = parseExpression(state, 1);
+      if (increment == nullptr) return nullptr;
+    }
+    if (!expect(state, lex::TokenType::R_PAREN, "Expected ')' after for-loop clauses")) return nullptr;
+
+    auto body = parseBlock(state);
+    if (body == nullptr) return nullptr;
+
+    return makeNode<For>(for_tok.line, for_tok.column, std::move(init), std::move(condition), std::move(increment), std::move(body));
+  }
   std::unique_ptr<VarDecl> Parser::parseClassField(State* state) {
     // field declaration
     lex::Token field_pin_tok = advance(state); // consume 'pin'

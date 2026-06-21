@@ -2,9 +2,9 @@
 #include <Token.h>
 #include <algorithm>
 #include <cmath>
+#include <iostream>
 #include <print>
 #include <stdexcept>
-#include <iostream>
 
 namespace eval {
   static bool isAssignmentOperator(lex::TokenType type) {
@@ -225,6 +225,7 @@ namespace eval {
       return Value{};
     }
 
+    // NOLINTBEGIN (cppcoreguidelines-pro-type-static-cast-downcast)
     switch (node->type) {
       case par::NodeType::LITERAL: return evalLiteral(static_cast<const par::Literal*>(node));
       case par::NodeType::IDENTIFIER: return evalIdentifier(static_cast<const par::Identifier*>(node), env);
@@ -233,6 +234,7 @@ namespace eval {
       case par::NodeType::BLOCK: return evalBlock(static_cast<const par::Block*>(node), env);
       case par::NodeType::IF: return evalIf(static_cast<const par::If*>(node), env);
       case par::NodeType::WHILE: return evalWhile(static_cast<const par::While*>(node), env);
+      case par::NodeType::FOR: return evalFor(static_cast<const par::For*>(node), env);
       case par::NodeType::VAR_DECL: return evalVarDecl(static_cast<const par::VarDecl*>(node), env);
       case par::NodeType::EXPR_STMT: return evalExprStmt(static_cast<const par::ExprStmt*>(node), env);
       case par::NodeType::CALL: return evalCall(static_cast<const par::Call*>(node), env);
@@ -242,6 +244,7 @@ namespace eval {
       case par::NodeType::RETURN: return evalReturn(static_cast<const par::Return*>(node), env);
       case par::NodeType::BREAK: return evalBreak(static_cast<const par::Break*>(node), env);
       case par::NodeType::CONTINUE: return evalContinue(static_cast<const par::Continue*>(node), env);
+      case par::NodeType::JUMP: return evalJump(static_cast<const par::Jump*>(node), env);
       case par::NodeType::CLASS_DECL: return evalClassDecl(static_cast<const par::ClassDecl*>(node), env);
       case par::NodeType::NEW_EXPR: return evalNewExpr(static_cast<const par::NewExpr*>(node), env);
       case par::NodeType::THIS_EXPR: return evalThisExpr(static_cast<const par::ThisExpr*>(node), env);
@@ -500,15 +503,38 @@ namespace eval {
     return result;
   }
 
+  // Own scope so a `pin i = 0;` initializer doesn't leak past the loop, same
+  // reasoning evalBlock uses for ordinary blocks. continue still has to run
+  // the increment before looping back, that's what the catch does, run
+  // increment, then fall through to re-check the condition.
+  Value Evaluator::evalFor(const par::For* node, const std::shared_ptr<Environment>& env) {
+    auto scope = std::make_shared<Environment>(env);
+    if (node->init) {
+      evaluate(node->init.get(), scope);
+    }
+
+    Value result;
+    while (!node->condition || evaluate(node->condition.get(), scope).isTruthy()) {
+      try {
+        result = evaluate(node->body.get(), scope);
+      } catch (const BreakSignal&) {
+        break;
+      } catch (const ContinueSignal&) {
+        // fall through to increment below, same as a normal iteration
+      }
+      if (node->increment) {
+        evaluate(node->increment.get(), scope);
+      }
+    }
+    return result;
+  }
   Value Evaluator::evalVarDecl(const par::VarDecl* node, const std::shared_ptr<Environment>& env) {
     Value value = node->initializer ? evaluate(node->initializer.get(), env) : Value{};
     env->define(node->name, value);
     return value;
   }
 
-  Value Evaluator::evalExprStmt(const par::ExprStmt* node, const std::shared_ptr<Environment>& env) {
-    return evaluate(node->expr.get(), env);
-  }
+  Value Evaluator::evalExprStmt(const par::ExprStmt* node, const std::shared_ptr<Environment>& env) { return evaluate(node->expr.get(), env); }
 
   // Dispatches a call to whichever kind of callable the callee evaluated to:
   // a user-defined Function (goes through callFunction), a NativeFunction
@@ -629,6 +655,14 @@ namespace eval {
   Value Evaluator::evalBreak(const par::Break* /*node*/, const std::shared_ptr<Environment>& /*env*/) { throw BreakSignal{}; }
 
   Value Evaluator::evalContinue(const par::Continue* /*node*/, const std::shared_ptr<Environment>& /*env*/) { throw ContinueSignal{}; }
+  // break; / continue; one Jump node, kind tells them apart.
+  Value Evaluator::evalJump(const par::Jump* node, const std::shared_ptr<Environment>& /*env*/) {
+    switch (node->kind) {
+      case par::JumpKind::BREAK: throw BreakSignal{};
+      case par::JumpKind::CONTINUE: throw ContinueSignal{};
+    }
+    throw std::runtime_error("Evaluator: unhandled JumpKind");
+  }
 
   // class Name [extends Parent] { ... }
   //
