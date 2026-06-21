@@ -29,9 +29,9 @@ namespace fpar {
     ~Parser() = default;
 
     void parseRoot(const Path& path);
-    bool parse(State* state);                                                                                      // TODO: implement
-    void printTree() const;                                                                                        // TODO: refactor
-    static void printNode(const Node* node, const std::string& prefix, bool is_last, std::string_view label = ""); // TODO: refactor
+    bool parse(State* state);
+    void printTree() const;
+    static void printNode(const Node* node, const std::string& prefix, bool is_last, std::string_view label = "");
 
     protected:
     ParserHooks m_hooks; // NOLINT
