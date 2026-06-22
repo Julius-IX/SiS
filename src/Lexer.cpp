@@ -247,7 +247,7 @@ namespace lex {
           case 'f': str[write_index++] = '\f'; break;
           case 'v': str[write_index++] = '\v'; break;
           case 'a': str[write_index++] = '\a'; break;
-          case '0': str[write_index++] = '\0'; break;
+          case '0': str[write_index++] = '\0'; break; // NOTE: this will likely break when calling std::string::c_str()
           case '\\': str[write_index++] = '\\'; break;
           case '"': str[write_index++] = '"'; break;
           case '\'': str[write_index++] = '\''; break;
