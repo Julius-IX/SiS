@@ -167,7 +167,7 @@ namespace lex {
     case '+': case '-': case '*': case '/': case '%': case '=':
     case '<': case '>': case '&': case '|': case '^': case '!':
     case ')': case ']': case '}': case ';': case ',': case ' ':
-    case '\n': case '\t': case '\r': case '\v': case '\0':
+    case '\n': case '\t': case '\r': case '\v': case '\0': case ':':
     return true;
     default: return false;
     }
