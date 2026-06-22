@@ -255,3 +255,42 @@ namespace { // Ternary
     ASSERT_EQ(as_Ternary->else_expr->type, par::NodeType::LITERAL);
   }
 } // namespace
+
+namespace { // Member access & subscript
+
+  TEST(Parser, MemberAccessDot) {
+    TestParser p;
+    ASSERT_TRUE(p.parseSource("obj.field;"));
+
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, ExprStmt);
+    ASSERT_NODE(as_ExprStmt->expr.get(), MemberAccess);
+    EXPECT_EQ(as_MemberAccess->field, "field");
+    ASSERT_EQ(as_MemberAccess->object->type, par::NodeType::IDENTIFIER);
+  }
+
+  TEST(Parser, ChainedMemberAccess) {
+    // a.b.c  =>  MemberAccess(MemberAccess(a, b), c)
+    TestParser p;
+    ASSERT_TRUE(p.parseSource("a.b.c;"));
+
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, ExprStmt);
+    ASSERT_NODE(as_ExprStmt->expr.get(), MemberAccess);
+    EXPECT_EQ(as_MemberAccess->field, "c");
+    ASSERT_EQ(as_MemberAccess->object->type, par::NodeType::MEMBER_ACCESS);
+    auto* inner = static_cast<par::MemberAccess*>(as_MemberAccess->object.get());
+    EXPECT_EQ(inner->field, "b");
+  }
+
+  TEST(Parser, Subscript) {
+    TestParser p;
+    ASSERT_TRUE(p.parseSource("arr[0];"));
+
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, ExprStmt);
+    ASSERT_NODE(as_ExprStmt->expr.get(), Subscript);
+    ASSERT_EQ(as_Subscript->object->type, par::NodeType::IDENTIFIER);
+    ASSERT_EQ(as_Subscript->index->type, par::NodeType::LITERAL);
+  }
+} // namespace
