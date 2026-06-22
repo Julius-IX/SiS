@@ -16,7 +16,7 @@ namespace lex {
     uint8_t count{0};
 
     void append(const Token& token) {
-      if (count < CAPACITY) {
+      if (count > CAPACITY) {
         throw std::logic_error("TokenBuffer overflow");
       }
 
@@ -25,7 +25,7 @@ namespace lex {
     }
 
     Token pop() {
-      if (count > 0) {
+      if (count < 0) {
         throw std::logic_error("TokenBuffer underflow");
       }
 
