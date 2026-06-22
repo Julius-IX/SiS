@@ -5,6 +5,7 @@
 #include <iostream>
 #include <print>
 #include <stdexcept>
+#include <spdlog/fmt/fmt.h>
 
 namespace eval {
   static bool isAssignmentOperator(lex::TokenType type) {
@@ -79,10 +80,10 @@ namespace eval {
                   .name = "print",
                   .fn = [](std::vector<Value>& args) -> Value {
                     for (size_t i = 0; i < args.size(); ++i) {
-                      std::print("{}", args[i].toString());
-                      if (i + 1 < args.size()) std::print(" ");
+                      fmt::print("{}", args[i].toString());
+                      if (i + 1 < args.size()) fmt::print(" ");
                     }
-                    std::print("\n");
+                    fmt::print("\n");
                     return Value{};
                   },
                 }));
@@ -191,7 +192,7 @@ namespace eval {
                       throw std::runtime_error("read() expects at most 1 argument, got " + std::to_string(args.size()));
                     }
                     if (args.size() == 1) {
-                      std::print("{}", args[0].toString());
+                      fmt::print("{}", args[0].toString());
                     }
                     std::string input;
                     std::getline(std::cin, input);

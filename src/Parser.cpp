@@ -8,7 +8,7 @@
 
 // NOTE: placeholder
 static void panic(const std::string_view msg) {
-  std::print("PANIC: {}\n", msg.data());
+  fmt::print("PANIC: {}\n", msg.data());
   std::exit(1);
 }
 
