@@ -7,9 +7,8 @@
 #include <print>
 
 // NOTE: placeholder
-[[noreturn]] static void panic(const std::string_view msg) {
+static void panic(const std::string_view msg) {
   fmt::print("PANIC: {}\n", msg.data());
-  std::exit(1);
 }
 
 namespace par { // Hooks
