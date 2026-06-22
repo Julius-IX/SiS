@@ -703,31 +703,39 @@ namespace par { // Complex parsing structures
     return node;
   }
 
-  // parseFnLiteral called from parseAtom when 'fn' appears in expression
-  // position (i.e. anonymous fn, no name). Named fns at statement level are
-  // handled in parseStatement as sugar for pin name = fn(...){...};
-  std::unique_ptr<Node> Parser::parseFnLiteral(State* state) {
-    lex::Token fn_tok = advance(state); // consume 'fn'
-    if (!expect(state, lex::TokenType::L_PAREN, "Expected '(' after 'fn'")) return nullptr;
+  // shared helper: parses '(' param, param, ... ')' and returns the param name list.
+  // Called by both parseFnLiteral and parseTopLevelFn.
+  std::optional<std::vector<std::string>> Parser::parseParamList(State* state) {
+    if (!expect(state, lex::TokenType::L_PAREN, "Expected '(' after 'fn'")) return std::nullopt;
     std::vector<std::string> params;
     while (!check(state->lexer.get(), lex::TokenType::R_PAREN) && !isAtEnd(state->lexer.get())) {
       lex::Token param_tok = advance(state);
       if (param_tok.type != lex::TokenType::IDENT) {
         panic(m_hooks.format_error(state, param_tok, "Expected parameter name"));
-        return nullptr;
+        return std::nullopt;
       }
       auto param = getFromVariant<std::string>(state->tokens.back());
       if (!param) {
         panic(m_hooks.format_error(state, param_tok, "Empty parameter name"));
-        return nullptr;
+        return std::nullopt;
       }
       params.push_back(std::move(*param));
       if (!match(state, lex::TokenType::COMMA)) break;
     }
-    if (!expect(state, lex::TokenType::R_PAREN, "Expected ')' after parameters")) return nullptr;
+    if (!expect(state, lex::TokenType::R_PAREN, "Expected ')' after parameters")) return std::nullopt;
+    return params;
+  }
+
+  // parseFnLiteral called from parseAtom when 'fn' appears in expression
+  // position (i.e. anonymous fn, no name). Named fns at statement level are
+  // handled in parseStatement as sugar for pin name = fn(...){...};
+  std::unique_ptr<Node> Parser::parseFnLiteral(State* state) {
+    lex::Token fn_tok = advance(state); // consume 'fn'
+    auto params = parseParamList(state);
+    if (!params) return nullptr;
     auto body = parseBlock(state);
     if (body == nullptr) return nullptr;
-    auto node = std::make_unique<FnLiteral>(std::move(params), std::move(body));
+    auto node = std::make_unique<FnLiteral>(std::move(*params), std::move(body));
     node->line = fn_tok.line;
     node->column = fn_tok.column;
     return node;
@@ -751,28 +759,11 @@ namespace par { // Complex parsing structures
       panic(m_hooks.format_error(state, name_tok, "Empty function name"));
       return nullptr;
     }
-    // Now parse the rest as if we saw fn without consuming the name
-    // We need the '(' next
-    if (!expect(state, lex::TokenType::L_PAREN, "Expected '(' after function name")) return nullptr;
-    std::vector<std::string> params;
-    while (!check(state->lexer.get(), lex::TokenType::R_PAREN) && !isAtEnd(state->lexer.get())) {
-      lex::Token param_tok = advance(state);
-      if (param_tok.type != lex::TokenType::IDENT) {
-        panic(m_hooks.format_error(state, param_tok, "Expected parameter name"));
-        return nullptr;
-      }
-      auto param = getFromVariant<std::string>(state->tokens.back());
-      if (!param) {
-        panic(m_hooks.format_error(state, param_tok, "Empty parameter name"));
-        return nullptr;
-      }
-      params.push_back(std::move(*param));
-      if (!match(state, lex::TokenType::COMMA)) break;
-    }
-    if (!expect(state, lex::TokenType::R_PAREN, "Expected ')' after parameters")) return nullptr;
+    auto params = parseParamList(state);
+    if (!params) return nullptr;
     auto body = parseBlock(state);
     if (body == nullptr) return nullptr;
-    auto fn = makeNode<FnLiteral>(fn_tok.line, fn_tok.column, std::move(params), std::move(body));
+    auto fn = makeNode<FnLiteral>(fn_tok.line, fn_tok.column, std::move(*params), std::move(body));
     return makeNode<VarDecl>(fn_tok.line, fn_tok.column, std::move(*name), std::move(fn));
   }
 
