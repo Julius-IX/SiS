@@ -51,7 +51,7 @@ namespace eval {
         } else if constexpr (std::is_same_v<T, Function>) {
           return av.declaration == std::get<Function>(b.data).declaration;
         } else if constexpr (std::is_same_v<T, NativeFunction>) {
-          return av.name == std::get<NativeFunction>(b.data).name;
+          return false;
         } else if constexpr (std::is_same_v<T, std::shared_ptr<Class>>) {
           return av == std::get<std::shared_ptr<Class>>(b.data);
         } else if constexpr (std::is_same_v<T, std::shared_ptr<Instance>>) {
