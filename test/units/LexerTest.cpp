@@ -4,20 +4,24 @@
 #include <Lexer.h>
 #include <spdlog/fmt/fmt.h>
 
-int8_t tokenToLength(const lex::Token& token) {
+#include <algorithm>
+
+typedef std::vector<lex::Token> TokenVector;
+
+int32_t tokenToLength(const lex::Token& token) {
   switch (token.type) {
     case lex::ILLEGAL:
-    case lex::IDENT: return std::holds_alternative<std::string>(token.value) ? static_cast<int8_t>(std::get<std::string>(token.value).length()) : 0;
+    case lex::IDENT: return std::holds_alternative<std::string>(token.value) ? static_cast<int32_t>(std::get<std::string>(token.value).length()) : 0;
 
     case lex::NUM:
       if (std::holds_alternative<double>(token.value)) {
         std::ostringstream oss;
         oss << std::get<double>(token.value);
-        return static_cast<int8_t>(oss.str().length());
+        return static_cast<int32_t>(oss.str().length());
       }
       return 0;
 
-    case lex::STRING: return std::holds_alternative<std::string>(token.value) ? static_cast<int8_t>(std::get<std::string>(token.value).length()) : 0;
+    case lex::STRING: return std::holds_alternative<std::string>(token.value) ? static_cast<int32_t>(std::get<std::string>(token.value).size()) + 2 : 0; // +2 for quotes
 
     case lex::COMMENT:
     case lex::SIS_EOF: return 0;
@@ -68,21 +72,38 @@ int8_t tokenToLength(const lex::Token& token) {
     case lex::THIS:
     case lex::SIS_NULL: return 4;
 
+    case lex::BREAK:
     case lex::FALSE:
     case lex::WHILE:
     case lex::CLASS:
     case lex::SUPER: return 5;
 
+    case lex::RETURN:
     case lex::SWITCH: return 6;
 
+    case lex::DEFAULT:
     case lex::EXTENDS:
     case lex::INCLUDE: return 7;
 
-    default: return -1;
+    case lex::CONTINUE: return 8;
+
+    default: {
+      fmt::print("Invalid Token Type received: {}\n", lex::literalTokenToString(token.type));
+      return -1;
+    }
   }
 }
 
-typedef std::vector<lex::Token> TokenVector;
+void populateTokenLengths(TokenVector& tokens) {
+  for (auto& token : tokens) {
+    int32_t token_len = tokenToLength(token);
+
+    if (token_len < 0) throw std::runtime_error("Mock lex::Token.length is negative");
+
+    token.length = token_len;
+  }
+}
+
 static std::string tokenVariantToString(const lex::Token& token) {
   lex::TokenVariant tok_var = token.value;
   if (std::holds_alternative<std::monostate>(tok_var)) {
@@ -125,6 +146,7 @@ void compareTokenStream(lex::Lexer& lexer, const TokenVector& expected_tokens) {
                                    token.length,
                                    expected_tokens.at(index).length);
     }
+    token = lexer.nextToken();
 
     if (token.type == lex::SIS_EOF) break;
     ++index;
@@ -136,7 +158,8 @@ TEST(Lexer, TreatCommentAsSpaces) {
                       "pin this_variable = //line comment getting in the way \" value of variable \"";
 
   // clang-format off
-  const TokenVector expected {
+  // NOLINTBEGIN
+  TokenVector expected {
     {.type = lex::CLASS,     .value = {}, .line = 1, .column = 1},
     {.type = lex::IDENT,     .value = "DaClass", .line = 1, .column = 7},
     {.type = lex::L_BRACE,   .value = {}, .line = 1, .column = 36},
@@ -148,7 +171,9 @@ TEST(Lexer, TreatCommentAsSpaces) {
     {.type = lex::ASSIGN,  .value = {}, .line = 2, .column = 19},
     {.type = lex::SIS_EOF, .value = {}, .line = 2, .column = 87},
   };
+  // NOLINTEND
   // clang-format on
+  populateTokenLengths(expected);
 
   lex::Lexer lexer(input);
   compareTokenStream(lexer, expected);
@@ -158,7 +183,8 @@ TEST(Lexer, CanDiscernValidInvalidNumber) {
   std::string input = "123, 111.018, 1100., 1414..4, 12B34";
 
   // clang-format off
-  const TokenVector expected {
+  // NOLINTBEGIN
+  TokenVector expected {
     {.type = lex::NUM,     .value = 123.,      .line = 1, .column = 1  },
     {.type = lex::COMMA,   .value = {},        .line = 1, .column = 4  },
     {.type = lex::NUM,     .value = 111.018,   .line = 1, .column = 6  },
@@ -170,6 +196,20 @@ TEST(Lexer, CanDiscernValidInvalidNumber) {
     {.type = lex::ILLEGAL, .value = "12B34",   .line = 1, .column = 31 },
     {.type = lex::SIS_EOF, .value = {},        .line = 1, .column = 36 },
   };
+  populateTokenLengths(expected);
+
+  // NOTE: tokenToLength for NUM uses the double's string form, which drops trailing dots.
+  // "1100." → 1100.0 → "1100" → 4, but the source span is 5.
+  auto num_it = std::ranges::find_if(expected, [](const lex::Token& t) {
+      return t.type == lex::NUM &&
+      std::holds_alternative<double>(t.value)
+      && std::get<double>(t.value) == 1100.0;
+  });
+
+  if (num_it != expected.end()) {
+    num_it->length = 5;
+  }
+  // NOLINTEND
   // clang-format on
 
   lex::Lexer lexer(input);
@@ -183,7 +223,8 @@ TEST(Lexer, CanDiscernValidInvalidIdentifier) {
                       "invalid@\n";
 
   // clang-format off
-  const TokenVector expected {
+  // NOLINTBEGIN
+  TokenVector expected {
     {.type = lex::IDENT,   .value = "validIdent",   .line = 1, .column = 1  },
     {.type = lex::IDENT,   .value = "valid_ident_", .line = 1, .column = 12 },
     {.type = lex::IDENT,   .value = "_valid_",      .line = 2, .column = 1  },
@@ -195,8 +236,10 @@ TEST(Lexer, CanDiscernValidInvalidIdentifier) {
     {.type = lex::ILLEGAL, .value = "invalid@",     .line = 4, .column = 1  },
     {.type = lex::SIS_EOF, .value = {},             .line = 5, .column = 1  },
   };
+  // NOLINTEND
   // clang-format on
 
+  populateTokenLengths(expected);
   lex::Lexer lexer(input);
   compareTokenStream(lexer, expected);
 }
@@ -207,7 +250,8 @@ TEST(Lexer, ReturnIllegalOnUnknownChar) {
                       "for $ in\n";
 
   // clang-format off
-  const TokenVector expected {
+  // NOLINTBEGIN
+  TokenVector expected {
     {.type = lex::ILLEGAL, .value = "@",     .line = 1, .column = 1 },
     {.type = lex::IDENT  , .value = "beans", .line = 1, .column = 3  },
     {.type = lex::ILLEGAL, .value = "&",     .line = 1, .column = 9  },
@@ -221,8 +265,10 @@ TEST(Lexer, ReturnIllegalOnUnknownChar) {
     {.type = lex::IDENT,   .value = "in",    .line = 3, .column = 7  },
     {.type = lex::SIS_EOF, .value = {},      .line = 4, .column = 10 },
   };
+  // NOLINTEND
   // clang-format on
 
+  populateTokenLengths(expected);
   lex::Lexer lexer(input);
   compareTokenStream(lexer, expected);
 }
@@ -232,7 +278,8 @@ TEST(Lexer, ReusabilityWorks) {
   std::string second_input = "if (true) {/* comment */}";
 
   // clang-format off
-  const TokenVector expected_set_one {
+  // NOLINTBEGIN
+  TokenVector expected_set_one {
     {.type = lex::PIN,       .value = {},     .line = 1, .column = 1  },
     {.type = lex::IDENT,     .value = "var1", .line = 1, .column = 5  },
     {.type = lex::ASSIGN,    .value = {},     .line = 1, .column = 10 },
@@ -240,7 +287,7 @@ TEST(Lexer, ReusabilityWorks) {
     {.type = lex::SEMICOLON, .value = {},     .line = 1, .column = 14 },
     {.type = lex::SIS_EOF,   .value = {},     .line = 1, .column = 15 },
   };
-  const TokenVector expected_set_two {
+  TokenVector expected_set_two {
     {.type = lex::IF,      .value = {}, .line = 1, .column = 1  },
     {.type = lex::L_PAREN, .value = {}, .line = 1, .column = 4  },
     {.type = lex::TRUE,    .value = {}, .line = 1, .column = 5  },
@@ -249,7 +296,11 @@ TEST(Lexer, ReusabilityWorks) {
     {.type = lex::R_BRACE, .value = {}, .line = 1, .column = 25 },
     {.type = lex::SIS_EOF, .value = {}, .line = 1, .column = 26 },
   };
+  // NOLINTEND
   // clang-format on
+
+  populateTokenLengths(expected_set_one);
+  populateTokenLengths(expected_set_two);
 
   lex::Lexer lexer(first_input);
 
@@ -264,6 +315,7 @@ TEST(Lexer, ReusabilityWorks) {
 TEST(Lexer, SplitsTokensCorretly) {
   const std::string input =
     // clang-format off
+    // NOLINTBEGIN
     /* 12345678901234567890123456789012345678901234567890*/
     /* 1 */  "pin int_literal = 5;\n"
     /* 2 */  "pin double_literal = 5.5;\n"
@@ -297,7 +349,7 @@ TEST(Lexer, SplitsTokensCorretly) {
     /*30 */  "/* This is a random comment */"
              ;
 
-  const TokenVector expected {
+  TokenVector expected {
     {.type = lex::PIN           , .value = {}              , .line = 1  , .column = 1  },
     {.type = lex::IDENT         , .value = "int_literal"   , .line = 1  , .column = 5  },
     {.type = lex::ASSIGN        , .value = {}              , .line = 1  , .column = 17 },
@@ -435,6 +487,15 @@ TEST(Lexer, SplitsTokensCorretly) {
     {.type = lex::IDENT         , .value = "THIS_IS_A_TEST_IDENTIFIER", .line = 29, .column = 1},
     {.type = lex::SIS_EOF       , .value = {}              ,  .line = 30, .column = 31 }
   };
+
+  populateTokenLengths(expected);
+
+  // NOTE: this is here because escaped characters are not counted as part of the string in the helper function
+  auto it = std::ranges::find(expected, lex::TokenType::STRING, &lex::Token::type);
+  if (it != expected.end()) { 
+    it->length = 17;
+  }
+  // NOLINTEND
   // clang-format on
 
   lex::Lexer lexer(input);
