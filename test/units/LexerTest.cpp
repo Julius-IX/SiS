@@ -558,3 +558,33 @@ TEST(Lexer, UnterminatedStringReturnsIllegal) {
   ASSERT_TRUE(std::holds_alternative<std::string>(tok.value));
   EXPECT_EQ(std::get<std::string>(tok.value), "Unterminated string literal");
 }
+
+TEST(Lexer, MultilineBlockCommentTracksLineCorrectly) {
+  std::string input = "pin a = 1;\n"
+                      "/* this comment\n"
+                      "   spans three\n"
+                      "   lines */\n"
+                      "pin b = 2;";
+
+  // clang-format off
+  // NOLINTBEGIN
+  TokenVector expected {
+    {.type = lex::PIN,       .value = {},    .line = 1, .column = 1},
+    {.type = lex::IDENT,     .value = "a",   .line = 1, .column = 5},
+    {.type = lex::ASSIGN,    .value = {},    .line = 1, .column = 7},
+    {.type = lex::NUM,       .value = 1.0,   .line = 1, .column = 9},
+    {.type = lex::SEMICOLON, .value = {},    .line = 1, .column = 10},
+    {.type = lex::PIN,       .value = {},    .line = 5, .column = 1},
+    {.type = lex::IDENT,     .value = "b",   .line = 5, .column = 5},
+    {.type = lex::ASSIGN,    .value = {},    .line = 5, .column = 7},
+    {.type = lex::NUM,       .value = 2.0,   .line = 5, .column = 9},
+    {.type = lex::SEMICOLON, .value = {},    .line = 5, .column = 10},
+    {.type = lex::SIS_EOF,   .value = {},    .line = 5, .column = 11},
+  };
+  // NOLINTEND
+  // clang-format on
+
+  populateTokenLengths(expected);
+  lex::Lexer lexer(input);
+  compareTokenStream(lexer, expected);
+}
