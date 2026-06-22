@@ -866,11 +866,16 @@ namespace eval {
   }
 
   // Binds args to params in a fresh scope whose parent is the closure (NOT
-  // the call site), then evaluates the body. Catches ReturnSignal so a
-  // return statement unwinds cleanly back here, that's the function-call
-  // boundary return is scoped to: anything thrown by evalReturn deeper
-  // inside (through any number of nested blocks/ifs/whiles) bubbles up
-  // through all of them untouched until it lands in this catch.
+  // the call site), then evaluates the body statements directly in that
+  // scope. Catches ReturnSignal so a return statement unwinds cleanly back
+  // here, that's the function-call boundary return is scoped to: anything
+  // thrown by evalReturn deeper inside (through any number of nested
+  // blocks/ifs/whiles) bubbles up through all of them untouched until it
+  // lands in this catch.
+  //
+  // Body statements are evaluated directly in call_env rather than via
+  // evalBlock, which would create a redundant child scope and make params
+  // one level up from the body's locals rather than peers.
   //
   // `bound_this`/`defining_class` are set for method calls (see
   // resolveMember and evalNewExpr): "this" and "__class__" get defined in
@@ -894,7 +899,12 @@ namespace eval {
     }
 
     try {
-      return evaluate(fn.declaration->body.get(), call_env);
+      Value result;
+      const auto* body = static_cast<const par::Block*>(fn.declaration->body.get());
+      for (const auto& stmt : body->statements) {
+        result = evaluate(stmt.get(), call_env);
+      }
+      return result;
     } catch (const ReturnSignal& ret) {
       return ret.value;
     }
