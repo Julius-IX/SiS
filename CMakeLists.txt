@@ -40,6 +40,14 @@ target_link_libraries(SiSlib PUBLIC
 
 add_executable(SiS src/main.cpp)
 
+if(MINGW)
+    target_link_options(SiS PRIVATE
+        -static
+        -static-libgcc
+        -static-libstdc++
+    )
+endif()
+
 target_link_libraries(SiS PRIVATE
     SiSlib
     spdlog::spdlog $<$<BOOL:${MINGW}>:ws2_32>

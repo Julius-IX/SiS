@@ -2,6 +2,7 @@
 
 #include <print>
 #include <string>
+#include <spdlog/fmt/fmt.h>
 
 namespace par { // Tree-drawing (debugging only don't expect direct access to this)
   namespace {
@@ -198,14 +199,14 @@ namespace par { // Tree-drawing (debugging only don't expect direct access to th
 
   void printNode(const Node* node, const std::string& prefix, bool is_last, std::string_view label) {
     if (node == nullptr) {
-      std::print("{}{}{}null\n", prefix, is_last ? LAST_BRANCH : BRANCH, label.empty() ? "" : std::string(label) + ": ");
+      fmt::print("{}{}{}null\n", prefix, is_last ? LAST_BRANCH : BRANCH, label.empty() ? "" : std::string(label) + ": ");
       return;
     }
 
     const std::string_view branch = is_last ? LAST_BRANCH : BRANCH;
     const std::string summary = nodeSummary(node);
 
-    std::print("{}{}{}{}{}{}{} ({}:{})\n",
+    fmt::print("{}{}{}{}{}{}{} ({}:{})\n",
                prefix,
                branch,
                label.empty() ? "" : std::string(label) + ": ",
@@ -227,7 +228,7 @@ namespace par { // Tree-drawing (debugging only don't expect direct access to th
 
   void printTree(const Node* root_node) {
     if (root_node == nullptr) {
-      std::print("(empty tree)\n");
+      fmt::print("(empty tree)\n");
       return;
     }
 
