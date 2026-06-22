@@ -563,3 +563,27 @@ namespace { // Switch
   }
 } // namespace
 
+namespace { // new expression
+  TEST(Parser, NewExprNoArgs) {
+    TestParser p;
+    ASSERT_TRUE(p.parseSource("new Foo();"));
+
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, ExprStmt);
+    ASSERT_NODE(as_ExprStmt->expr.get(), NewExpr);
+    EXPECT_EQ(as_NewExpr->class_name, "Foo");
+    EXPECT_TRUE(as_NewExpr->args.empty());
+  }
+
+  TEST(Parser, NewExprWithArgs) {
+    TestParser p;
+    ASSERT_TRUE(p.parseSource("new Point(1, 2);"));
+
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, ExprStmt);
+    ASSERT_NODE(as_ExprStmt->expr.get(), NewExpr);
+    EXPECT_EQ(as_NewExpr->class_name, "Point");
+    EXPECT_EQ(as_NewExpr->args.size(), 2U);
+  }
+} // namespace
+
