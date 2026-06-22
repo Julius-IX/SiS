@@ -430,3 +430,36 @@ namespace { // Return
   }
 } // namespace
 
+namespace { // If / else
+  TEST(Parser, IfNoElse) {
+    TestParser p;
+    ASSERT_TRUE(p.parseSource("if (x) { }"));
+
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, If);
+    ASSERT_NE(as_If->condition, nullptr);
+    ASSERT_NE(as_If->then_branch, nullptr);
+    EXPECT_EQ(as_If->else_branch, nullptr);
+  }
+
+  TEST(Parser, IfElse) {
+    TestParser p;
+    ASSERT_TRUE(p.parseSource("if (x) { } else { }"));
+
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, If);
+    ASSERT_NE(as_If->else_branch, nullptr);
+    EXPECT_EQ(as_If->else_branch->type, par::NodeType::BLOCK);
+  }
+
+  TEST(Parser, IfElseIf) {
+    TestParser p;
+    ASSERT_TRUE(p.parseSource("if (a) { } else if (b) { } else { }"));
+
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, If);
+    ASSERT_NE(as_If->else_branch, nullptr);
+    // else-branch is another If node (not a Block)
+    EXPECT_EQ(as_If->else_branch->type, par::NodeType::IF);
+  }
+} // namespace
