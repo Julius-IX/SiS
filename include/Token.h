@@ -1,10 +1,11 @@
 #pragma once
 
 #include <cstdint>
+#include <filesystem>
+#include <spdlog/fmt/fmt.h>
 #include <string>
 #include <unordered_map>
 #include <variant>
-#include <filesystem>
 
 using Path = std::filesystem::path;
 
@@ -90,16 +91,15 @@ namespace lex {
     return IDENT;
   }
 
-  inline std::string tokenToString(const Token& token) {
-    const auto& t_val = token.value;
-
+  inline std::string literalTokenToString(const Token& token) {
     switch (token.type) {
       case SIS_EOF: return "SIS_EOF";
       case ILLEGAL: return "ILLEGAL";
-      case IDENT: return std::get<std::string>(t_val);
 
-      case NUM: return std::to_string(std::get<double>(t_val));
-      case STRING: return std::get<std::string>(t_val);
+      case IDENT: return "IDENT";
+      case NUM: return "NUM";
+      case STRING: return "STRING";
+
       case TRUE: return "TRUE";
       case FALSE: return "FALSE";
       case SIS_NULL: return "SIS_NULL";
@@ -160,18 +160,9 @@ namespace lex {
       case SEMICOLON: return "SEMICOLON";
       case ARROW: return "ARROW";
 
-      case COMMENT: return std::get<std::string>(t_val);
-      default: return "";
-    }
-  }
-
-  inline std::string literalTokenToString(const Token& token) {
-    switch (token.type) {
-      case IDENT: return "IDENT";
-      case NUM: return "NUM";
-      case STRING: return "STRING";
       case COMMENT: return "COMMENT";
-      default: return tokenToString(token);
+
+      default: return fmt::format("Invalid Token Type received: {}", static_cast<int>(token.type));
     }
   }
 

@@ -13,8 +13,7 @@
 namespace par {
   typedef struct ParserState {
     std::unique_ptr<lex::Lexer> lexer;
-    std::vector<lex::Token> tokens;
-    size_t token_idex;
+    lex::Token last_token;
   } State;
 
   struct ParserHooks {
@@ -58,7 +57,8 @@ namespace par {
     std::unique_ptr<Node> parseAtom(State* state);                                                   // nud: things that START an expression
     std::unique_ptr<Node> parseContinuation(State* state, std::unique_ptr<Node> left);               // led: things that EXTEND an expression
     std::unique_ptr<Node> parseExpression(State* state, int min_prec = 1);                           // driver loop
-    std::vector<std::unique_ptr<Node>> parseExpressionList(State* state, lex::TokenType terminator); // comma-sep until terminator
+    std::optional<std::vector<std::unique_ptr<Node>>> parseExpressionList(State* state, lex::TokenType terminator); // comma-sep until terminator
+    std::optional<std::vector<std::string>> parseParamList(State* state);
 
     // Statement parsing one function per distinct statement shape
     std::unique_ptr<Node> parseStatement(State* state);

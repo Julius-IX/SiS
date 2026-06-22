@@ -5,11 +5,6 @@
 #include <cassert>
 #include <string>
 
-// TODO: fix some bs with lexer state management
-// `case 1:{`
-// returns illegal token bc `:` is touching another token
-// or just force the user to place spaces around the colon
-
 namespace lex {
   typedef std::pair<TokenType, TokenVariant> TypeValuePair;
   typedef std::unordered_map<char, std::unordered_map<char, TokenType>> DoubleSymbolTable;
@@ -21,20 +16,28 @@ namespace lex {
     uint8_t count{0};
 
     void append(const Token& token) {
-      assert(count < CAPACITY && "TokenBuffer overflow");
+      if (count > CAPACITY) {
+        LOG_ERROR("TokenBuffer overflow");
+        throw std::logic_error("TokenBuffer overflow");
+      }
+
       slots[(head + count) % CAPACITY] = token;
       count++;
     }
 
     Token pop() {
-      assert(count > 0 && "TokenBuffer underflow");
+      if (count < 0) {
+        LOG_ERROR("TokenBuffer overflow");
+        throw std::logic_error("TokenBuffer underflow");
+      }
+
       Token token = slots[head];
       head = (head + 1) % CAPACITY;
       --count;
       return token;
     }
 
-    [[nodiscard]] const Token& peek(const ushort index = 1) const noexcept {
+    [[nodiscard]] const Token& peek(const unsigned short index = 1) const noexcept {
       assert(index <= count && "TokenBuffer peek out of range");
       return slots[(head + index - 1) % CAPACITY];
     }
@@ -60,7 +63,6 @@ namespace lex {
     Lexer(std::string input, std::optional<Path> source_path = std::nullopt)
       : m_input(std::move(input)), // NOLINT
         m_source_path(std::move(source_path)),
-        m_live_pos({}),
         m_state({}),
         m_buffer({}) {
       if (!this->m_input.empty()) this->m_state.current_char = this->m_input[0];
@@ -72,7 +74,7 @@ namespace lex {
     ~Lexer() = default;
 
     [[nodiscard]] Token nextToken();
-    [[nodiscard]] const Token& peekToken(const ushort index = 1) const noexcept { return m_buffer.peek(index); }
+    [[nodiscard]] const Token& peekToken(const unsigned short index = 1) const noexcept { return m_buffer.peek(index); }
 
     void newInput(std::string input) {
       reset();
@@ -86,14 +88,9 @@ namespace lex {
 
     void reset() noexcept {
       this->m_input = {};
-      this->m_live_pos = {};
       this->m_state = {};
       this->m_buffer = {};
     }
-
-    [[nodiscard]] size_t getLine() const noexcept { return this->m_live_pos.line; }
-
-    [[nodiscard]] size_t getColumn() const noexcept { return this->m_live_pos.column; }
 
     std::string getLineContent(size_t line) {
       if (auto it = m_line_cache.find(line); it != m_line_cache.end()) return it->second;
@@ -121,16 +118,12 @@ namespace lex {
     private:
     std::string m_input;
     std::optional<Path> m_source_path;
-    Position m_live_pos;
     std::unordered_map<size_t, std::string> m_line_cache;
     State m_state;
     TokenBuffer m_buffer;
     static DoubleSymbolTable s_symbol_table;
 
     [[nodiscard]] static DoubleSymbolTable initSymbolTable();
-
-    [[nodiscard]] size_t getAheadLine() const noexcept { return this->m_state.line; }
-    [[nodiscard]] size_t getAheadColumn() const noexcept { return this->m_state.pos - this->m_state.bol + 1; }
 
     [[nodiscard]] static Token newToken(const TokenType type, const TokenVariant& value, const size_t line, const size_t column) {
       return Token{.type = type, .value = value, .line = line, .column = column};
@@ -143,16 +136,14 @@ namespace lex {
 
     [[nodiscard]] bool stateIsNotAtEof() const { return (this->m_state.pos < this->m_input.size()); }
 
-    [[nodiscard]] const char& peekChar() const noexcept;
+    [[nodiscard]] char peekChar(uint32_t offset = 0) const noexcept;
 
     [[nodiscard]] TypeValuePair parsePossiblePair(const char& table_id);
 
     [[nodiscard]] TypeValuePair parseNum();
     [[nodiscard]] TypeValuePair processValidNumLiteral(const size_t& index_start);
-    void skipInvalidNumSequence(const char* next_char);
 
     [[nodiscard]] TypeValuePair parseIdent();
-    void skipInvalidIdentSequence(const char* next_char);
     void escapeChars(std::string& str);
 
     [[nodiscard]] TypeValuePair parseComment(const char* next_char);
@@ -167,7 +158,7 @@ namespace lex {
     case '+': case '-': case '*': case '/': case '%': case '=':
     case '<': case '>': case '&': case '|': case '^': case '!':
     case ')': case ']': case '}': case ';': case ',': case ' ':
-    case '\n': case '\t': case '\r': case '\v': case '\0':
+    case '\n': case '\t': case '\r': case '\v': case '\0': case ':':
     return true;
     default: return false;
     }

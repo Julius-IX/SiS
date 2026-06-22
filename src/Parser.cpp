@@ -7,8 +7,8 @@
 #include <print>
 
 // NOTE: placeholder
-static void panic(const std::string_view msg) {
-  std::print("PANIC: {}\n", msg.data());
+[[noreturn]] static void panic(const std::string_view msg) {
+  fmt::print("PANIC: {}\n", msg.data());
   std::exit(1);
 }
 
@@ -91,7 +91,7 @@ namespace par { // Helpers
   // already know what it is and just need to move past it.
   lex::Token Parser::advance(State* state) {
     lex::Token token = state->lexer->nextToken();
-    state->tokens.push_back(token);
+    state->last_token = token;
     return token;
   }
 
@@ -99,7 +99,7 @@ namespace par { // Helpers
   // Otherwise leave it alone and return false.
   bool Parser::match(State* state, lex::TokenType type) {
     if (!check(state->lexer.get(), type)) return false;
-    state->tokens.push_back(state->lexer->nextToken());
+    state->last_token = state->lexer->nextToken();
     return true;
   }
 
@@ -109,7 +109,7 @@ namespace par { // Helpers
       panic(m_hooks.format_error(state, state->lexer->peekToken(), err_msg));
       return false;
     }
-    state->tokens.push_back(state->lexer->nextToken());
+    state->last_token = state->lexer->nextToken();
     return true;
   }
 
@@ -132,7 +132,7 @@ namespace par { // Include resolving
       panic(fmt::format("Could not open root source file '{}'", original_path.string()));
       return;
     }
-    m_states[full_root_path] = State{.lexer = std::make_unique<lex::Lexer>(source.value(), full_root_path), .tokens = {}, .token_idex = 0};
+    m_states[full_root_path] = State{.lexer = std::make_unique<lex::Lexer>(source.value(), full_root_path), .last_token = {}};
   }
 
   void Parser::parseCurrentFile(const Path& current_path) {
@@ -151,7 +151,7 @@ namespace par { // Include resolving
       panic(fmt::format("Could not open included source file '{}'", include_path.string()));
       return false;
     }
-    m_states[include_path] = State{.lexer = std::make_unique<lex::Lexer>(source.value(), include_path), .tokens = {}, .token_idex = 0};
+    m_states[include_path] = State{.lexer = std::make_unique<lex::Lexer>(source.value(), include_path), .last_token = {}};
     return true;
   }
 
@@ -177,7 +177,7 @@ namespace par { // Include resolving
         continue;
       }
 
-      if (std::ranges::contains(m_include_stack, include_path.value().value())) {
+      if (m_states.contains(include_path.value().value())) {
         panic(fmt::format("Circular include detected at '{}'", include_path.value().value().string()));
         break;
       }
@@ -189,7 +189,7 @@ namespace par { // Include resolving
       m_include_stack.push_back(include_path.value().value());
     }
 
-    return !std::ranges::contains(m_root->statements, nullptr);
+    return std::ranges::find(m_root->statements, nullptr) == m_root->statements.end();
   }
 
   std::expected<std::optional<Path>, std::string> Parser::checkForInclude(const Path& path) {
@@ -201,22 +201,22 @@ namespace par { // Include resolving
     advance(&m_states[path]);
 
     if (!match(&m_states[path], lex::TokenType::STRING)) {
-      return std::unexpected(m_hooks.format_error(&m_states[path], m_states[path].tokens.back(), "Expected string literal path after 'include'"));
+      return std::unexpected(m_hooks.format_error(&m_states[path], m_states[path].last_token, "Expected string literal path after 'include'"));
     }
 
-    std::optional<Path> include_path = getFromVariant<std::string>(m_states[path].tokens.back()).value();
+    std::optional<Path> include_path = getFromVariant<std::string>(m_states[path].last_token).value();
 
     if (!include_path) {
-      return std::unexpected(m_hooks.format_error(&m_states[path], m_states[path].tokens.back(), "Failed to get path from 'include'"));
+      return std::unexpected(m_hooks.format_error(&m_states[path], m_states[path].last_token, "Failed to get path from 'include'"));
     }
 
     if (!match(&m_states[path], lex::TokenType::SEMICOLON)) {
-      return std::unexpected(m_hooks.format_error(&m_states[path], m_states[path].tokens.back(), "Expected ';' after 'include' expression"));
+      return std::unexpected(m_hooks.format_error(&m_states[path], m_states[path].last_token, "Expected ';' after 'include' expression"));
     }
 
     include_path = m_hooks.resolve_file(path.parent_path(), include_path.value());
     if (!include_path) {
-      return std::unexpected(m_hooks.format_error(&m_states[path], m_states[path].tokens.back(), "Failed to resolve include path"));
+      return std::unexpected(m_hooks.format_error(&m_states[path], m_states[path].last_token, "Failed to resolve include path"));
     }
 
     return include_path;
@@ -327,11 +327,15 @@ namespace par { // Base parsing loop functions
     switch (tok.type) {
       case lex::TokenType::NUM: {
         advance(state);
-        return makeNode<Literal>(tok.line, tok.column, std::get<double>(tok.value));
+        std::optional<double> value = getFromVariant<double>(tok);
+        if (value == std::nullopt) return nullptr;
+        return makeNode<Literal>(tok.line, tok.column, value.value());
       }
       case lex::TokenType::STRING: {
         advance(state);
-        return makeNode<Literal>(tok.line, tok.column, std::get<std::string>(tok.value));
+        std::optional<std::string> value = getFromVariant<std::string>(tok);
+        if (value == std::nullopt) return nullptr;
+        return makeNode<Literal>(tok.line, tok.column, value.value());
       }
       case lex::TokenType::TRUE: {
         advance(state);
@@ -348,9 +352,9 @@ namespace par { // Base parsing loop functions
 
       case lex::TokenType::IDENT: {
         advance(state);
-        auto name = getFromVariant<std::string>(state->tokens.back());
+        auto name = getFromVariant<std::string>(state->last_token);
         if (!name) {
-          panic(m_hooks.format_error(state, state->tokens.back(), "Empty identifier name"));
+          panic(m_hooks.format_error(state, state->last_token, "Empty identifier name"));
           return nullptr;
         }
         return makeNode<Identifier>(tok.line, tok.column, std::move(*name));
@@ -374,9 +378,10 @@ namespace par { // Base parsing loop functions
 
       case lex::TokenType::L_BRACK: {
         advance(state);
-        std::vector<std::unique_ptr<Node>> elements = parseExpressionList(state, lex::TokenType::R_BRACK);
+        std::optional<std::vector<std::unique_ptr<Node>>> elements = parseExpressionList(state, lex::TokenType::R_BRACK);
+        if (elements == std::nullopt) return nullptr; 
         if (!expect(state, lex::TokenType::R_BRACK, "Expected ']' after array elements")) return nullptr;
-        return makeNode<ArrayLiteral>(tok.line, tok.column, std::move(elements));
+        return makeNode<ArrayLiteral>(tok.line, tok.column, std::move(elements.value()));
       }
 
       case lex::TokenType::FN: return parseFnLiteral(state);
@@ -498,7 +503,7 @@ namespace par { // Base parsing loop functions
           panic(m_hooks.format_error(state, field_tok, "Expected field name after '.'"));
           return nullptr;
         }
-        auto field = getFromVariant<std::string>(state->tokens.back());
+        auto field = getFromVariant<std::string>(state->last_token);
         if (!field) {
           panic(m_hooks.format_error(state, field_tok, "Empty field name"));
           return nullptr;
@@ -520,9 +525,10 @@ namespace par { // Base parsing loop functions
       case lex::TokenType::L_PAREN: {
         size_t left_line = left->line;
         size_t left_column = left->column;
-        std::vector<std::unique_ptr<Node>> args = parseExpressionList(state, lex::TokenType::R_PAREN);
+        std::optional<std::vector<std::unique_ptr<Node>>> args = parseExpressionList(state, lex::TokenType::R_PAREN);
+        if (args == std::nullopt) return nullptr;
         if (!expect(state, lex::TokenType::R_PAREN, "Expected ')' after call arguments")) return nullptr;
-        return makeNode<Call>(left_line, left_column, std::move(left), std::move(args));
+        return makeNode<Call>(left_line, left_column, std::move(left), std::move(args.value()));
       }
 
       default: panic(m_hooks.format_error(state, op, "Unexpected token in infix position")); return nullptr;
@@ -548,13 +554,13 @@ namespace par { // Base parsing loop functions
   // parseExpressionList shared helper for comma-separated expression lists.
   // Used by array literals, call args, and new() args. Stops when it sees
   // `terminator` (doesn't consume, it's caller is responsible for that).
-  std::vector<std::unique_ptr<Node>> Parser::parseExpressionList(State* state, lex::TokenType terminator) {
+  std::optional<std::vector<std::unique_ptr<Node>>> Parser::parseExpressionList(State* state, lex::TokenType terminator) {
     std::vector<std::unique_ptr<Node>> list;
     if (check(state->lexer.get(), terminator)) return list; // empty list
 
     while (true) {
-      auto expr = parseExpression(state, 1);
-      if (!expr) return {};
+      std::unique_ptr<Node> expr = parseExpression(state, 1);
+      if (expr == nullptr) return std::nullopt ;
       list.push_back(std::move(expr));
       if (!match(state, lex::TokenType::COMMA)) break;
     }
@@ -666,7 +672,7 @@ namespace par { // Complex parsing structures
       panic(m_hooks.format_error(state, name_tok, "Expected variable name after 'pin'"));
       return nullptr;
     }
-    auto name = getFromVariant<std::string>(state->tokens.back());
+    auto name = getFromVariant<std::string>(state->last_token);
     if (!name) {
       panic(m_hooks.format_error(state, name_tok, "Empty variable name"));
       return nullptr;
@@ -703,31 +709,39 @@ namespace par { // Complex parsing structures
     return node;
   }
 
-  // parseFnLiteral called from parseAtom when 'fn' appears in expression
-  // position (i.e. anonymous fn, no name). Named fns at statement level are
-  // handled in parseStatement as sugar for pin name = fn(...){...};
-  std::unique_ptr<Node> Parser::parseFnLiteral(State* state) {
-    lex::Token fn_tok = advance(state); // consume 'fn'
-    if (!expect(state, lex::TokenType::L_PAREN, "Expected '(' after 'fn'")) return nullptr;
+  // shared helper: parses '(' param, param, ... ')' and returns the param name list.
+  // Called by both parseFnLiteral and parseTopLevelFn.
+  std::optional<std::vector<std::string>> Parser::parseParamList(State* state) {
+    if (!expect(state, lex::TokenType::L_PAREN, "Expected '(' after 'fn'")) return std::nullopt;
     std::vector<std::string> params;
     while (!check(state->lexer.get(), lex::TokenType::R_PAREN) && !isAtEnd(state->lexer.get())) {
       lex::Token param_tok = advance(state);
       if (param_tok.type != lex::TokenType::IDENT) {
         panic(m_hooks.format_error(state, param_tok, "Expected parameter name"));
-        return nullptr;
+        return std::nullopt;
       }
-      auto param = getFromVariant<std::string>(state->tokens.back());
+      auto param = getFromVariant<std::string>(state->last_token);
       if (!param) {
         panic(m_hooks.format_error(state, param_tok, "Empty parameter name"));
-        return nullptr;
+        return std::nullopt;
       }
       params.push_back(std::move(*param));
       if (!match(state, lex::TokenType::COMMA)) break;
     }
-    if (!expect(state, lex::TokenType::R_PAREN, "Expected ')' after parameters")) return nullptr;
+    if (!expect(state, lex::TokenType::R_PAREN, "Expected ')' after parameters")) return std::nullopt;
+    return params;
+  }
+
+  // parseFnLiteral called from parseAtom when 'fn' appears in expression
+  // position (i.e. anonymous fn, no name). Named fns at statement level are
+  // handled in parseStatement as sugar for pin name = fn(...){...};
+  std::unique_ptr<Node> Parser::parseFnLiteral(State* state) {
+    lex::Token fn_tok = advance(state); // consume 'fn'
+    auto params = parseParamList(state);
+    if (!params) return nullptr;
     auto body = parseBlock(state);
     if (body == nullptr) return nullptr;
-    auto node = std::make_unique<FnLiteral>(std::move(params), std::move(body));
+    auto node = std::make_unique<FnLiteral>(std::move(*params), std::move(body));
     node->line = fn_tok.line;
     node->column = fn_tok.column;
     return node;
@@ -740,39 +754,22 @@ namespace par { // Complex parsing structures
   // "function statement" from "pinned function expression."
   std::unique_ptr<Node> Parser::parseTopLevelFn(State* state) {
     advance(state); // consume 'fn'
-    lex::Token fn_tok = state->tokens.back();
+    lex::Token fn_tok = state->last_token;
     lex::Token name_tok = advance(state);
     if (name_tok.type != lex::TokenType::IDENT) {
       panic(m_hooks.format_error(state, name_tok, "Expected function name after 'fn'"));
       return nullptr;
     }
-    auto name = getFromVariant<std::string>(state->tokens.back());
+    auto name = getFromVariant<std::string>(state->last_token);
     if (!name) {
       panic(m_hooks.format_error(state, name_tok, "Empty function name"));
       return nullptr;
     }
-    // Now parse the rest as if we saw fn without consuming the name
-    // We need the '(' next
-    if (!expect(state, lex::TokenType::L_PAREN, "Expected '(' after function name")) return nullptr;
-    std::vector<std::string> params;
-    while (!check(state->lexer.get(), lex::TokenType::R_PAREN) && !isAtEnd(state->lexer.get())) {
-      lex::Token param_tok = advance(state);
-      if (param_tok.type != lex::TokenType::IDENT) {
-        panic(m_hooks.format_error(state, param_tok, "Expected parameter name"));
-        return nullptr;
-      }
-      auto param = getFromVariant<std::string>(state->tokens.back());
-      if (!param) {
-        panic(m_hooks.format_error(state, param_tok, "Empty parameter name"));
-        return nullptr;
-      }
-      params.push_back(std::move(*param));
-      if (!match(state, lex::TokenType::COMMA)) break;
-    }
-    if (!expect(state, lex::TokenType::R_PAREN, "Expected ')' after parameters")) return nullptr;
+    auto params = parseParamList(state);
+    if (!params) return nullptr;
     auto body = parseBlock(state);
     if (body == nullptr) return nullptr;
-    auto fn = makeNode<FnLiteral>(fn_tok.line, fn_tok.column, std::move(params), std::move(body));
+    auto fn = makeNode<FnLiteral>(fn_tok.line, fn_tok.column, std::move(*params), std::move(body));
     return makeNode<VarDecl>(fn_tok.line, fn_tok.column, std::move(*name), std::move(fn));
   }
 
@@ -783,15 +780,16 @@ namespace par { // Complex parsing structures
       panic(m_hooks.format_error(state, name_tok, "Expected class name after 'new'"));
       return nullptr;
     }
-    auto class_name = getFromVariant<std::string>(state->tokens.back());
+    auto class_name = getFromVariant<std::string>(state->last_token);
     if (!class_name) {
       panic(m_hooks.format_error(state, name_tok, "Empty class name"));
       return nullptr;
     }
     if (!expect(state, lex::TokenType::L_PAREN, "Expected '(' after class name in 'new'")) return nullptr;
-    auto args = parseExpressionList(state, lex::TokenType::R_PAREN);
+    std::optional<std::vector<std::unique_ptr<Node>>> args = parseExpressionList(state, lex::TokenType::R_PAREN);
+    if (args == std::nullopt) return nullptr;
     if (!expect(state, lex::TokenType::R_PAREN, "Expected ')' after constructor arguments")) return nullptr;
-    auto node = std::make_unique<NewExpr>(std::move(*class_name), std::move(args));
+    auto node = std::make_unique<NewExpr>(std::move(*class_name), std::move(args.value()));
     node->line = new_tok.line;
     node->column = new_tok.column;
     return node;
@@ -815,7 +813,7 @@ namespace par { // Complex parsing structures
       return nullptr;
     }
 
-    auto member = getFromVariant<std::string>(state->tokens.back());
+    auto member = getFromVariant<std::string>(state->last_token);
     if (!member) {
       panic(m_hooks.format_error(state, member_tok, "Empty member name"));
       return nullptr;
@@ -878,7 +876,7 @@ namespace par { // Complex parsing structures
         if (c.value == nullptr) return nullptr;
       } else if (match(state, lex::TokenType::DEFAULT)) {
         if (seen_default) {
-          panic(m_hooks.format_error(state, state->tokens.back(), "Duplicate 'default' in switch"));
+          panic(m_hooks.format_error(state, state->last_token, "Duplicate 'default' in switch"));
           return nullptr;
         }
         seen_default = true;
@@ -909,7 +907,7 @@ namespace par { // Complex parsing structures
       panic(m_hooks.format_error(state, field_tok, "Expected field name"));
       return nullptr;
     }
-    auto field_name = getFromVariant<std::string>(state->tokens.back());
+    auto field_name = getFromVariant<std::string>(state->last_token);
     if (!field_name) {
       panic(m_hooks.format_error(state, field_tok, "Empty field name"));
       return nullptr;
@@ -935,7 +933,7 @@ namespace par { // Complex parsing structures
         panic(m_hooks.format_error(state, param_tok, "Expected parameter name"));
         return std::nullopt;
       }
-      auto param = getFromVariant<std::string>(state->tokens.back());
+      auto param = getFromVariant<std::string>(state->last_token);
       if (!param) {
         panic(m_hooks.format_error(state, param_tok, "Empty parameter name"));
         return std::nullopt;
@@ -955,7 +953,7 @@ namespace par { // Complex parsing structures
       panic(m_hooks.format_error(state, method_tok, "Expected method name"));
       return nullptr;
     }
-    auto method_name = getFromVariant<std::string>(state->tokens.back());
+    auto method_name = getFromVariant<std::string>(state->last_token);
     if (!method_name) {
       panic(m_hooks.format_error(state, method_tok, "Empty method name"));
       return nullptr;
@@ -977,7 +975,7 @@ namespace par { // Complex parsing structures
       panic(m_hooks.format_error(state, name_tok, "Expected class name"));
       return false;
     }
-    auto name = getFromVariant<std::string>(state->tokens.back());
+    auto name = getFromVariant<std::string>(state->last_token);
     if (!name) {
       panic(m_hooks.format_error(state, name_tok, "Empty class name"));
       return false;
@@ -990,7 +988,7 @@ namespace par { // Complex parsing structures
         panic(m_hooks.format_error(state, parent_tok, "Expected parent class name after 'extends'"));
         return false;
       }
-      auto pname = getFromVariant<std::string>(state->tokens.back());
+      auto pname = getFromVariant<std::string>(state->last_token);
       if (!pname) {
         panic(m_hooks.format_error(state, parent_tok, "Empty parent class name"));
         return false;

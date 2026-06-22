@@ -4,6 +4,7 @@
 #include <cmath>
 #include <iostream>
 #include <print>
+#include <spdlog/fmt/fmt.h>
 #include <stdexcept>
 
 namespace eval {
@@ -50,11 +51,11 @@ namespace eval {
         } else if constexpr (std::is_same_v<T, Function>) {
           return av.declaration == std::get<Function>(b.data).declaration;
         } else if constexpr (std::is_same_v<T, NativeFunction>) {
-          return av.name == std::get<NativeFunction>(b.data).name;
+          return false;
         } else if constexpr (std::is_same_v<T, std::shared_ptr<Class>>) {
           return av == std::get<std::shared_ptr<Class>>(b.data);
-        } else if constexpr (std::is_same_v<T, Instance>) {
-          return av.fields == std::get<Instance>(b.data).fields;
+        } else if constexpr (std::is_same_v<T, std::shared_ptr<Instance>>) {
+          return av == std::get<std::shared_ptr<Instance>>(b.data);
         } else {
           return av == std::get<T>(b.data);
         }
@@ -79,10 +80,10 @@ namespace eval {
                   .name = "print",
                   .fn = [](std::vector<Value>& args) -> Value {
                     for (size_t i = 0; i < args.size(); ++i) {
-                      std::print("{}", args[i].toString());
-                      if (i + 1 < args.size()) std::print(" ");
+                      fmt::print("{}", args[i].toString());
+                      if (i + 1 < args.size()) fmt::print(" ");
                     }
-                    std::print("\n");
+                    fmt::print("\n");
                     return Value{};
                   },
                 }));
@@ -191,7 +192,7 @@ namespace eval {
                       throw std::runtime_error("read() expects at most 1 argument, got " + std::to_string(args.size()));
                     }
                     if (args.size() == 1) {
-                      std::print("{}", args[0].toString());
+                      fmt::print("{}", args[0].toString());
                     }
                     std::string input;
                     std::getline(std::cin, input);
@@ -362,22 +363,32 @@ namespace eval {
   // the MemberAccess/SuperAccess paths in evalAssignment below, so
   // "x += 1", "obj.field += 1", and "this->field += 1" all go through the
   // same arithmetic instead of three copies of the same switch.
+  // PLUS is overloaded for string concatenation matching evalBinary's behaviour,
+  // so `x += "hello"` works the same as `x = x + "hello"`.
   static Value applyCompoundOp(lex::TokenType op, const Value& current, const Value& rhs) {
+    const lex::TokenType binary_op = compoundToBinaryOp(op);
+
+    if (binary_op == lex::TokenType::PLUS) {
+      if (std::holds_alternative<std::string>(current.data) || std::holds_alternative<std::string>(rhs.data)) {
+        return {current.toString() + rhs.toString()};
+      }
+    }
+
     const auto* l = std::get_if<double>(&current.data);
     const auto* r = std::get_if<double>(&rhs.data);
-    if (!l || !r) {
+    if ((l == nullptr) || (r == nullptr)) {
       throw std::runtime_error("Compound assignment requires two numbers");
     }
-    switch (compoundToBinaryOp(op)) {
-      case lex::TokenType::PLUS: return Value(*l + *r);
-      case lex::TokenType::MINUS: return Value(*l - *r);
-      case lex::TokenType::STAR: return Value(*l * *r);
+    switch (binary_op) {
+      case lex::TokenType::PLUS: return {*l + *r};
+      case lex::TokenType::MINUS: return {*l - *r};
+      case lex::TokenType::STAR: return {*l * *r};
       case lex::TokenType::SLASH:
         if (*r == 0.0) throw std::runtime_error("Division by zero");
-        return Value(*l / *r);
+        return {*l / *r};
       case lex::TokenType::PERCENT:
         if (*r == 0.0) throw std::runtime_error("Modulo by zero");
-        return Value(std::fmod(*l, *r));
+        return {std::fmod(*l, *r)};
       default: throw std::runtime_error("Unsupported compound assignment operator");
     }
   }
@@ -434,8 +445,8 @@ namespace eval {
         object = evaluate(member->object.get(), env);
       }
 
-      const auto* instance = std::get_if<Instance>(&object.data);
-      if (!instance) {
+      const auto* inst_ptr = std::get_if<std::shared_ptr<Instance>>(&object.data);
+      if (inst_ptr == nullptr) {
         throw std::runtime_error("Cannot assign to a field on a non-instance value (" + object.typeName() + ")");
       }
 
@@ -443,15 +454,15 @@ namespace eval {
       if (node->operation == lex::TokenType::ASSIGN) {
         new_value = evaluate(node->right.get(), env);
       } else {
-        auto it = instance->fields->find(member->field);
-        if (it == instance->fields->end()) {
-          throw std::runtime_error("Undefined field '" + member->field + "' on instance of " + instance->klass->name);
+        auto it = inst_ptr->get()->fields->find(member->field);
+        if (it == inst_ptr->get()->fields->end()) {
+          throw std::runtime_error("Undefined field '" + member->field + "' on instance of " + inst_ptr->get()->klass->name);
         }
         Value rhs = evaluate(node->right.get(), env);
         new_value = applyCompoundOp(node->operation, it->second, rhs);
       }
 
-      (*instance->fields)[member->field] = new_value;
+      (*inst_ptr->get()->fields)[member->field] = new_value;
       return new_value;
     }
 
@@ -587,11 +598,7 @@ namespace eval {
       return callFunction(*fn, std::move(args), node);
     }
     if (const auto* native = std::get_if<NativeFunction>(&callee.data)) {
-      try {
-        return native->fn(args);
-      } catch (const std::runtime_error& e) {
-        throw std::runtime_error(std::string(e.what()));
-      }
+      return native->fn(args);
     }
 
     throw std::runtime_error("Attempted to call a non-function value (" + callee.typeName() + ")");
@@ -707,18 +714,18 @@ namespace eval {
       throw std::runtime_error("String has no member '" + field + "'");
     }
 
-    if (const auto* instance = std::get_if<Instance>(&object.data)) {
+    if (const auto* instance = std::get_if<std::shared_ptr<Instance>>(&object.data)) {
       // Fields take priority over methods.
-      auto field_it = instance->fields->find(field);
-      if (field_it != instance->fields->end()) {
+      auto field_it = instance->get()->fields->find(field);
+      if (field_it != instance->get()->fields->end()) {
         return field_it->second;
       }
 
-      std::shared_ptr<Class> lookup_class = search_class ? search_class : instance->klass;
+      std::shared_ptr<Class> lookup_class = search_class ? search_class : instance->get()->klass;
       std::shared_ptr<Class> owner;
       const Function* method = lookup_class->findMethod(field, &owner);
-      if (!method) {
-        throw std::runtime_error("'" + instance->klass->name + "' has no field or method '" + field + "'");
+      if (method == nullptr) {
+        throw std::runtime_error("'" + instance->get()->klass->name + "' has no field or method '" + field + "'");
       }
 
       // Bind `this` (and `__class__`) by creating a fresh closure scope
@@ -802,20 +809,18 @@ namespace eval {
   //
   // Field initialization walks the inheritance chain ROOT-FIRST (grandparent,
   // then parent, then this class), applying each class's own field defaults
-  // in declaration order as it goes. That ordering means a subclass that
-  // re-declares a field name already set by an ancestor simply overwrites it
-  // with its own default, "more derived wins" for the default value, while
-  // fields unique to the parent still end up present on the instance.
+  // in declaration order as it goes. Each default is evaluated in a fresh
+  // child scope with `this` bound to the partially-constructed instance, so
+  // defaults can reference sibling fields initialized earlier in the chain.
+  // Child field defaults overwrite any same-named field set by an ancestor.
   //
   // After fields are populated, the constructor is looked up via the normal
   // method-resolution chain (klass->findMethod, walks up through parents
   // same as any other method call) and invoked with `this` bound to the new
   // instance and `defining_class` set to whichever class actually DEFINES
   // the constructor that ran, so a super->constructor() call inside it
-  // resolves starting from THAT class's parent (see evalSuperAccess for why
-  // this distinction matters for multi-level inheritance). If no constructor
-  // exists anywhere in the chain, construction just succeeds with only the
-  // field defaults applied.
+  // resolves starting from THAT class's parent. If no constructor exists
+  // anywhere in the chain, construction succeeds with only field defaults applied.
   Value Evaluator::evalNewExpr(const par::NewExpr* node, const std::shared_ptr<Environment>& env) {
     auto class_it = m_classes.find(node->class_name);
     if (class_it == m_classes.end()) {
@@ -824,34 +829,28 @@ namespace eval {
     std::shared_ptr<Class> klass = class_it->second;
 
     auto fields = std::make_shared<std::unordered_map<std::string, Value>>();
-    Instance instance{.klass = klass, .fields = fields};
+    auto instance = std::make_shared<Instance>(Instance{.klass = klass, .fields = fields});
 
-    // Collect the chain root-first (parent before child) so child field
-    // defaults are applied last and therefore win on name collisions.
     std::vector<Class*> chain;
     for (Class* c = klass.get(); c != nullptr; c = c->parent.get()) {
       chain.push_back(c);
     }
     std::ranges::reverse(chain);
 
+    Value instance_value(instance);
+
     for (Class* c : chain) {
       for (const auto& field_decl : c->declaration->fields) {
-        Value default_value = field_decl->initializer ? evaluate(field_decl->initializer.get(), env) : Value{};
+        auto field_init_env = std::make_shared<Environment>(env);
+        field_init_env->define("this", instance_value);
+        Value default_value = field_decl->initializer ? evaluate(field_decl->initializer.get(), field_init_env) : Value{};
         (*fields)[field_decl->name] = std::move(default_value);
       }
     }
 
-    Value instance_value(instance);
-
-    const Function* ctor = klass->findMethod("constructor");
-    if (ctor) {
-      // Find which class in the chain actually owns this constructor
-      // (could be inherited), so super->... inside it resolves correctly.
-      std::shared_ptr<Class> owner = klass;
-      while (owner && !owner->methods.contains("constructor")) {
-        owner = owner->parent;
-      }
-
+    std::shared_ptr<Class> owner;
+    const Function* ctor = klass->findMethod("constructor", &owner);
+    if (ctor != nullptr) {
       std::vector<Value> args;
       args.reserve(node->args.size());
       for (const auto& arg : node->args) {
@@ -867,11 +866,16 @@ namespace eval {
   }
 
   // Binds args to params in a fresh scope whose parent is the closure (NOT
-  // the call site), then evaluates the body. Catches ReturnSignal so a
-  // return statement unwinds cleanly back here, that's the function-call
-  // boundary return is scoped to: anything thrown by evalReturn deeper
-  // inside (through any number of nested blocks/ifs/whiles) bubbles up
-  // through all of them untouched until it lands in this catch.
+  // the call site), then evaluates the body statements directly in that
+  // scope. Catches ReturnSignal so a return statement unwinds cleanly back
+  // here, that's the function-call boundary return is scoped to: anything
+  // thrown by evalReturn deeper inside (through any number of nested
+  // blocks/ifs/whiles) bubbles up through all of them untouched until it
+  // lands in this catch.
+  //
+  // Body statements are evaluated directly in call_env rather than via
+  // evalBlock, which would create a redundant child scope and make params
+  // one level up from the body's locals rather than peers.
   //
   // `bound_this`/`defining_class` are set for method calls (see
   // resolveMember and evalNewExpr): "this" and "__class__" get defined in
@@ -895,7 +899,12 @@ namespace eval {
     }
 
     try {
-      return evaluate(fn.declaration->body.get(), call_env);
+      Value result;
+      const auto* body = static_cast<const par::Block*>(fn.declaration->body.get());
+      for (const auto& stmt : body->statements) {
+        result = evaluate(stmt.get(), call_env);
+      }
+      return result;
     } catch (const ReturnSignal& ret) {
       return ret.value;
     }
