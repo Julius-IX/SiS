@@ -23,9 +23,9 @@ int32_t tokenToLength(const lex::Token& token) {
 
     case lex::STRING: return std::holds_alternative<std::string>(token.value) ? static_cast<int32_t>(std::get<std::string>(token.value).size()) + 2 : 0; // +2 for quotes
 
-    case lex::COMMENT:
-    case lex::SIS_EOF: return 0;
+    case lex::COMMENT: return 0;
 
+    case lex::SIS_EOF:
     case lex::PLUS:
     case lex::MINUS:
     case lex::STAR:
@@ -161,9 +161,10 @@ void compareTokenStream(lex::Lexer& lexer, const TokenVector& expected_tokens) {
     if (token != expected_tokens.at(index)) {
       ADD_FAILURE() << formatComparedToken(token, expected_tokens.at(index));
     }
-    token = lexer.nextToken();
 
-    if (token.type == lex::SIS_EOF) break;
+    if (token.type == lex::SIS_EOF) { break; }
+
+    token = lexer.nextToken();
     ++index;
   }
 }
@@ -184,7 +185,7 @@ TEST(Lexer, TreatCommentAsSpaces) {
     {.type = lex::PIN,     .value = {}, .line = 2, .column = 1},
     {.type = lex::IDENT,   .value = "this_variable", .line = 2, .column = 5},
     {.type = lex::ASSIGN,  .value = {}, .line = 2, .column = 19},
-    {.type = lex::SIS_EOF, .value = {}, .line = 2, .column = 87},
+    {.type = lex::SIS_EOF, .value = {}, .line = 2, .column = 76},
   };
   // NOLINTEND
   // clang-format on
@@ -249,7 +250,7 @@ TEST(Lexer, CanDiscernValidInvalidIdentifier) {
     {.type = lex::R_BRACE, .value = {},             .line = 3, .column = 7  },
     {.type = lex::IDENT,   .value = "valid",        .line = 3, .column = 8  },
     {.type = lex::ILLEGAL, .value = "invalid@",     .line = 4, .column = 1  },
-    {.type = lex::SIS_EOF, .value = {},             .line = 5, .column = 1  },
+    {.type = lex::SIS_EOF, .value = {},             .line = 4, .column = 10  },
   };
   // NOLINTEND
   // clang-format on
@@ -278,7 +279,7 @@ TEST(Lexer, ReturnIllegalOnUnknownChar) {
     {.type = lex::FOR,     .value = {},      .line = 3, .column = 1  },
     {.type = lex::ILLEGAL, .value = "$",     .line = 3, .column = 5  },
     {.type = lex::IDENT,   .value = "in",    .line = 3, .column = 7  },
-    {.type = lex::SIS_EOF, .value = {},      .line = 4, .column = 10 },
+    {.type = lex::SIS_EOF, .value = {},      .line = 3, .column = 10 },
   };
   // NOLINTEND
   // clang-format on
@@ -361,7 +362,7 @@ TEST(Lexer, SplitsTokensCorretly) {
     /*27 */  " */\n"
     /*28 */  "// TODO: suffer\n"
     /*29 */  "THIS_IS_A_TEST_IDENTIFIER\n"
-    /*30 */  "/* This is a random comment */"
+    /*30 */  "/* This is a random comment */\n"
              ;
 
   TokenVector expected {
@@ -500,7 +501,7 @@ TEST(Lexer, SplitsTokensCorretly) {
     {.type = lex::ARROW         , .value = {}              , .line = 23 , .column = 12 },
 
     {.type = lex::IDENT         , .value = "THIS_IS_A_TEST_IDENTIFIER", .line = 29, .column = 1},
-    {.type = lex::SIS_EOF       , .value = {}              ,  .line = 30, .column = 31 }
+    {.type = lex::SIS_EOF       , .value = {}              ,  .line = 30, .column = 32 }
   };
 
   populateTokenLengths(expected);
