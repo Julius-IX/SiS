@@ -501,3 +501,24 @@ TEST(Lexer, SplitsTokensCorretly) {
   lex::Lexer lexer(input);
   compareTokenStream(lexer, expected);
 }
+
+TEST(Lexer, EmptyInputReturnsEOF) {
+  lex::Lexer lexer("");
+
+  const lex::Token& token = lexer.peekToken();
+  if (token.type != lex::SIS_EOF) {
+    ADD_FAILURE() << fmt::format("Token:\n"
+        "Type   = {}\n"
+        "Value  = {}\n"
+        "Line   = {}\n"
+        "Column = {}\n"
+        "Length = {}\n",
+        lex::literalTokenToString(token.type),
+        tokenVariantToString(token),
+        token.line,
+        token.column,
+        token.length);
+  } else {
+    SUCCEED();
+  }
+}
