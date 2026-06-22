@@ -463,3 +463,42 @@ namespace { // If / else
     EXPECT_EQ(as_If->else_branch->type, par::NodeType::IF);
   }
 } // namespace
+
+namespace { // While / For loop
+  TEST(Parser, WhileLoop) {
+    TestParser p;
+    ASSERT_TRUE(p.parseSource("while (x > 0) { x = x - 1; }"));
+
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, While);
+    ASSERT_NE(as_While->condition, nullptr);
+    ASSERT_NE(as_While->body, nullptr);
+    EXPECT_EQ(as_While->body->type, par::NodeType::BLOCK);
+  }
+
+  TEST(Parser, ForLoopFullClauses) {
+    TestParser p;
+    ASSERT_TRUE(p.parseSource("for (pin i = 0; i < 10; i = i + 1) { }"));
+
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, For);
+    ASSERT_NE(as_For->init, nullptr);
+    ASSERT_NE(as_For->condition, nullptr);
+    ASSERT_NE(as_For->increment, nullptr);
+    ASSERT_NE(as_For->body, nullptr);
+    EXPECT_EQ(as_For->init->type, par::NodeType::VAR_DECL);
+  }
+
+  TEST(Parser, ForLoopEmptyClauses) {
+    // for(;;) is valid — all three clauses are null
+    TestParser p;
+    ASSERT_TRUE(p.parseSource("for (;;) { break; }"));
+
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, For);
+    EXPECT_EQ(as_For->init, nullptr);
+    EXPECT_EQ(as_For->condition, nullptr);
+    EXPECT_EQ(as_For->increment, nullptr);
+  }
+} // namespace
+
