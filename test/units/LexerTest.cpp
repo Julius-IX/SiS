@@ -588,3 +588,18 @@ TEST(Lexer, MultilineBlockCommentTracksLineCorrectly) {
   lex::Lexer lexer(input);
   compareTokenStream(lexer, expected);
 }
+
+TEST(Lexer, PeekTokenDoesNotConsumeTokens) {
+  std::string input = "pin x = 5;";
+  lex::Lexer lexer(input);
+
+  // peek at first 3 tokens without consuming
+  EXPECT_EQ(lexer.peekToken(1).type, lex::PIN);
+  EXPECT_EQ(lexer.peekToken(2).type, lex::IDENT);
+  EXPECT_EQ(lexer.peekToken(3).type, lex::ASSIGN);
+
+  // now consume and verify order is preserved
+  EXPECT_EQ(lexer.nextToken().type, lex::PIN);
+  EXPECT_EQ(lexer.nextToken().type, lex::IDENT);
+  EXPECT_EQ(lexer.nextToken().type, lex::ASSIGN);
+}
