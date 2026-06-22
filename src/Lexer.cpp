@@ -137,7 +137,11 @@ namespace lex {
     }
 
     if (!isValidNumFollower(*next_char)) {
-      skipInvalidNumSequence(next_char);
+      while (!isValidNumFollower(*next_char)) {
+        advanceState();
+        ++next_char;
+      }
+
       size_t end_index = (this->m_state.pos - start_index) + 1;
       tvp.second = this->m_input.substr(start_index, end_index);
     } else {
@@ -164,27 +168,6 @@ namespace lex {
     return tvp;
   }
 
-  /* No im not going to merge these into one function
-   * predicates can suck mah ass
-   * and function pointers are scary
-   *
-   * yes these are separate functions bc otherwise
-   * the others have too many branches which is annoying
-   * they already have too many
-   */
-  void Lexer::skipInvalidNumSequence(const char* next_char) {
-    while (!isValidNumFollower(*next_char)) {
-      advanceState();
-      ++next_char;
-    }
-  }
-  void Lexer::skipInvalidIdentSequence(const char* next_char) {
-    while (!isValidWordFollower(*next_char)) {
-      advanceState();
-      ++next_char;
-    }
-  }
-
   /* incoming segfault */
   TypeValuePair Lexer::parseIdent() {
     const size_t start_index = this->m_state.pos;
@@ -197,7 +180,11 @@ namespace lex {
     }
 
     if (!isValidWordFollower(*next_char)) {
-      skipInvalidIdentSequence(next_char);
+      while (!isValidWordFollower(*next_char)) {
+        advanceState();
+        ++next_char;
+      }
+
       size_t end_index = (this->m_state.pos - start_index) + 1;
       tvp.second = this->m_input.substr(start_index, end_index);
 

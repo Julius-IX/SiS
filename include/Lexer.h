@@ -134,10 +134,8 @@ namespace lex {
 
     [[nodiscard]] TypeValuePair parseNum();
     [[nodiscard]] TypeValuePair processValidNumLiteral(const size_t& index_start);
-    void skipInvalidNumSequence(const char* next_char);
 
     [[nodiscard]] TypeValuePair parseIdent();
-    void skipInvalidIdentSequence(const char* next_char);
     void escapeChars(std::string& str);
 
     [[nodiscard]] TypeValuePair parseComment(const char* next_char);
