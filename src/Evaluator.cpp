@@ -363,22 +363,32 @@ namespace eval {
   // the MemberAccess/SuperAccess paths in evalAssignment below, so
   // "x += 1", "obj.field += 1", and "this->field += 1" all go through the
   // same arithmetic instead of three copies of the same switch.
+  // PLUS is overloaded for string concatenation matching evalBinary's behaviour,
+  // so `x += "hello"` works the same as `x = x + "hello"`.
   static Value applyCompoundOp(lex::TokenType op, const Value& current, const Value& rhs) {
+    const lex::TokenType binary_op = compoundToBinaryOp(op);
+
+    if (binary_op == lex::TokenType::PLUS) {
+      if (std::holds_alternative<std::string>(current.data) || std::holds_alternative<std::string>(rhs.data)) {
+        return {current.toString() + rhs.toString()};
+      }
+    }
+
     const auto* l = std::get_if<double>(&current.data);
     const auto* r = std::get_if<double>(&rhs.data);
-    if (!l || !r) {
+    if ((l == nullptr) || (r == nullptr)) {
       throw std::runtime_error("Compound assignment requires two numbers");
     }
-    switch (compoundToBinaryOp(op)) {
-      case lex::TokenType::PLUS: return Value(*l + *r);
-      case lex::TokenType::MINUS: return Value(*l - *r);
-      case lex::TokenType::STAR: return Value(*l * *r);
+    switch (binary_op) {
+      case lex::TokenType::PLUS: return {*l + *r};
+      case lex::TokenType::MINUS: return {*l - *r};
+      case lex::TokenType::STAR: return {*l * *r};
       case lex::TokenType::SLASH:
         if (*r == 0.0) throw std::runtime_error("Division by zero");
-        return Value(*l / *r);
+        return {*l / *r};
       case lex::TokenType::PERCENT:
         if (*r == 0.0) throw std::runtime_error("Modulo by zero");
-        return Value(std::fmod(*l, *r));
+        return {std::fmod(*l, *r)};
       default: throw std::runtime_error("Unsupported compound assignment operator");
     }
   }
