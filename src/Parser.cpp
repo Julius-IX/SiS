@@ -189,7 +189,7 @@ namespace par { // Include resolving
       m_include_stack.push_back(include_path.value().value());
     }
 
-    return !std::ranges::contains(m_root->statements, nullptr);
+    return std::ranges::find(m_root->statements, nullptr) == m_root->statements.end();
   }
 
   std::expected<std::optional<Path>, std::string> Parser::checkForInclude(const Path& path) {
