@@ -177,7 +177,7 @@ namespace par { // Include resolving
         continue;
       }
 
-      if (std::ranges::contains(m_include_stack, include_path.value().value())) {
+      if (m_states.contains(include_path.value().value())) {
         panic(fmt::format("Circular include detected at '{}'", include_path.value().value().string()));
         break;
       }
