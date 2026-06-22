@@ -103,3 +103,41 @@ namespace { // Identifiers
     EXPECT_EQ(as_Identifier->name, "myVar");
   }
 } // namespace
+
+namespace { // Variable Declarations
+
+  TEST(Parser, VarDeclNoInitializer) {
+    TestParser p;
+    ASSERT_TRUE(p.parseSource("pin x;"));
+
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, VarDecl);
+    EXPECT_EQ(as_VarDecl->name, "x");
+    EXPECT_EQ(as_VarDecl->initializer, nullptr);
+  }
+
+  TEST(Parser, VarDeclWithInitializer) {
+    TestParser p;
+    ASSERT_TRUE(p.parseSource("pin answer = 42;"));
+
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, VarDecl);
+    EXPECT_EQ(as_VarDecl->name, "answer");
+    ASSERT_NE(as_VarDecl->initializer, nullptr);
+    ASSERT_EQ(as_VarDecl->initializer->type, par::NodeType::LITERAL);
+    auto* lit = static_cast<par::Literal*>(as_VarDecl->initializer.get());
+    EXPECT_DOUBLE_EQ(std::get<double>(lit->value), 42.0);
+  }
+
+  TEST(Parser, VarDeclWithStringInitializer) {
+    TestParser p;
+    ASSERT_TRUE(p.parseSource(R"(pin msg = "hi";)"));
+
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, VarDecl);
+    EXPECT_EQ(as_VarDecl->name, "msg");
+    ASSERT_NE(as_VarDecl->initializer, nullptr);
+    auto* lit = static_cast<par::Literal*>(as_VarDecl->initializer.get());
+    EXPECT_EQ(std::get<std::string>(lit->value), "hi");
+  }
+} // namespace
