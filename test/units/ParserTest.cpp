@@ -91,3 +91,15 @@ namespace { // Literals
     EXPECT_TRUE(std::holds_alternative<std::monostate>(as_Literal->value));
   }
 } // namespace
+
+namespace { // Identifiers
+  TEST(Parser, BareIdentifier) {
+    TestParser p;
+    ASSERT_TRUE(p.parseSource("myVar;"));
+
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, ExprStmt);
+    ASSERT_NODE(as_ExprStmt->expr.get(), Identifier);
+    EXPECT_EQ(as_Identifier->name, "myVar");
+  }
+} // namespace
