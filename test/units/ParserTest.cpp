@@ -32,3 +32,62 @@ class TestParser : public par::Parser {
 #define GET_STMT(root, n, Type)                                                                                                                                                    \
   ASSERT_GT((root).statements.size(), static_cast<size_t>(n));                                                                                                                     \
   ASSERT_NODE((root).statements[(n)].get(), Type)
+
+namespace { // Literals
+
+  TEST(Parser, NumericLiteral) {
+    TestParser p;
+    ASSERT_TRUE(p.parseSource("42;"));
+
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, ExprStmt);
+    ASSERT_NODE(as_ExprStmt->expr.get(), Literal);
+    ASSERT_TRUE(std::holds_alternative<double>(as_Literal->value));
+    EXPECT_DOUBLE_EQ(std::get<double>(as_Literal->value), 42.0);
+  }
+
+  TEST(Parser, StringLiteral) {
+    TestParser p;
+    ASSERT_TRUE(p.parseSource(R"("hello";)"));
+
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, ExprStmt);
+    ASSERT_NODE(as_ExprStmt->expr.get(), Literal);
+    ASSERT_TRUE(std::holds_alternative<std::string>(as_Literal->value));
+    EXPECT_EQ(std::get<std::string>(as_Literal->value), "hello");
+  }
+
+  TEST(Parser, BoolLiterals) {
+    TestParser p;
+    ASSERT_TRUE(p.parseSource("true; false;"));
+
+    const par::Block& root = p.peekRoot();
+    ASSERT_EQ(root.statements.size(), 2U);
+
+    // true
+    {
+      GET_STMT(root, 0, ExprStmt);
+      ASSERT_NODE(as_ExprStmt->expr.get(), Literal);
+      ASSERT_TRUE(std::holds_alternative<bool>(as_Literal->value));
+      EXPECT_TRUE(std::get<bool>(as_Literal->value));
+    }
+
+    // false
+    {
+      GET_STMT(root, 1, ExprStmt);
+      ASSERT_NODE(as_ExprStmt->expr.get(), Literal);
+      ASSERT_TRUE(std::holds_alternative<bool>(as_Literal->value));
+      EXPECT_FALSE(std::get<bool>(as_Literal->value));
+    }
+  }
+
+  TEST(Parser, NullLiteral) {
+    TestParser p;
+    ASSERT_TRUE(p.parseSource("null;"));
+
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, ExprStmt);
+    ASSERT_NODE(as_ExprStmt->expr.get(), Literal);
+    EXPECT_TRUE(std::holds_alternative<std::monostate>(as_Literal->value));
+  }
+} // namespace
