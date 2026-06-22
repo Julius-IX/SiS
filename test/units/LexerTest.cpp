@@ -626,3 +626,12 @@ TEST(Lexer, ArrowTokenParsedCorrectly) {
   lex::Lexer lexer(input);
   compareTokenStream(lexer, expected);
 }
+
+TEST(Lexer, WhitespaceOnlyInput) {
+  std::string input = "   \n\t\n  ";
+  lex::Lexer lexer(input);
+
+  lex::Token tok = lexer.nextToken();
+  EXPECT_EQ(tok.type, lex::SIS_EOF);
+  EXPECT_EQ(tok.line, 3);
+}
