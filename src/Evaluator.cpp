@@ -4,8 +4,8 @@
 #include <cmath>
 #include <iostream>
 #include <print>
-#include <stdexcept>
 #include <spdlog/fmt/fmt.h>
+#include <stdexcept>
 
 namespace eval {
   static bool isAssignmentOperator(lex::TokenType type) {
@@ -803,20 +803,18 @@ namespace eval {
   //
   // Field initialization walks the inheritance chain ROOT-FIRST (grandparent,
   // then parent, then this class), applying each class's own field defaults
-  // in declaration order as it goes. That ordering means a subclass that
-  // re-declares a field name already set by an ancestor simply overwrites it
-  // with its own default, "more derived wins" for the default value, while
-  // fields unique to the parent still end up present on the instance.
+  // in declaration order as it goes. Each default is evaluated in a fresh
+  // child scope with `this` bound to the partially-constructed instance, so
+  // defaults can reference sibling fields initialized earlier in the chain.
+  // Child field defaults overwrite any same-named field set by an ancestor.
   //
   // After fields are populated, the constructor is looked up via the normal
   // method-resolution chain (klass->findMethod, walks up through parents
   // same as any other method call) and invoked with `this` bound to the new
   // instance and `defining_class` set to whichever class actually DEFINES
   // the constructor that ran, so a super->constructor() call inside it
-  // resolves starting from THAT class's parent (see evalSuperAccess for why
-  // this distinction matters for multi-level inheritance). If no constructor
-  // exists anywhere in the chain, construction just succeeds with only the
-  // field defaults applied.
+  // resolves starting from THAT class's parent. If no constructor exists
+  // anywhere in the chain, construction succeeds with only field defaults applied.
   Value Evaluator::evalNewExpr(const par::NewExpr* node, const std::shared_ptr<Environment>& env) {
     auto class_it = m_classes.find(node->class_name);
     if (class_it == m_classes.end()) {
@@ -827,27 +825,25 @@ namespace eval {
     auto fields = std::make_shared<std::unordered_map<std::string, Value>>();
     Instance instance{.klass = klass, .fields = fields};
 
-    // Collect the chain root-first (parent before child) so child field
-    // defaults are applied last and therefore win on name collisions.
     std::vector<Class*> chain;
     for (Class* c = klass.get(); c != nullptr; c = c->parent.get()) {
       chain.push_back(c);
     }
     std::ranges::reverse(chain);
 
+    Value instance_value(instance);
+
     for (Class* c : chain) {
       for (const auto& field_decl : c->declaration->fields) {
-        Value default_value = field_decl->initializer ? evaluate(field_decl->initializer.get(), env) : Value{};
+        auto field_init_env = std::make_shared<Environment>(env);
+        field_init_env->define("this", instance_value);
+        Value default_value = field_decl->initializer ? evaluate(field_decl->initializer.get(), field_init_env) : Value{};
         (*fields)[field_decl->name] = std::move(default_value);
       }
     }
 
-    Value instance_value(instance);
-
     const Function* ctor = klass->findMethod("constructor");
     if (ctor) {
-      // Find which class in the chain actually owns this constructor
-      // (could be inherited), so super->... inside it resolves correctly.
       std::shared_ptr<Class> owner = klass;
       while (owner && !owner->methods.contains("constructor")) {
         owner = owner->parent;
