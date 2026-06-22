@@ -5,11 +5,6 @@
 #include <cassert>
 #include <string>
 
-// TODO: fix some bs with lexer state management
-// `case 1:{`
-// returns illegal token bc `:` is touching another token
-// or just force the user to place spaces around the colon
-
 namespace lex {
   typedef std::pair<TokenType, TokenVariant> TypeValuePair;
   typedef std::unordered_map<char, std::unordered_map<char, TokenType>> DoubleSymbolTable;
