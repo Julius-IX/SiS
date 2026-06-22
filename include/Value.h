@@ -70,10 +70,10 @@ namespace eval {
   // own map, that's what makes two instances independent of each other) plus
   // a pointer back to the Class that describes its shape and methods.
   //
-  // Held by shared_ptr for the same reason Array is, instances have
-  // reference semantics: `pin b = a;` aliases the same object, mutating
-  // through `b` is visible through `a`, matching typical OOP-language
-  // behavior rather than value-type copy semantics.
+  // Held by shared_ptr (same as Array) so instances have reference semantics:
+  // `pin b = a;` aliases the same object, mutating through `b` is visible
+  // through `a`. This also avoids copying the struct on every evaluate()
+  // return — only the shared_ptr is copied, not the fields map or klass ptr.
   struct Instance {
     std::shared_ptr<Class> klass;
     std::shared_ptr<std::unordered_map<std::string, Value>> fields;
@@ -83,7 +83,7 @@ namespace eval {
   // only) because the evaluator also needs to represent things the parser
   // never produces directly, like functions, arrays, classes and instances.
   struct Value {
-    std::variant<std::monostate, double, bool, std::string, Array, Function, NativeFunction, std::shared_ptr<Class>, Instance> data;
+    std::variant<std::monostate, double, bool, std::string, Array, Function, NativeFunction, std::shared_ptr<Class>, std::shared_ptr<Instance>> data;
 
     Value()
       : data(std::monostate{}) {}
@@ -101,7 +101,7 @@ namespace eval {
       : data(std::move(f)) {}
     Value(std::shared_ptr<Class> c) // NOLINT
       : data(std::move(c)) {}
-    Value(Instance i) // NOLINT
+    Value(std::shared_ptr<Instance> i) // NOLINT
       : data(std::move(i)) {}
 
     // Truthiness rules: null is false, bool is itself, numbers are false only

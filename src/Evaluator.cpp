@@ -54,8 +54,8 @@ namespace eval {
           return av.name == std::get<NativeFunction>(b.data).name;
         } else if constexpr (std::is_same_v<T, std::shared_ptr<Class>>) {
           return av == std::get<std::shared_ptr<Class>>(b.data);
-        } else if constexpr (std::is_same_v<T, Instance>) {
-          return av.fields == std::get<Instance>(b.data).fields;
+        } else if constexpr (std::is_same_v<T, std::shared_ptr<Instance>>) {
+          return av == std::get<std::shared_ptr<Instance>>(b.data);
         } else {
           return av == std::get<T>(b.data);
         }
@@ -435,8 +435,8 @@ namespace eval {
         object = evaluate(member->object.get(), env);
       }
 
-      const auto* instance = std::get_if<Instance>(&object.data);
-      if (!instance) {
+      const auto* inst_ptr = std::get_if<std::shared_ptr<Instance>>(&object.data);
+      if (inst_ptr == nullptr) {
         throw std::runtime_error("Cannot assign to a field on a non-instance value (" + object.typeName() + ")");
       }
 
@@ -444,15 +444,15 @@ namespace eval {
       if (node->operation == lex::TokenType::ASSIGN) {
         new_value = evaluate(node->right.get(), env);
       } else {
-        auto it = instance->fields->find(member->field);
-        if (it == instance->fields->end()) {
-          throw std::runtime_error("Undefined field '" + member->field + "' on instance of " + instance->klass->name);
+        auto it = inst_ptr->get()->fields->find(member->field);
+        if (it == inst_ptr->get()->fields->end()) {
+          throw std::runtime_error("Undefined field '" + member->field + "' on instance of " + inst_ptr->get()->klass->name);
         }
         Value rhs = evaluate(node->right.get(), env);
         new_value = applyCompoundOp(node->operation, it->second, rhs);
       }
 
-      (*instance->fields)[member->field] = new_value;
+      (*inst_ptr->get()->fields)[member->field] = new_value;
       return new_value;
     }
 
@@ -708,18 +708,18 @@ namespace eval {
       throw std::runtime_error("String has no member '" + field + "'");
     }
 
-    if (const auto* instance = std::get_if<Instance>(&object.data)) {
+    if (const auto* instance = std::get_if<std::shared_ptr<Instance>>(&object.data)) {
       // Fields take priority over methods.
-      auto field_it = instance->fields->find(field);
-      if (field_it != instance->fields->end()) {
+      auto field_it = instance->get()->fields->find(field);
+      if (field_it != instance->get()->fields->end()) {
         return field_it->second;
       }
 
-      std::shared_ptr<Class> lookup_class = search_class ? search_class : instance->klass;
+      std::shared_ptr<Class> lookup_class = search_class ? search_class : instance->get()->klass;
       std::shared_ptr<Class> owner;
       const Function* method = lookup_class->findMethod(field, &owner);
-      if (!method) {
-        throw std::runtime_error("'" + instance->klass->name + "' has no field or method '" + field + "'");
+      if (method == nullptr) {
+        throw std::runtime_error("'" + instance->get()->klass->name + "' has no field or method '" + field + "'");
       }
 
       // Bind `this` (and `__class__`) by creating a fresh closure scope
@@ -823,7 +823,7 @@ namespace eval {
     std::shared_ptr<Class> klass = class_it->second;
 
     auto fields = std::make_shared<std::unordered_map<std::string, Value>>();
-    Instance instance{.klass = klass, .fields = fields};
+    auto instance = std::make_shared<Instance>(Instance{.klass = klass, .fields = fields});
 
     std::vector<Class*> chain;
     for (Class* c = klass.get(); c != nullptr; c = c->parent.get()) {
@@ -844,7 +844,7 @@ namespace eval {
 
     std::shared_ptr<Class> owner;
     const Function* ctor = klass->findMethod("constructor", &owner);
-    if (ctor) {
+    if (ctor != nullptr) {
       std::vector<Value> args;
       args.reserve(node->args.size());
       for (const auto& arg : node->args) {

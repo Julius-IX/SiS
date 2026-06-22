@@ -15,7 +15,7 @@ namespace eval {
           return !v.empty();
         } else if constexpr (std::is_same_v<T, Array>) {
           return v && !v->empty();
-        } else { // Function, NativeFunction, shared_ptr<Class>, Instance
+        } else { // Function, NativeFunction, shared_ptr<Class>, shared_ptr<Instance>
           return true;
         }
       },
@@ -50,8 +50,8 @@ namespace eval {
           return "<native function " + v.name + ">";
         } else if constexpr (std::is_same_v<T, std::shared_ptr<Class>>) {
           return v ? ("<class " + v->name + ">") : "<class>";
-        } else { // Instance
-          return "<" + (v.klass ? v.klass->name : std::string("instance")) + " instance>";
+        } else { // shared_ptr<Instance>
+          return v ? ("<" + (v->klass ? v->klass->name : std::string("instance")) + " instance>") : "<instance>";
         }
       },
       data);
@@ -69,7 +69,7 @@ namespace eval {
         else if constexpr (std::is_same_v<T, Function>) return "function";
         else if constexpr (std::is_same_v<T, NativeFunction>) return "function";
         else if constexpr (std::is_same_v<T, std::shared_ptr<Class>>) return "class";
-        else return "instance"; // Instance
+        else return "instance"; // shared_ptr<Instance>
       },
       data);
   }
