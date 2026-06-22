@@ -547,3 +547,14 @@ TEST(Lexer, StringEscapeSequences) {
   lex::Lexer lexer(input);
   compareTokenStream(lexer, expected);
 }
+
+TEST(Lexer, UnterminatedStringReturnsIllegal) {
+  std::string input = "\"hello world";
+
+  lex::Lexer lexer(input);
+  lex::Token tok = lexer.nextToken();
+
+  EXPECT_EQ(tok.type, lex::ILLEGAL);
+  ASSERT_TRUE(std::holds_alternative<std::string>(tok.value));
+  EXPECT_EQ(std::get<std::string>(tok.value), "Unterminated string literal");
+}
