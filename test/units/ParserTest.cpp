@@ -676,3 +676,25 @@ namespace { // Class declarations
   }
 } // namespace
 
+namespace { // Source position tracking
+  TEST(Parser, LiteralSourcePosition) {
+    TestParser p;
+    ASSERT_TRUE(p.parseSource("42;"));
+
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, ExprStmt);
+    auto* lit = static_cast<par::Literal*>(as_ExprStmt->expr.get());
+    EXPECT_EQ(lit->line, 1U);
+    EXPECT_EQ(lit->column, 1U);
+  }
+
+  TEST(Parser, MultilinePositionTracking) {
+    TestParser p;
+    ASSERT_TRUE(p.parseSource("pin a = 1;\npin b = 2;"));
+
+    const par::Block& root = p.peekRoot();
+    ASSERT_EQ(root.statements.size(), 2U);
+    EXPECT_EQ(root.statements[0]->line, 1U);
+    EXPECT_EQ(root.statements[1]->line, 2U);
+  }
+} // namespace
