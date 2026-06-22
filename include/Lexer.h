@@ -34,7 +34,7 @@ namespace lex {
       return token;
     }
 
-    [[nodiscard]] const Token& peek(const ushort index = 1) const noexcept {
+    [[nodiscard]] const Token& peek(const unsigned short index = 1) const noexcept {
       assert(index <= count && "TokenBuffer peek out of range");
       return slots[(head + index - 1) % CAPACITY];
     }
@@ -72,7 +72,7 @@ namespace lex {
     ~Lexer() = default;
 
     [[nodiscard]] Token nextToken();
-    [[nodiscard]] const Token& peekToken(const ushort index = 1) const noexcept { return m_buffer.peek(index); }
+    [[nodiscard]] const Token& peekToken(const unsigned short index = 1) const noexcept { return m_buffer.peek(index); }
 
     void newInput(std::string input) {
       reset();
