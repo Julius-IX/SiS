@@ -698,3 +698,32 @@ namespace { // Source position tracking
     EXPECT_EQ(root.statements[1]->line, 2U);
   }
 } // namespace
+
+namespace { // Error / malformed inputs parser must not crash and must return false
+  TEST(Parser, MissingSemicolonReturnsFalse) {
+    TestParser p;
+    EXPECT_FALSE(p.parseSource("pin x = 1"));
+  }
+
+  TEST(Parser, UnmatchedParenReturnsFalse) {
+    TestParser p;
+    EXPECT_FALSE(p.parseSource("foo(;"));
+  }
+
+  TEST(Parser, MissingClassNameReturnsFalse) {
+    TestParser p;
+    EXPECT_FALSE(p.parseSource("class {}"));
+  }
+
+  TEST(Parser, EmptyInputSucceeds) {
+    TestParser p;
+    ASSERT_TRUE(p.parseSource(""));
+    EXPECT_TRUE(p.peekRoot().statements.empty());
+  }
+
+  TEST(Parser, MultipleTopLevelStatements) {
+    TestParser p;
+    ASSERT_TRUE(p.parseSource("pin a = 1; pin b = 2; pin c = 3;"));
+    EXPECT_EQ(p.peekRoot().statements.size(), 3U);
+  }
+} // namespace
