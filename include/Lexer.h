@@ -44,7 +44,7 @@ namespace lex {
   } TokenBuffer;
 
   typedef struct LexState {
-    char current_char{' '};
+    char current_char{'\0'};
 
     size_t pos{0};
     size_t next_pos{1};
