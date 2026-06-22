@@ -14,7 +14,6 @@ namespace par {
   typedef struct ParserState {
     std::unique_ptr<lex::Lexer> lexer;
     lex::Token last_token;
-    size_t token_idex;
   } State;
 
   struct ParserHooks {

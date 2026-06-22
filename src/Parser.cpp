@@ -132,7 +132,7 @@ namespace par { // Include resolving
       panic(fmt::format("Could not open root source file '{}'", original_path.string()));
       return;
     }
-    m_states[full_root_path] = State{.lexer = std::make_unique<lex::Lexer>(source.value(), full_root_path), .last_token = {}, .token_idex = 0};
+    m_states[full_root_path] = State{.lexer = std::make_unique<lex::Lexer>(source.value(), full_root_path), .last_token = {}};
   }
 
   void Parser::parseCurrentFile(const Path& current_path) {
@@ -151,7 +151,7 @@ namespace par { // Include resolving
       panic(fmt::format("Could not open included source file '{}'", include_path.string()));
       return false;
     }
-    m_states[include_path] = State{.lexer = std::make_unique<lex::Lexer>(source.value(), include_path), .last_token = {}, .token_idex = 0};
+    m_states[include_path] = State{.lexer = std::make_unique<lex::Lexer>(source.value(), include_path), .last_token = {}};
     return true;
   }
 
