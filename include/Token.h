@@ -69,8 +69,20 @@ namespace lex {
     size_t column;
     size_t length;
 
+    [[nodiscard]] bool equivalent(const Token& other) const {
+      return this->type == other.type && this->value == other.value;
+    }
+
     auto operator<=>(const Token&) const = delete;
-    bool operator==(const Token& other) const { return this->type == other.type && this->value == other.value; }
+    bool operator==(const Token& other) const {
+      return 
+        this->type == other.type &&
+        this->value == other.value &&
+        this->source == other.source &&
+        this->line == other.line &&
+        this->column == other.column &&
+        this->length == other.length;
+    }
   } Token;
 
   inline TokenType lookupIdentifier(const std::string& identifier) {
