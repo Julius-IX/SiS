@@ -355,3 +355,48 @@ namespace { // Function calls
   }
 } // namespace
 
+namespace { // Function literals & top-level fn declarations
+  TEST(Parser, AnonymousFnLiteral) {
+    TestParser p;
+    ASSERT_TRUE(p.parseSource("pin f = fn(x, y) {};"));
+
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, VarDecl);
+    EXPECT_EQ(as_VarDecl->name, "f");
+    ASSERT_NE(as_VarDecl->initializer, nullptr);
+    ASSERT_EQ(as_VarDecl->initializer->type, par::NodeType::FN_LITERAL);
+    auto* fn = static_cast<par::FnLiteral*>(as_VarDecl->initializer.get());
+    EXPECT_EQ(fn->params.size(), 2U);
+    EXPECT_EQ(fn->params[0], "x");
+    EXPECT_EQ(fn->params[1], "y");
+    ASSERT_EQ(fn->body->type, par::NodeType::BLOCK);
+  }
+
+  TEST(Parser, TopLevelFnDeclarationDesugarsToVarDecl) {
+    // fn add(a, b) { return a + b; }
+    // should produce: VarDecl("add", FnLiteral(["a","b"], Block(...)))
+    TestParser p;
+    ASSERT_TRUE(p.parseSource("fn add(a, b) { return a + b; }"));
+
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, VarDecl);
+    EXPECT_EQ(as_VarDecl->name, "add");
+    ASSERT_NE(as_VarDecl->initializer, nullptr);
+    ASSERT_EQ(as_VarDecl->initializer->type, par::NodeType::FN_LITERAL);
+    auto* fn = static_cast<par::FnLiteral*>(as_VarDecl->initializer.get());
+    ASSERT_EQ(fn->params.size(), 2U);
+    EXPECT_EQ(fn->params[0], "a");
+    EXPECT_EQ(fn->params[1], "b");
+  }
+
+  TEST(Parser, FnNoParams) {
+    TestParser p;
+    ASSERT_TRUE(p.parseSource("fn greet() {}"));
+
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, VarDecl);
+    auto* fn = static_cast<par::FnLiteral*>(as_VarDecl->initializer.get());
+    EXPECT_TRUE(fn->params.empty());
+  }
+} // namespace
+
