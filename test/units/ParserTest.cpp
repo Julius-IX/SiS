@@ -400,3 +400,33 @@ namespace { // Function literals & top-level fn declarations
   }
 } // namespace
 
+namespace { // Return
+  TEST(Parser, ReturnWithValue) {
+    TestParser p;
+    ASSERT_TRUE(p.parseSource("fn f() { return 1; }"));
+
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, VarDecl);
+    auto* fn = static_cast<par::FnLiteral*>(as_VarDecl->initializer.get());
+    auto* body = static_cast<par::Block*>(fn->body.get());
+    ASSERT_EQ(body->statements.size(), 1U);
+    ASSERT_EQ(body->statements[0]->type, par::NodeType::RETURN);
+    auto* ret = static_cast<par::Return*>(body->statements[0].get());
+    ASSERT_NE(ret->value, nullptr);
+    EXPECT_EQ(ret->value->type, par::NodeType::LITERAL);
+  }
+
+  TEST(Parser, ReturnNoValue) {
+    TestParser p;
+    ASSERT_TRUE(p.parseSource("fn f() { return; }"));
+
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, VarDecl);
+    auto* fn = static_cast<par::FnLiteral*>(as_VarDecl->initializer.get());
+    auto* body = static_cast<par::Block*>(fn->body.get());
+    ASSERT_EQ(body->statements.size(), 1U);
+    auto* ret = static_cast<par::Return*>(body->statements[0].get());
+    EXPECT_EQ(ret->value, nullptr);
+  }
+} // namespace
+
