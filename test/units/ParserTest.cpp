@@ -241,3 +241,17 @@ namespace { // Expressions binary, unary, precedence
     EXPECT_EQ(add->operation, lex::TokenType::PLUS);
   }
 } // namespace
+
+namespace { // Ternary
+  TEST(Parser, TernaryExpression) {
+    TestParser p;
+    ASSERT_TRUE(p.parseSource("a ? 1 : 2;"));
+
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, ExprStmt);
+    ASSERT_NODE(as_ExprStmt->expr.get(), Ternary);
+    ASSERT_EQ(as_Ternary->condition->type, par::NodeType::IDENTIFIER);
+    ASSERT_EQ(as_Ternary->then_expr->type, par::NodeType::LITERAL);
+    ASSERT_EQ(as_Ternary->else_expr->type, par::NodeType::LITERAL);
+  }
+} // namespace
