@@ -141,3 +141,103 @@ namespace { // Variable Declarations
     EXPECT_EQ(std::get<std::string>(lit->value), "hi");
   }
 } // namespace
+
+namespace { // Expressions binary, unary, precedence
+  TEST(Parser, BinaryAddition) {
+    TestParser p;
+    ASSERT_TRUE(p.parseSource("1 + 2;"));
+
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, ExprStmt);
+    ASSERT_NODE(as_ExprStmt->expr.get(), Binary);
+    EXPECT_EQ(as_Binary->operation, lex::TokenType::PLUS);
+    ASSERT_EQ(as_Binary->left->type, par::NodeType::LITERAL);
+    ASSERT_EQ(as_Binary->right->type, par::NodeType::LITERAL);
+  }
+
+  TEST(Parser, BinaryPrecedenceMulBeforeAdd) {
+    // 1 + 2 * 3 should parse as 1 + (2 * 3)
+    TestParser p;
+    ASSERT_TRUE(p.parseSource("1 + 2 * 3;"));
+
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, ExprStmt);
+    ASSERT_NODE(as_ExprStmt->expr.get(), Binary);
+    EXPECT_EQ(as_Binary->operation, lex::TokenType::PLUS);
+
+    // right child must be the multiplication
+    ASSERT_EQ(as_Binary->right->type, par::NodeType::BINARY);
+    auto* mul = static_cast<par::Binary*>(as_Binary->right.get());
+    EXPECT_EQ(mul->operation, lex::TokenType::STAR);
+  }
+
+  TEST(Parser, UnaryNegation) {
+    TestParser p;
+    ASSERT_TRUE(p.parseSource("-5;"));
+
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, ExprStmt);
+    ASSERT_NODE(as_ExprStmt->expr.get(), Unary);
+    EXPECT_EQ(as_Unary->operation, lex::TokenType::MINUS);
+    ASSERT_EQ(as_Unary->operand->type, par::NodeType::LITERAL);
+  }
+
+  TEST(Parser, UnaryLogicalNot) {
+    TestParser p;
+    ASSERT_TRUE(p.parseSource("!true;"));
+
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, ExprStmt);
+    ASSERT_NODE(as_ExprStmt->expr.get(), Unary);
+    EXPECT_EQ(as_Unary->operation, lex::TokenType::NOT);
+  }
+
+  TEST(Parser, AssignmentIsRightAssociative) {
+    // a = b = 1 should parse as a = (b = 1)
+    TestParser p;
+    ASSERT_TRUE(p.parseSource("a = b = 1;"));
+
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, ExprStmt);
+    ASSERT_NODE(as_ExprStmt->expr.get(), Binary);
+    EXPECT_EQ(as_Binary->operation, lex::TokenType::ASSIGN);
+
+    // right child must also be an assignment
+    ASSERT_EQ(as_Binary->right->type, par::NodeType::BINARY);
+    auto* inner = static_cast<par::Binary*>(as_Binary->right.get());
+    EXPECT_EQ(inner->operation, lex::TokenType::ASSIGN);
+  }
+
+  TEST(Parser, CompoundAssignmentOperators) {
+    const std::vector<std::pair<std::string, lex::TokenType>> cases = {
+      {"x += 1;", lex::TokenType::PLUS_ASSIGN},
+      {"x -= 1;", lex::TokenType::MINUS_ASSIGN},
+      {"x *= 2;", lex::TokenType::STAR_ASSIGN},
+      {"x /= 2;", lex::TokenType::SLASH_ASSIGN},
+      {"x %= 3;", lex::TokenType::PERCENT_ASSIGN},
+    };
+
+    for (const auto& [src, expected_op] : cases) {
+      TestParser p;
+      ASSERT_TRUE(p.parseSource(src)) << "Failed to parse: " << src;
+      const par::Block& root = p.peekRoot();
+      GET_STMT(root, 0, ExprStmt);
+      ASSERT_NODE(as_ExprStmt->expr.get(), Binary);
+      EXPECT_EQ(as_Binary->operation, expected_op) << "Wrong op for: " << src;
+    }
+  }
+
+  TEST(Parser, GroupedExpressionOverridesPrecedence) {
+    // (1 + 2) * 3 — the addition must be inside the mul
+    TestParser p;
+    ASSERT_TRUE(p.parseSource("(1 + 2) * 3;"));
+
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, ExprStmt);
+    ASSERT_NODE(as_ExprStmt->expr.get(), Binary);
+    EXPECT_EQ(as_Binary->operation, lex::TokenType::STAR);
+    ASSERT_EQ(as_Binary->left->type, par::NodeType::BINARY);
+    auto* add = static_cast<par::Binary*>(as_Binary->left.get());
+    EXPECT_EQ(add->operation, lex::TokenType::PLUS);
+  }
+} // namespace
