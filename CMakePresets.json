@@ -14,7 +14,17 @@
       "binaryDir": "${sourceDir}/build/Release",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "BUILD_GMOCK": "OFF"
+        "BUILD_GMOCK": "OFF",
+        "LOGGING_DISABLED": "ON"
+      }
+    },
+    {
+      "name": "windows",
+      "binaryDir": "${sourceDir}/build/windows",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_GMOCK": "OFF",
+        "LOGGING_DISABLED": "ON"
       }
     }
   ],
@@ -30,12 +40,22 @@
     {
       "name": "tdebug",
       "configurePreset": "debug",
-      "targets": ["all", "run_tests"]
+      "targets": [
+        "all",
+        "run_tests"
+      ]
     },
     {
       "name": "trelease",
       "configurePreset": "release",
-      "targets": ["all", "run_tests"]
+      "targets": [
+        "all",
+        "run_tests"
+      ]
+    },
+    {
+      "name": "windows",
+      "configurePreset": "windows"
     }
   ]
 }
