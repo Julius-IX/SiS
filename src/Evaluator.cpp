@@ -588,11 +588,7 @@ namespace eval {
       return callFunction(*fn, std::move(args), node);
     }
     if (const auto* native = std::get_if<NativeFunction>(&callee.data)) {
-      try {
-        return native->fn(args);
-      } catch (const std::runtime_error& e) {
-        throw std::runtime_error(std::string(e.what()));
-      }
+      return native->fn(args);
     }
 
     throw std::runtime_error("Attempted to call a non-function value (" + callee.typeName() + ")");
