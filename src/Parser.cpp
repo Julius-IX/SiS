@@ -374,9 +374,10 @@ namespace par { // Base parsing loop functions
 
       case lex::TokenType::L_BRACK: {
         advance(state);
-        std::vector<std::unique_ptr<Node>> elements = parseExpressionList(state, lex::TokenType::R_BRACK);
+        std::optional<std::vector<std::unique_ptr<Node>>> elements = parseExpressionList(state, lex::TokenType::R_BRACK);
+        if (elements == std::nullopt) return nullptr; 
         if (!expect(state, lex::TokenType::R_BRACK, "Expected ']' after array elements")) return nullptr;
-        return makeNode<ArrayLiteral>(tok.line, tok.column, std::move(elements));
+        return makeNode<ArrayLiteral>(tok.line, tok.column, std::move(elements.value()));
       }
 
       case lex::TokenType::FN: return parseFnLiteral(state);
@@ -520,9 +521,10 @@ namespace par { // Base parsing loop functions
       case lex::TokenType::L_PAREN: {
         size_t left_line = left->line;
         size_t left_column = left->column;
-        std::vector<std::unique_ptr<Node>> args = parseExpressionList(state, lex::TokenType::R_PAREN);
+        std::optional<std::vector<std::unique_ptr<Node>>> args = parseExpressionList(state, lex::TokenType::R_PAREN);
+        if (args == std::nullopt) return nullptr;
         if (!expect(state, lex::TokenType::R_PAREN, "Expected ')' after call arguments")) return nullptr;
-        return makeNode<Call>(left_line, left_column, std::move(left), std::move(args));
+        return makeNode<Call>(left_line, left_column, std::move(left), std::move(args.value()));
       }
 
       default: panic(m_hooks.format_error(state, op, "Unexpected token in infix position")); return nullptr;
@@ -548,13 +550,13 @@ namespace par { // Base parsing loop functions
   // parseExpressionList shared helper for comma-separated expression lists.
   // Used by array literals, call args, and new() args. Stops when it sees
   // `terminator` (doesn't consume, it's caller is responsible for that).
-  std::vector<std::unique_ptr<Node>> Parser::parseExpressionList(State* state, lex::TokenType terminator) {
+  std::optional<std::vector<std::unique_ptr<Node>>> Parser::parseExpressionList(State* state, lex::TokenType terminator) {
     std::vector<std::unique_ptr<Node>> list;
     if (check(state->lexer.get(), terminator)) return list; // empty list
 
     while (true) {
-      auto expr = parseExpression(state, 1);
-      if (!expr) return {};
+      std::unique_ptr<Node> expr = parseExpression(state, 1);
+      if (expr == nullptr) return std::nullopt ;
       list.push_back(std::move(expr));
       if (!match(state, lex::TokenType::COMMA)) break;
     }
@@ -780,9 +782,10 @@ namespace par { // Complex parsing structures
       return nullptr;
     }
     if (!expect(state, lex::TokenType::L_PAREN, "Expected '(' after class name in 'new'")) return nullptr;
-    auto args = parseExpressionList(state, lex::TokenType::R_PAREN);
+    std::optional<std::vector<std::unique_ptr<Node>>> args = parseExpressionList(state, lex::TokenType::R_PAREN);
+    if (args == std::nullopt) return nullptr;
     if (!expect(state, lex::TokenType::R_PAREN, "Expected ')' after constructor arguments")) return nullptr;
-    auto node = std::make_unique<NewExpr>(std::move(*class_name), std::move(args));
+    auto node = std::make_unique<NewExpr>(std::move(*class_name), std::move(args.value()));
     node->line = new_tok.line;
     node->column = new_tok.column;
     return node;
