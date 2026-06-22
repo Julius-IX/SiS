@@ -327,11 +327,15 @@ namespace par { // Base parsing loop functions
     switch (tok.type) {
       case lex::TokenType::NUM: {
         advance(state);
-        return makeNode<Literal>(tok.line, tok.column, std::get<double>(tok.value));
+        std::optional<double> value = getFromVariant<double>(tok);
+        if (value == std::nullopt) return nullptr;
+        return makeNode<Literal>(tok.line, tok.column, value.value());
       }
       case lex::TokenType::STRING: {
         advance(state);
-        return makeNode<Literal>(tok.line, tok.column, std::get<std::string>(tok.value));
+        std::optional<std::string> value = getFromVariant<std::string>(tok);
+        if (value == std::nullopt) return nullptr;
+        return makeNode<Literal>(tok.line, tok.column, value.value());
       }
       case lex::TokenType::TRUE: {
         advance(state);
