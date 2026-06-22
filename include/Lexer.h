@@ -117,8 +117,8 @@ namespace lex {
 
     [[nodiscard]] static DoubleSymbolTable initSymbolTable();
 
-    [[nodiscard]] size_t getAheadLine() const noexcept { return this->m_state.line; }
-    [[nodiscard]] size_t getAheadColumn() const noexcept { return this->m_state.pos - this->m_state.bol + 1; }
+    [[nodiscard]] size_t getLine() const noexcept { return this->m_state.line; }
+    [[nodiscard]] size_t getColumn() const noexcept { return this->m_state.pos - this->m_state.bol + 1; }
 
     [[nodiscard]] static Token newToken(const TokenType type, const TokenVariant& value, const size_t line, const size_t column) {
       return Token{.type = type, .value = value, .line = line, .column = column};
