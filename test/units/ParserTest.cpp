@@ -615,3 +615,64 @@ namespace { // this / super member access
   }
 } // namespace
 
+namespace { // Class declarations
+  TEST(Parser, EmptyClass) {
+    TestParser p;
+    ASSERT_TRUE(p.parseSource("class Empty {}"));
+
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, ClassDecl);
+    EXPECT_EQ(as_ClassDecl->name, "Empty");
+    EXPECT_TRUE(as_ClassDecl->parent_name.empty());
+    EXPECT_TRUE(as_ClassDecl->fields.empty());
+    EXPECT_TRUE(as_ClassDecl->methods.empty());
+  }
+
+  TEST(Parser, ClassWithExtendsClause) {
+    TestParser p;
+    ASSERT_TRUE(p.parseSource("class Dog extends Animal {}"));
+
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, ClassDecl);
+    EXPECT_EQ(as_ClassDecl->name, "Dog");
+    EXPECT_EQ(as_ClassDecl->parent_name, "Animal");
+  }
+
+  TEST(Parser, ClassWithFieldsAndMethods) {
+    TestParser p;
+    ASSERT_TRUE(p.parseSource("class Point {"
+                              "  pin x = 0;"
+                              "  pin y = 0;"
+                              "  fn distanceTo(other) { return 0; }"
+                              "}"));
+
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, ClassDecl);
+    EXPECT_EQ(as_ClassDecl->fields.size(), 2U);
+    EXPECT_EQ(as_ClassDecl->methods.size(), 1U);
+    EXPECT_EQ(as_ClassDecl->method_names.size(), 1U);
+    EXPECT_EQ(as_ClassDecl->fields[0]->name, "x");
+    EXPECT_EQ(as_ClassDecl->fields[1]->name, "y");
+    EXPECT_EQ(as_ClassDecl->method_names[0], "distanceTo");
+  }
+
+  TEST(Parser, FieldsAndMethodsAreSplit) {
+    // Fields and methods must stay in separate vectors — the evaluator depends
+    // on running all field defaults before calling any method.
+    TestParser p;
+    ASSERT_TRUE(p.parseSource("class C {"
+                              "  fn a() {}"
+                              "  pin val = 1;"
+                              "  fn b() {}"
+                              "}"));
+
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, ClassDecl);
+    EXPECT_EQ(as_ClassDecl->fields.size(), 1U);
+    EXPECT_EQ(as_ClassDecl->methods.size(), 2U);
+    EXPECT_EQ(as_ClassDecl->fields[0]->name, "val");
+    EXPECT_EQ(as_ClassDecl->method_names[0], "a");
+    EXPECT_EQ(as_ClassDecl->method_names[1], "b");
+  }
+} // namespace
+
