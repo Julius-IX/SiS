@@ -162,7 +162,9 @@ void compareTokenStream(lex::Lexer& lexer, const TokenVector& expected_tokens) {
       ADD_FAILURE() << formatComparedToken(token, expected_tokens.at(index));
     }
 
-    if (token.type == lex::SIS_EOF) { break; }
+    if (token.type == lex::SIS_EOF) {
+      break;
+    }
 
     token = lexer.nextToken();
     ++index;
@@ -527,4 +529,21 @@ TEST(Lexer, EmptyInputReturnsEOF) {
   } else {
     SUCCEED();
   }
+}
+
+TEST(Lexer, StringEscapeSequences) {
+  std::string input = R"("hello\n\nworld\t\r\\\"end")";
+
+  // clang-format off
+  TokenVector expected {
+    {.type = lex::STRING,  .value = "hello\n\nworld\t\r\\\"end", .line = 1, .column = 1},
+    {.type = lex::SIS_EOF, .value = {},                        .line = 1, .column = 28},
+  };
+  // clang-format on
+
+  populateTokenLengths(expected);
+  expected[0].length = static_cast<int32_t>(input.size());
+
+  lex::Lexer lexer(input);
+  compareTokenStream(lexer, expected);
 }
