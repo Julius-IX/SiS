@@ -67,6 +67,7 @@ namespace lex {
         m_buffer({}) {
       if (!this->m_input.empty()) this->m_state.current_char = this->m_input[0];
 
+      m_state.current_char = m_input.size() > 0 ? m_input[0] : '\0';
       for (size_t i = 0; i < TokenBuffer::CAPACITY; ++i) {
         fillBuffer();
       }
@@ -90,6 +91,7 @@ namespace lex {
       this->m_input = {};
       this->m_state = {};
       this->m_buffer = {};
+      m_state.current_char = m_input.size() > 0 ? m_input[0] : '\0';
     }
 
     std::string getLineContent(size_t line) {
