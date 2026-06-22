@@ -278,8 +278,6 @@ namespace lex {
     size_t start_pos = this->m_state.pos;
     size_t line = getAheadLine();
     size_t column = getAheadColumn();
-    this->m_live_pos.line = line;
-    this->m_live_pos.column = column;
 
     char& current_char = this->m_state.current_char;
     TypeValuePair tvp{ILLEGAL, std::string{current_char}};

@@ -55,7 +55,6 @@ namespace lex {
     Lexer(std::string input, std::optional<Path> source_path = std::nullopt)
       : m_input(std::move(input)), // NOLINT
         m_source_path(std::move(source_path)),
-        m_live_pos({}),
         m_state({}),
         m_buffer({}) {
       if (!this->m_input.empty()) this->m_state.current_char = this->m_input[0];
@@ -81,14 +80,9 @@ namespace lex {
 
     void reset() noexcept {
       this->m_input = {};
-      this->m_live_pos = {};
       this->m_state = {};
       this->m_buffer = {};
     }
-
-    [[nodiscard]] size_t getLine() const noexcept { return this->m_live_pos.line; }
-
-    [[nodiscard]] size_t getColumn() const noexcept { return this->m_live_pos.column; }
 
     std::string getLineContent(size_t line) {
       if (auto it = m_line_cache.find(line); it != m_line_cache.end()) return it->second;
@@ -116,7 +110,6 @@ namespace lex {
     private:
     std::string m_input;
     std::optional<Path> m_source_path;
-    Position m_live_pos;
     std::unordered_map<size_t, std::string> m_line_cache;
     State m_state;
     TokenBuffer m_buffer;
