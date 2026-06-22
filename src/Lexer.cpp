@@ -111,35 +111,34 @@ namespace lex {
     }
   }
 
-  /* incoming segfault 
-   * strings are null terminated so accessing at string.size() is safe
-   * (if you use string.c_str or string.data)
+  /* default offset is 0 and grabs the char after the current one
+   * offset of 1 will grab the char after that etc etc
    */
-  const char& Lexer::peekChar() const noexcept {
-    if (this->m_state.next_pos >= this->m_input.length()) {
-      return this->m_input.data()[this->m_input.size()];
+  char Lexer::peekChar(uint32_t offset) const noexcept {
+    if ((this->m_state.next_pos + offset) >= this->m_input.length()) {
+      return '\0';
     }
-    return this->m_input.data()[this->m_state.next_pos];
+    return this->m_input[this->m_state.next_pos + offset];
   }
 
   /* incoming segfault */
   TypeValuePair Lexer::parseNum() {
     const size_t start_index = this->m_state.pos;
-    bool seen_dot{false};
     TypeValuePair tvp{ILLEGAL, {}};
-    const char* next_char = &peekChar();
 
-    while (isNum(*next_char) || (*next_char == '.' && !seen_dot)) {
+    bool seen_dot{false};
+    char next_char = peekChar();
+    while (isNum(next_char) || (next_char == '.' && !seen_dot)) {
       advanceState();
-      if (*next_char == '.') seen_dot = true;
+      if (next_char == '.') seen_dot = true;
 
-      ++next_char;
+      next_char = peekChar();
     }
 
-    if (!isValidNumFollower(*next_char)) {
-      while (!isValidNumFollower(*next_char)) {
+    if (!isValidNumFollower(next_char)) {
+      while (!isValidNumFollower(next_char)) {
         advanceState();
-        ++next_char;
+        next_char = peekChar();
       }
 
       size_t end_index = (this->m_state.pos - start_index) + 1;
@@ -171,18 +170,20 @@ namespace lex {
   /* incoming segfault */
   TypeValuePair Lexer::parseIdent() {
     const size_t start_index = this->m_state.pos;
-    const char* next_char = &peekChar();
     TypeValuePair tvp{ILLEGAL, "FAILED TO PARSE IDENTIFIER"};
 
-    while (isAlpha(*next_char) || isNum(*next_char)) {
+    char next_char = peekChar();
+    while (isAlpha(next_char) || isNum(next_char)) {
       advanceState();
-      ++next_char;
+
+      next_char = peekChar();
     }
 
-    if (!isValidWordFollower(*next_char)) {
-      while (!isValidWordFollower(*next_char)) {
+    if (!isValidWordFollower(next_char)) {
+      while (!isValidWordFollower(next_char)) {
         advanceState();
-        ++next_char;
+
+        next_char = peekChar();
       }
 
       size_t end_index = (this->m_state.pos - start_index) + 1;

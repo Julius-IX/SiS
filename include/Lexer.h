@@ -128,7 +128,7 @@ namespace lex {
 
     [[nodiscard]] bool stateIsNotAtEof() const { return (this->m_state.pos < this->m_input.size()); }
 
-    [[nodiscard]] const char& peekChar() const noexcept;
+    [[nodiscard]] char peekChar(uint32_t offset = 0) const noexcept;
 
     [[nodiscard]] TypeValuePair parsePossiblePair(const char& table_id);
 
