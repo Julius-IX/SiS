@@ -530,3 +530,36 @@ namespace { // Jump statements (break / continue)
 
 } // namespace
 
+namespace { // Switch
+  TEST(Parser, SwitchWithCasesAndDefault) {
+    TestParser p;
+    ASSERT_TRUE(p.parseSource("switch (x) {"
+                              "  case 1: break;"
+                              "  case 2: break;"
+                              "  default: break;"
+                              "}"));
+
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, Switch);
+    ASSERT_NE(as_Switch->subject, nullptr);
+    EXPECT_EQ(as_Switch->cases.size(), 3U);
+
+    // First two cases have a value; last one is default (value == nullptr).
+    ASSERT_NE(as_Switch->cases[0].value, nullptr);
+    ASSERT_NE(as_Switch->cases[1].value, nullptr);
+    EXPECT_EQ(as_Switch->cases[2].value, nullptr); // default
+  }
+
+  TEST(Parser, SwitchCaseBodiesAreCollected) {
+    TestParser p;
+    ASSERT_TRUE(p.parseSource("switch (v) {"
+                              "  case 0: pin a = 1; pin b = 2;"
+                              "}"));
+
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, Switch);
+    ASSERT_EQ(as_Switch->cases.size(), 1U);
+    EXPECT_EQ(as_Switch->cases[0].body.size(), 2U);
+  }
+} // namespace
+
