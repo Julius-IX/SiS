@@ -842,13 +842,9 @@ namespace eval {
       }
     }
 
-    const Function* ctor = klass->findMethod("constructor");
+    std::shared_ptr<Class> owner;
+    const Function* ctor = klass->findMethod("constructor", &owner);
     if (ctor) {
-      std::shared_ptr<Class> owner = klass;
-      while (owner && !owner->methods.contains("constructor")) {
-        owner = owner->parent;
-      }
-
       std::vector<Value> args;
       args.reserve(node->args.size());
       for (const auto& arg : node->args) {
