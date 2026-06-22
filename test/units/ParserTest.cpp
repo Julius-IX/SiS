@@ -502,3 +502,31 @@ namespace { // While / For loop
   }
 } // namespace
 
+namespace { // Jump statements (break / continue)
+  TEST(Parser, BreakStatement) {
+    TestParser p;
+    ASSERT_TRUE(p.parseSource("while (true) { break; }"));
+
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, While);
+    auto* body = static_cast<par::Block*>(as_While->body.get());
+    ASSERT_EQ(body->statements.size(), 1U);
+    ASSERT_EQ(body->statements[0]->type, par::NodeType::JUMP);
+    auto* jmp = static_cast<par::Jump*>(body->statements[0].get());
+    EXPECT_EQ(jmp->kind, par::JumpKind::BREAK);
+  }
+
+  TEST(Parser, ContinueStatement) {
+    TestParser p;
+    ASSERT_TRUE(p.parseSource("while (true) { continue; }"));
+
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, While);
+    auto* body = static_cast<par::Block*>(as_While->body.get());
+    ASSERT_EQ(body->statements.size(), 1U);
+    auto* jmp = static_cast<par::Jump*>(body->statements[0].get());
+    EXPECT_EQ(jmp->kind, par::JumpKind::CONTINUE);
+  }
+
+} // namespace
+
