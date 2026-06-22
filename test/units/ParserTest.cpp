@@ -294,3 +294,29 @@ namespace { // Member access & subscript
     ASSERT_EQ(as_Subscript->index->type, par::NodeType::LITERAL);
   }
 } // namespace
+
+namespace { // Array literals
+  TEST(Parser, EmptyArrayLiteral) {
+    TestParser p;
+    ASSERT_TRUE(p.parseSource("[];"));
+
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, ExprStmt);
+    ASSERT_NODE(as_ExprStmt->expr.get(), ArrayLiteral);
+    EXPECT_TRUE(as_ArrayLiteral->elements.empty());
+  }
+
+  TEST(Parser, ArrayLiteralWithElements) {
+    TestParser p;
+    ASSERT_TRUE(p.parseSource("[1, 2, 3];"));
+
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, ExprStmt);
+    ASSERT_NODE(as_ExprStmt->expr.get(), ArrayLiteral);
+    EXPECT_EQ(as_ArrayLiteral->elements.size(), 3U);
+    for (auto& elem : as_ArrayLiteral->elements) {
+      EXPECT_EQ(elem->type, par::NodeType::LITERAL);
+    }
+  }
+} // namespace
+
