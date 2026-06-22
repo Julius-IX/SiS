@@ -16,13 +16,19 @@ namespace lex {
     uint8_t count{0};
 
     void append(const Token& token) {
-      assert(count < CAPACITY && "TokenBuffer overflow");
+      if (count < CAPACITY) {
+        throw std::logic_error("TokenBuffer overflow");
+      }
+
       slots[(head + count) % CAPACITY] = token;
       count++;
     }
 
     Token pop() {
-      assert(count > 0 && "TokenBuffer underflow");
+      if (count > 0) {
+        throw std::logic_error("TokenBuffer underflow");
+      }
+
       Token token = slots[head];
       head = (head + 1) % CAPACITY;
       --count;
