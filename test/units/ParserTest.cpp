@@ -320,3 +320,38 @@ namespace { // Array literals
   }
 } // namespace
 
+namespace { // Function calls
+  TEST(Parser, CallNoArgs) {
+    TestParser p;
+    ASSERT_TRUE(p.parseSource("foo();"));
+
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, ExprStmt);
+    ASSERT_NODE(as_ExprStmt->expr.get(), Call);
+    ASSERT_EQ(as_Call->callee->type, par::NodeType::IDENTIFIER);
+    EXPECT_TRUE(as_Call->args.empty());
+  }
+
+  TEST(Parser, CallWithArgs) {
+    TestParser p;
+    ASSERT_TRUE(p.parseSource("add(1, 2, 3);"));
+
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, ExprStmt);
+    ASSERT_NODE(as_ExprStmt->expr.get(), Call);
+    EXPECT_EQ(as_Call->args.size(), 3U);
+  }
+
+  TEST(Parser, MethodCallChain) {
+    // obj.method(1) — Call whose callee is a MemberAccess
+    TestParser p;
+    ASSERT_TRUE(p.parseSource("obj.method(1);"));
+
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, ExprStmt);
+    ASSERT_NODE(as_ExprStmt->expr.get(), Call);
+    ASSERT_EQ(as_Call->callee->type, par::NodeType::MEMBER_ACCESS);
+    EXPECT_EQ(as_Call->args.size(), 1U);
+  }
+} // namespace
+
