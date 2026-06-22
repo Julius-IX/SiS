@@ -2,16 +2,87 @@
 #include <gtest/gtest.h>
 
 #include <Lexer.h>
+#include <spdlog/fmt/fmt.h>
 
-/* I'm using weird helper functions bc I barely know how Google Test works.
- * Many of the MATCHERS.* automatically print values passed to them upon failure.
- * This is very annoying, especially when it tries to print types such as structs, resulting in binary gibberish.
- * I couldn't find a way to get past that. Maybe with a TEST FIXTURE, but I kinda find those annoying.
- * These helper functions do the job well enough. This isn't gonna be a real product anyway.
- */
+int8_t tokenToLength(const lex::Token& token) {
+  switch (token.type) {
+    case lex::ILLEGAL:
+    case lex::IDENT: return std::holds_alternative<std::string>(token.value) ? static_cast<int8_t>(std::get<std::string>(token.value).length()) : 0;
+
+    case lex::NUM:
+      if (std::holds_alternative<double>(token.value)) {
+        std::ostringstream oss;
+        oss << std::get<double>(token.value);
+        return static_cast<int8_t>(oss.str().length());
+      }
+      return 0;
+
+    case lex::STRING: return std::holds_alternative<std::string>(token.value) ? static_cast<int8_t>(std::get<std::string>(token.value).length()) : 0;
+
+    case lex::COMMENT:
+    case lex::SIS_EOF: return 0;
+
+    case lex::PLUS:
+    case lex::MINUS:
+    case lex::STAR:
+    case lex::SLASH:
+    case lex::PERCENT:
+    case lex::QUESTION_MARK:
+    case lex::ASSIGN:
+    case lex::LESS_THAN:
+    case lex::GREATER_THAN:
+    case lex::NOT:
+    case lex::L_PAREN:
+    case lex::R_PAREN:
+    case lex::L_BRACK:
+    case lex::R_BRACK:
+    case lex::L_BRACE:
+    case lex::R_BRACE:
+    case lex::COMMA:
+    case lex::DOT:
+    case lex::COLON:
+    case lex::SEMICOLON: return 1;
+
+    case lex::IF:
+    case lex::FN:
+    case lex::PLUS_ASSIGN:
+    case lex::MINUS_ASSIGN:
+    case lex::STAR_ASSIGN:
+    case lex::SLASH_ASSIGN:
+    case lex::PERCENT_ASSIGN:
+    case lex::EQUALS:
+    case lex::NOT_EQUALS:
+    case lex::LESS_THAN_EQUALS:
+    case lex::GREATER_THAN_EQUALS:
+    case lex::AND:
+    case lex::OR:
+    case lex::ARROW: return 2;
+
+    case lex::FOR:
+    case lex::PIN:
+    case lex::NEW: return 3;
+
+    case lex::TRUE:
+    case lex::ELSE:
+    case lex::CASE:
+    case lex::THIS:
+    case lex::SIS_NULL: return 4;
+
+    case lex::FALSE:
+    case lex::WHILE:
+    case lex::CLASS:
+    case lex::SUPER: return 5;
+
+    case lex::SWITCH: return 6;
+
+    case lex::EXTENDS:
+    case lex::INCLUDE: return 7;
+
+    default: return -1;
+  }
+}
 
 typedef std::vector<lex::Token> TokenVector;
-
 static std::string tokenVariantToString(const lex::Token& token) {
   lex::TokenVariant tok_var = token.value;
   if (std::holds_alternative<std::monostate>(tok_var)) {
