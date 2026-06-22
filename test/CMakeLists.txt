@@ -6,15 +6,12 @@ file(GLOB_RECURSE TEST_SOURCES
 add_executable(sis_tests ${TEST_SOURCES})
 target_include_directories(sis_tests PRIVATE
         ${PROJECT_SOURCE_DIR}/include
-        ${nloh_json_SOURCE_DIR}/single_include
-        ${cxxopts_SOURCE_DIR}/include
 )
 
 target_link_libraries(sis_tests PRIVATE
         SiSlib
         gtest
         gtest_main
-        cxxopts
 )
 
 include(GoogleTest)
