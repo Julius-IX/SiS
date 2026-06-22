@@ -104,64 +104,27 @@ static std::string tokenVariantToString(const lex::Token& token) {
   return "ERROR: could not parse TokenVariant value to std::string";
 }
 
-void areTokensEqual(const lex::Token& actual, const lex::Token& expected) {
-  bool same_type = (actual.type == expected.type);
-  bool same_line = (actual.line == expected.line);
-  bool same_column = (actual.column == expected.column);
-
-  bool same_value = false;
-
-  std::visit(
-    [&same_value](auto&& arg1, auto&& arg2) {
-      using T1 = std::decay_t<decltype(arg1)>;
-      using T2 = std::decay_t<decltype(arg2)>;
-
-      if constexpr (std::is_same_v<T1, T2>) {
-        same_value = (arg1 == arg2);
-      } else {
-        same_value = false;
-      }
-    },
-    actual.value,
-    expected.value);
-
-  bool result = same_type && same_value && same_line && same_column;
-
-  if (!result) {
-    std::string message = "Token mismatch: ";
-
-    if (!same_type) {
-      message += "\n- Type mismatch: "
-                 "\n  actual: " +
-                 lex::literalTokenToString(actual.type) + "\n  expected: " + lex::literalTokenToString(expected.type) + '\n';
-    }
-    if (!same_value) {
-      message += "\n- Value mismatch: "
-                 "\n  actual: " +
-                 tokenVariantToString(actual) + "\n  expected: " + tokenVariantToString(expected) + '\n';
-    }
-    if (!same_line) {
-      message += "\n- Line mismatch: "
-                 "\n actual: " +
-                 std::to_string(actual.line) + "\n expected: " + std::to_string(expected.line) + '\n';
-    }
-    if (!same_column) {
-      message += "\n- Column mismatch: "
-                 "\n actual: " +
-                 std::to_string(actual.column) + "\n expected: " + std::to_string(expected.column) + '\n';
-    }
-    ADD_FAILURE();
-    std::cout << message << "\n\n";
-  }
-}
-
 void compareTokenStream(lex::Lexer& lexer, const TokenVector& expected_tokens) {
   lex::Token token = lexer.nextToken();
   size_t index{0};
 
   while (true) {
-    areTokensEqual(token, expected_tokens.at(index));
-    token = lexer.nextToken();
+    if (token != expected_tokens.at(index)) {
+      std::string actual_variant_value = tokenVariantToString(token);
+      std::string expected_variant_value = tokenVariantToString(expected_tokens[index]);
+
+      ADD_FAILURE() << fmt::format("Actual : Expected\nType = {} : {}\nValue = {} : {}\nLine = {} : {}\nColumn = {} : {}\nLength = {} : {}\n",
+                                   lex::literalTokenToString(token.type),
+                                   lex::literalTokenToString(expected_tokens.at(index).type),
+                                   actual_variant_value,
+                                   expected_variant_value,
+                                   token.line,
+                                   expected_tokens.at(index).line,
+                                   token.column,
+                                   expected_tokens.at(index).column,
+                                   token.length,
+                                   expected_tokens.at(index).length);
+    }
 
     if (token.type == lex::SIS_EOF) break;
     ++index;
