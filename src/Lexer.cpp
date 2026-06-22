@@ -224,6 +224,10 @@ namespace lex {
 
     std::string str = this->m_input.substr(start_index, end_index - start_index);
     escapeChars(str);
+    if (!stateIsNotAtEof()) {
+      tvp.second = "Unterminated string literal";
+      return tvp;
+    }
 
     tvp = {STRING, str};
     return tvp;
