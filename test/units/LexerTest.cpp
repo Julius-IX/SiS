@@ -125,26 +125,41 @@ static std::string tokenVariantToString(const lex::Token& token) {
   return "ERROR: could not parse TokenVariant value to std::string";
 }
 
+std::string formatSingleToken(const lex::Token& token) {
+  return fmt::format("Token:\n"
+                     "Type   = {}\n"
+                     "Value  = {}\n"
+                     "Line   = {}\n"
+                     "Column = {}\n"
+                     "Length = {}\n",
+                     lex::literalTokenToString(token.type),
+                     tokenVariantToString(token),
+                     token.line,
+                     token.column,
+                     token.length);
+}
+
+std::string formatComparedToken(const lex::Token& actual, const lex::Token& expected) {
+  return fmt::format("Actual : Expected\nType = {} : {}\nValue = {} : {}\nLine = {} : {}\nColumn = {} : {}\nLength = {} : {}\n",
+                     lex::literalTokenToString(actual.type),
+                     lex::literalTokenToString(expected.type),
+                     tokenVariantToString(actual),
+                     tokenVariantToString(expected),
+                     actual.line,
+                     expected.line,
+                     actual.column,
+                     expected.column,
+                     actual.length,
+                     expected.length);
+}
+
 void compareTokenStream(lex::Lexer& lexer, const TokenVector& expected_tokens) {
   lex::Token token = lexer.nextToken();
   size_t index{0};
 
   while (true) {
     if (token != expected_tokens.at(index)) {
-      std::string actual_variant_value = tokenVariantToString(token);
-      std::string expected_variant_value = tokenVariantToString(expected_tokens[index]);
-
-      ADD_FAILURE() << fmt::format("Actual : Expected\nType = {} : {}\nValue = {} : {}\nLine = {} : {}\nColumn = {} : {}\nLength = {} : {}\n",
-                                   lex::literalTokenToString(token.type),
-                                   lex::literalTokenToString(expected_tokens.at(index).type),
-                                   actual_variant_value,
-                                   expected_variant_value,
-                                   token.line,
-                                   expected_tokens.at(index).line,
-                                   token.column,
-                                   expected_tokens.at(index).column,
-                                   token.length,
-                                   expected_tokens.at(index).length);
+      ADD_FAILURE() << formatComparedToken(token, expected_tokens.at(index));
     }
     token = lexer.nextToken();
 
@@ -507,17 +522,7 @@ TEST(Lexer, EmptyInputReturnsEOF) {
 
   const lex::Token& token = lexer.peekToken();
   if (token.type != lex::SIS_EOF) {
-    ADD_FAILURE() << fmt::format("Token:\n"
-        "Type   = {}\n"
-        "Value  = {}\n"
-        "Line   = {}\n"
-        "Column = {}\n"
-        "Length = {}\n",
-        lex::literalTokenToString(token.type),
-        tokenVariantToString(token),
-        token.line,
-        token.column,
-        token.length);
+    ADD_FAILURE() << formatSingleToken(token);
   } else {
     SUCCEED();
   }
