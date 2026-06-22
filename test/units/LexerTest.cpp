@@ -603,3 +603,26 @@ TEST(Lexer, PeekTokenDoesNotConsumeTokens) {
   EXPECT_EQ(lexer.nextToken().type, lex::IDENT);
   EXPECT_EQ(lexer.nextToken().type, lex::ASSIGN);
 }
+
+TEST(Lexer, ArrowTokenParsedCorrectly) {
+  std::string input = "obj->field obj - > other";
+
+  // clang-format off
+  // NOLINTBEGIN
+  TokenVector expected {
+    {.type = lex::IDENT,        .value = "obj",   .line = 1, .column = 1 },
+    {.type = lex::ARROW,        .value = {},       .line = 1, .column = 4 },
+    {.type = lex::IDENT,        .value = "field",  .line = 1, .column = 6 },
+    {.type = lex::IDENT,        .value = "obj",   .line = 1, .column = 12},
+    {.type = lex::MINUS,        .value = {},       .line = 1, .column = 16},
+    {.type = lex::GREATER_THAN, .value = {},       .line = 1, .column = 18},
+    {.type = lex::IDENT,        .value = "other",  .line = 1, .column = 20},
+    {.type = lex::SIS_EOF,      .value = {},       .line = 1, .column = 25},
+  };
+  // NOLINTEND
+  // clang-format on
+
+  populateTokenLengths(expected);
+  lex::Lexer lexer(input);
+  compareTokenStream(lexer, expected);
+}
