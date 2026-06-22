@@ -21,6 +21,7 @@
     {
       "name": "windows",
       "binaryDir": "${sourceDir}/build/windows",
+      "toolchainFile": "toolchains/windows-x86_64.cmake",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "BUILD_GMOCK": "OFF",
