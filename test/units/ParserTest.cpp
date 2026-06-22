@@ -587,3 +587,31 @@ namespace { // new expression
   }
 } // namespace
 
+namespace { // this / super member access
+  TEST(Parser, ThisArrowMember) {
+    // this->field must produce MemberAccess(Self(false), "field")
+    TestParser p;
+    ASSERT_TRUE(p.parseSource("this->field;"));
+
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, ExprStmt);
+    ASSERT_NODE(as_ExprStmt->expr.get(), MemberAccess);
+    EXPECT_EQ(as_MemberAccess->field, "field");
+    ASSERT_EQ(as_MemberAccess->object->type, par::NodeType::SELF);
+    auto* self = static_cast<par::Self*>(as_MemberAccess->object.get());
+    EXPECT_FALSE(self->is_super);
+  }
+
+  TEST(Parser, SuperArrowMember) {
+    TestParser p;
+    ASSERT_TRUE(p.parseSource("super->init;"));
+
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, ExprStmt);
+    ASSERT_NODE(as_ExprStmt->expr.get(), MemberAccess);
+    ASSERT_EQ(as_MemberAccess->object->type, par::NodeType::SELF);
+    auto* self = static_cast<par::Self*>(as_MemberAccess->object.get());
+    EXPECT_TRUE(self->is_super);
+  }
+} // namespace
+
