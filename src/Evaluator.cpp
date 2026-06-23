@@ -268,9 +268,9 @@ namespace eval {
     for (const Path& path : parser.loadOrder()) {
       const par::State& state = parser.getState(path);
 
-      bool is_native = path.extension() == ".so" || path.extension() == ".dll" || path.extension() == ".dylib";
+      bool is_dynamic = path.extension() == ".so" || path.extension() == ".dll" || path.extension() == ".dylib";
 
-      std::shared_ptr<Environment> file_env = is_native ? loadDynamicLib(path, state.includes) : loadFile(path, *state.block, state.includes, &last);
+      std::shared_ptr<Environment> file_env = is_dynamic ? loadDynamicLib(path, state.includes) : loadFile(path, *state.block, state.includes, &last);
 
       mergeIntoEnv(file_env, m_global);
     }
