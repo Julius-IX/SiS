@@ -1,5 +1,3 @@
-// demo_stdlib_macros.cpp  —  same as demo_stdlib.cpp, rewritten with SisMacros.h
-//
 // Build:
 //   g++ -std=c++23 -shared -fPIC \
 //       -I/path/to/sis/include \
