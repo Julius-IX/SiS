@@ -562,3 +562,68 @@ namespace { // Classes
   }
 
 } // namespace
+
+namespace { // Inheritance and super
+
+  TEST(Evaluator, InheritedFieldDefaultsApplied) {
+    auto v = runScript("class Animal { pin legs = 4; }"
+                       "class Dog extends Animal {}"
+                       "pin d = new Dog();"
+                       "d.legs;");
+    EXPECT_DOUBLE_EQ(std::get<double>(v.data), 4.0);
+  }
+
+  TEST(Evaluator, ChildFieldOverridesParentDefault) {
+    auto v = runScript("class Animal { pin legs = 4; }"
+                       "class Snake extends Animal { pin legs = 0; }"
+                       "pin s = new Snake();"
+                       "s.legs;");
+    EXPECT_DOUBLE_EQ(std::get<double>(v.data), 0.0);
+  }
+
+  TEST(Evaluator, InheritedMethodCall) {
+    auto v = runScript("class Animal { fn speak() { return 42; } }"
+                       "class Dog extends Animal {}"
+                       "new Dog().speak();");
+    EXPECT_DOUBLE_EQ(std::get<double>(v.data), 42.0);
+  }
+
+  TEST(Evaluator, OverriddenMethodCall) {
+    auto v = runScript("class Animal { fn speak() { return 1; } }"
+                       "class Dog extends Animal { fn speak() { return 2; } }"
+                       "new Dog().speak();");
+    EXPECT_DOUBLE_EQ(std::get<double>(v.data), 2.0);
+  }
+
+  TEST(Evaluator, SuperMethodCall) {
+    auto v = runScript("class Animal { fn speak() { return 10; } }"
+                       "class Dog extends Animal {"
+                       "  fn speak() { return super->speak() + 5; }"
+                       "}"
+                       "new Dog().speak();");
+    EXPECT_DOUBLE_EQ(std::get<double>(v.data), 15.0);
+  }
+
+  TEST(Evaluator, SuperConstructorChain) {
+    auto v = runScript("class Animal {"
+                       "  pin type = \"unknown\";"
+                       "  fn constructor(t) { this->type = t; }"
+                       "}"
+                       "class Dog extends Animal {"
+                       "  fn constructor() { super->constructor(\"dog\"); }"
+                       "}"
+                       "pin d = new Dog();"
+                       "d.type;");
+    EXPECT_EQ(std::get<std::string>(v.data), "dog");
+  }
+
+  TEST(Evaluator, MultiLevelInheritance) {
+    // A -> B -> C; C instance can call A's method via inheritance chain
+    auto v = runScript("class A { fn val() { return 1; } }"
+                       "class B extends A {}"
+                       "class C extends B {}"
+                       "new C().val();");
+    EXPECT_DOUBLE_EQ(std::get<double>(v.data), 1.0);
+  }
+
+} // namespace
