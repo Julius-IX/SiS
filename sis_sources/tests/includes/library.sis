@@ -1,0 +1,15 @@
+pin LIB_VERSION = "0.1";
+
+fn libraryAdd(a, b) {
+    return a + b;
+}
+
+class LibraryClass {
+
+    pin name = "library";
+
+    fn getName() {
+        return this->name;
+    }
+
+}

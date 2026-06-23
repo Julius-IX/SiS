@@ -1,0 +1,2 @@
+pin x = "";
+if (x) { print("not empty"); } else { print("was empty"); }

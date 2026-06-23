@@ -1,0 +1,8 @@
+class Animal {
+    fn speak() { return "animal"; }
+}
+class Dog extends Animal {
+    fn speak() { return "dog"; }
+}
+pin d = new Dog();
+print(d.speak());

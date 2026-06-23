@@ -6,10 +6,9 @@
 #include <fstream>
 #include <print>
 
-// NOTE: placeholder
-[[noreturn]] static void panic(const std::string_view msg) {
-  fmt::print("PANIC: {}\n", msg.data());
-  std::exit(1);
+// WARN: May change at any time, temporary solution is the best permanent solution
+static void panic(const std::string_view msg) {
+  throw std::runtime_error(msg.data());
 }
 
 namespace par { // Hooks

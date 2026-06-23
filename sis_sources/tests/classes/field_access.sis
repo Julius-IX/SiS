@@ -1,0 +1,9 @@
+class Box {
+    pin val = 10;
+    fn get() { return this->val; }
+    fn set(v) { this->val = v; }
+}
+pin b = new Box();
+print(str(b.get()));
+b.set(20);
+print(str(b.get()));

@@ -1,0 +1,4 @@
+pin x = 42;
+print(str(x));
+x = 99;
+print(str(x));

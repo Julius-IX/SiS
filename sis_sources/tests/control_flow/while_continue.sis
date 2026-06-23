@@ -1,0 +1,8 @@
+pin i = 0;
+pin sum = 0;
+while (i < 4) {
+    i += 1;
+    if (i == 3) { continue; }
+    sum += i;
+}
+print(str(sum));

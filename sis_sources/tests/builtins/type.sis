@@ -1,0 +1,5 @@
+print(type(123));
+print(type("hi"));
+print(type(true));
+print(type(null));
+print(type([1, 2]));

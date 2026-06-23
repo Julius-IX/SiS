@@ -1,0 +1,4 @@
+pin i = 0;
+pin sum = 0;
+while (i < 5) { sum += i; i += 1; }
+print(str(sum));

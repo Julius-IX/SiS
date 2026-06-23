@@ -1,0 +1,2 @@
+print(true ? "yes" : "no");
+print(false ? "yes" : "no");
