@@ -207,3 +207,37 @@ namespace { // Unary operators
   }
 
 } // namespace
+
+namespace { // Variable declaration and assignment
+
+  TEST(Evaluator, VarDeclWithInitializer) {
+    EXPECT_DOUBLE_EQ(std::get<double>(runScript("pin x = 10; x;").data), 10.0);
+  }
+
+  TEST(Evaluator, VarDeclNoInitializerIsNull) {
+    EXPECT_TRUE(std::holds_alternative<std::monostate>(runScript("pin x; x;").data));
+  }
+
+  TEST(Evaluator, Assignment) {
+    EXPECT_DOUBLE_EQ(std::get<double>(runScript("pin x = 1; x = 99; x;").data), 99.0);
+  }
+
+  TEST(Evaluator, CompoundAssignmentOperators) {
+    EXPECT_DOUBLE_EQ(std::get<double>(runScript("pin x = 5; x += 3; x;").data), 8.0);
+    EXPECT_DOUBLE_EQ(std::get<double>(runScript("pin x = 10; x -= 4; x;").data), 6.0);
+    EXPECT_DOUBLE_EQ(std::get<double>(runScript("pin x = 3; x *= 4; x;").data), 12.0);
+    EXPECT_DOUBLE_EQ(std::get<double>(runScript("pin x = 9; x /= 3; x;").data), 3.0);
+    EXPECT_DOUBLE_EQ(std::get<double>(runScript("pin x = 10; x %= 3; x;").data), 1.0);
+  }
+
+  TEST(Evaluator, StringCompoundAssign) {
+    // += on strings follows the same string-coercion rule as +
+    EXPECT_EQ(std::get<std::string>(runScript(R"(pin s = "hi"; s += "!"; s;)").data), "hi!");
+  }
+
+  TEST(Evaluator, AssignmentIsRightAssociative) {
+    // a = b = 5 means both a and b end up as 5
+    EXPECT_DOUBLE_EQ(std::get<double>(runScript("pin a = 0; pin b = 0; a = b = 5; a;").data), 5.0);
+  }
+
+} // namespace
