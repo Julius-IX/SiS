@@ -455,3 +455,42 @@ namespace { // Functions and closures
   }
 
 } // namespace
+
+namespace { // Arrays
+
+  TEST(Evaluator, EmptyArrayLiteral) {
+    auto v = runScript("[];");
+    ASSERT_TRUE(std::holds_alternative<eval::Array>(v.data));
+    EXPECT_EQ(std::get<eval::Array>(v.data)->size(), 0U);
+  }
+
+  TEST(Evaluator, ArrayWithElements) {
+    auto v = runScript("[1, 2, 3];");
+    ASSERT_TRUE(std::holds_alternative<eval::Array>(v.data));
+    EXPECT_EQ(std::get<eval::Array>(v.data)->size(), 3U);
+    EXPECT_DOUBLE_EQ(std::get<double>((*std::get<eval::Array>(v.data))[0].data), 1.0);
+  }
+
+  TEST(Evaluator, ArraySubscript) {
+    EXPECT_DOUBLE_EQ(std::get<double>(runScript("[10, 20, 30][1];").data), 20.0);
+  }
+
+  TEST(Evaluator, ArrayLength) {
+    EXPECT_DOUBLE_EQ(std::get<double>(runScript("[1, 2, 3].length;").data), 3.0);
+  }
+
+  TEST(Evaluator, PushAndPop) {
+    auto v = runScript("pin arr = [];"
+                       "push(arr, 10);"
+                       "push(arr, 20);"
+                       "pop(arr);");
+    EXPECT_DOUBLE_EQ(std::get<double>(v.data), 20.0);
+  }
+
+  TEST(Evaluator, ArrayReferenceSemantics) {
+    // b aliases a; mutating through b is visible through a
+    auto v = runScript("pin a = [1]; pin b = a; push(b, 2); a.length;");
+    EXPECT_DOUBLE_EQ(std::get<double>(v.data), 2.0);
+  }
+
+} // namespace
