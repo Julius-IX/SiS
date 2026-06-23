@@ -420,3 +420,35 @@ namespace { // Built-in functions
   }
 
 } // namespace
+
+namespace { // Include resolution
+
+  TEST_F(E2E, IncludeExposesVariableFromLibrary) {
+    auto out = run("includes/basic_include.sis");
+    EXPECT_EQ(out[0], "0.1"); // LIB_VERSION from library.sis
+  }
+
+  TEST_F(E2E, IncludeExposesFunction) {
+    auto out = run("includes/basic_include.sis");
+    EXPECT_EQ(out[1], "5"); // libraryAdd(2, 3)
+  }
+
+  TEST_F(E2E, IncludeExposesClass) {
+    auto out = run("includes/basic_include.sis");
+    EXPECT_EQ(out[2], "library"); // new LibraryClass().getName()
+  }
+
+  TEST_F(E2E, NestedIncludeResolvesRelativeToIncludedFile) {
+    // sub/outer.sis includes ../library.sis — path must be resolved relative
+    // to sub/, not relative to the top-level test binary.
+    auto out = run("includes/sub/outer.sis");
+    EXPECT_EQ(out[0], "0.1");
+  }
+
+  TEST_F(E2E, DoubleIncludeThrowsCircularInclude) {
+    // The parser treats re-including an already-included file as a circular
+    // include error rather than silently skipping it.
+    EXPECT_THROW(run("includes/double_include.sis"), std::runtime_error);
+  }
+
+} // namespace
