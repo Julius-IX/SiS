@@ -188,3 +188,22 @@ namespace { // Logical operators
   }
 
 } // namespace
+
+namespace { // Unary operators
+
+  TEST(Evaluator, UnaryNegation) {
+    EXPECT_DOUBLE_EQ(std::get<double>(runScript("-7;").data), -7.0);
+  }
+
+  TEST(Evaluator, UnaryNot) {
+    EXPECT_FALSE(std::get<bool>(runScript("!true;").data));
+    EXPECT_TRUE(std::get<bool>(runScript("!false;").data));
+  }
+
+  TEST(Evaluator, NotUsesToInessRules) {
+    // 0 is falsy so !0 is true; any non-zero is truthy
+    EXPECT_TRUE(std::get<bool>(runScript("!0;").data));
+    EXPECT_FALSE(std::get<bool>(runScript("!1;").data));
+  }
+
+} // namespace
