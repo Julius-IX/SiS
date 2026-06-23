@@ -3,7 +3,7 @@ Shit Script (SiS)
 
 ## TODO
 - [ ] Add proper README
-- [ ] Stop being lazy and add proper Tests
+- [X] Stop being lazy and add proper Tests
 - [ ] Add more passable flags
 - [ ] Make lsp server
 - [ ] Add example project
