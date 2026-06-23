@@ -352,3 +352,33 @@ namespace { // While / For loop
   }
 
 } // namespace
+
+namespace { // Switch
+
+  TEST(Evaluator, SwitchMatchesCase) {
+    auto v = runScript("pin x = 2;"
+                       "switch (x) { case 1: x = 10; break; case 2: x = 20; break; }"
+                       "x;");
+    EXPECT_DOUBLE_EQ(std::get<double>(v.data), 20.0);
+  }
+
+  TEST(Evaluator, SwitchDefault) {
+    auto v = runScript("pin x = 99;"
+                       "switch (x) { case 1: x = 1; break; default: x = 0; break; }"
+                       "x;");
+    EXPECT_DOUBLE_EQ(std::get<double>(v.data), 0.0);
+  }
+
+  TEST(Evaluator, SwitchFallThrough) {
+    // no break between case 1 and case 2 — both bodies run
+    auto v = runScript("pin acc = 0;"
+                       "switch (1) { case 1: acc += 10; case 2: acc += 20; break; }"
+                       "acc;");
+    EXPECT_DOUBLE_EQ(std::get<double>(v.data), 30.0);
+  }
+
+  TEST(Evaluator, SwitchNoMatchNoDefaultReturnsNull) {
+    EXPECT_TRUE(std::holds_alternative<std::monostate>(runScript("switch (99) { case 1: 1; }").data));
+  }
+
+} // namespace
