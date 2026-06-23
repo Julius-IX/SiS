@@ -92,3 +92,26 @@ namespace { // Arithmetic
   }
 
 } // namespace
+
+namespace { // String operations
+
+  TEST(Evaluator, StringConcatenation) {
+    auto v = runScript(R"("hello" + " " + "world";)");
+    EXPECT_EQ(std::get<std::string>(v.data), "hello world");
+  }
+
+  TEST(Evaluator, StringNumberCoercion) {
+    // either operand being a string coerces the other via toString()
+    auto v = runScript(R"("x=" + 42;)");
+    EXPECT_EQ(std::get<std::string>(v.data), "x=42");
+  }
+
+  TEST(Evaluator, StringLength) {
+    EXPECT_DOUBLE_EQ(std::get<double>(runScript(R"(pin s = "hello"; s.length;)").data), 5.0);
+  }
+
+  TEST(Evaluator, StringSubscript) {
+    EXPECT_EQ(std::get<std::string>(runScript(R"("abc"[1];)").data), "b");
+  }
+
+} // namespace
