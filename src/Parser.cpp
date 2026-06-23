@@ -73,7 +73,7 @@ namespace par { // Hooks
 
     while (std::getline(ss, dir, sep)) {
       Path b(dir);
-      if (auto p = resolveFileOnDisk(b / "native" / (relative.string() + ".sis"))) {
+      if (auto p = resolveFileOnDisk(b / "managed" / (relative.string() + ".sis"))) { // NOTE: ill deff change this and then forget to edit the build script but whatever
         LOG_DEBUG_FLUSH("checking native dir: {}", p->string());
         return p;
       }
