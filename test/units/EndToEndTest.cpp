@@ -446,7 +446,6 @@ namespace { // Include resolution
   }
 
   TEST_F(E2E, DoubleIncludeThrowsCircularInclude) {
-    // The parser treats re-including an already-included file as a circular
     // include error rather than silently skipping it.
     EXPECT_THROW(run("includes/double_include.sis"), std::runtime_error);
   }
