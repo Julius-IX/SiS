@@ -1,0 +1,2 @@
+fn add(a, b) { return a + b; }
+print(str(add(10, 5)));

@@ -238,3 +238,43 @@ namespace { // Control flow
   }
 
 } // namespace
+
+namespace { // Functions
+
+  TEST_F(E2E, SimpleFunctionCall) {
+    auto out = run("functions/basic_call.sis");
+    EXPECT_EQ(out[0], "15");
+  }
+
+  TEST_F(E2E, RecursiveFactorial) {
+    auto out = run("functions/factorial.sis");
+    EXPECT_EQ(out[0], "120"); // factorial(5)
+  }
+
+  TEST_F(E2E, FunctionReturnEarlyExits) {
+    // First return encountered must exit; nothing after it should print.
+    auto out = run("functions/early_return.sis");
+    ASSERT_EQ(out.size(), 1U);
+    EXPECT_EQ(out[0], "first");
+  }
+
+  TEST_F(E2E, FunctionAsValue) {
+    // Functions are first-class: assign to pin, pass as arg, return from fn.
+    auto out = run("functions/first_class.sis");
+    EXPECT_EQ(out[0], "called");
+  }
+
+  TEST_F(E2E, ClosureCapturesEnclosingScope) {
+    auto out = run("functions/closure.sis");
+    EXPECT_EQ(out[0], "15"); // makeAdder(10)(5)
+  }
+
+  TEST_F(E2E, ClosureMutatesCapture) {
+    // Counter closure: each call increments the same captured variable.
+    auto out = run("functions/closure_mutation.sis");
+    EXPECT_EQ(out[0], "1");
+    EXPECT_EQ(out[1], "2");
+    EXPECT_EQ(out[2], "3");
+  }
+
+} // namespace

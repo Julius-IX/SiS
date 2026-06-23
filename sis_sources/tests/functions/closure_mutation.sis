@@ -1,0 +1,11 @@
+fn makeCounter() {
+    pin n = 0;
+    return fn() {
+        n += 1;
+        return n;
+    };
+}
+pin counter = makeCounter();
+print(str(counter()));
+print(str(counter()));
+print(str(counter()));

@@ -1,0 +1,5 @@
+pin makeAdder = fn(v) {
+    return fn(x) { return x + v; };
+};
+pin plusTen = makeAdder(10);
+print(str(plusTen(5)));
