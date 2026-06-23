@@ -1,0 +1,2 @@
+pin x;
+if (x) { print("not null"); } else { print("was null"); }

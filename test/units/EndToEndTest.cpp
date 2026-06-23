@@ -452,3 +452,26 @@ namespace { // Include resolution
   }
 
 } // namespace
+
+namespace { // Error and edge cases
+
+  TEST_F(E2E, ParseErrorOnMissingSemicolonThrows) { EXPECT_THROW(evalRun("errors/missing_semicolon.sis"), std::runtime_error); }
+
+  TEST_F(E2E, EmptyFileRunsWithoutError) { EXPECT_NO_THROW(run("errors/empty.sis")); }
+
+  TEST_F(E2E, NullIsFalsyInCondition) {
+    auto out = run("errors/null_falsy.sis");
+    EXPECT_EQ(out[0], "was null");
+  }
+
+  TEST_F(E2E, ZeroIsFalsyInCondition) {
+    auto out = run("errors/zero_falsy.sis");
+    EXPECT_EQ(out[0], "was zero");
+  }
+
+  TEST_F(E2E, EmptyStringIsFalsy) {
+    auto out = run("errors/empty_string_falsy.sis");
+    EXPECT_EQ(out[0], "was empty");
+  }
+
+} // namespace
