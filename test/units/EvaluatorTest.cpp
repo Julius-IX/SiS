@@ -382,3 +382,20 @@ namespace { // Switch
   }
 
 } // namespace
+
+namespace { // Ternary
+
+  TEST(Evaluator, TernaryTrueBranch) {
+    EXPECT_DOUBLE_EQ(std::get<double>(runScript("true ? 1 : 2;").data), 1.0);
+  }
+
+  TEST(Evaluator, TernaryFalseBranch) {
+    EXPECT_DOUBLE_EQ(std::get<double>(runScript("false ? 1 : 2;").data), 2.0);
+  }
+
+  TEST(Evaluator, TernaryOnlyEvaluatesOneBranch) {
+    // else branch has an undefined var; since condition is true it's never reached
+    EXPECT_NO_THROW(runScript("true ? 1 : undefinedVar;"));
+  }
+
+} // namespace
