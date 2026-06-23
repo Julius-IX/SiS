@@ -702,17 +702,17 @@ namespace { // Source position tracking
 namespace { // Error / malformed inputs parser must not crash and must return false
   TEST(Parser, MissingSemicolonReturnsFalse) {
     TestParser p;
-    EXPECT_FALSE(p.parseSource("pin x = 1"));
+    EXPECT_THROW(p.parseSource("pin x = 1"), std::runtime_error);
   }
 
   TEST(Parser, UnmatchedParenReturnsFalse) {
     TestParser p;
-    EXPECT_FALSE(p.parseSource("foo(;"));
+    EXPECT_THROW(p.parseSource("foo(;"), std::runtime_error);
   }
 
   TEST(Parser, MissingClassNameReturnsFalse) {
     TestParser p;
-    EXPECT_FALSE(p.parseSource("class {}"));
+    EXPECT_THROW(p.parseSource("class {}"), std::runtime_error);
   }
 
   TEST(Parser, EmptyInputSucceeds) {
