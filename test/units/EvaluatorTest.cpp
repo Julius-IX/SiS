@@ -627,3 +627,56 @@ namespace { // Inheritance and super
   }
 
 } // namespace
+
+namespace { // Built-ins
+
+  TEST(Evaluator, LenOnArray) {
+    EXPECT_DOUBLE_EQ(std::get<double>(runScript("len([1, 2, 3]);").data), 3.0);
+  }
+
+  TEST(Evaluator, LenOnString) {
+    EXPECT_DOUBLE_EQ(std::get<double>(runScript(R"(len("hello");)").data), 5.0);
+  }
+
+  TEST(Evaluator, TypeOfNumber) {
+    EXPECT_EQ(std::get<std::string>(runScript("type(1);").data), "num");
+  }
+
+  TEST(Evaluator, TypeOfString) {
+    EXPECT_EQ(std::get<std::string>(runScript(R"(type("x");)").data), "string");
+  }
+
+  TEST(Evaluator, TypeOfBool) {
+    EXPECT_EQ(std::get<std::string>(runScript("type(true);").data), "bool");
+  }
+
+  TEST(Evaluator, TypeOfNull) {
+    EXPECT_EQ(std::get<std::string>(runScript("type(null);").data), "null");
+  }
+
+  TEST(Evaluator, TypeOfArray) {
+    EXPECT_EQ(std::get<std::string>(runScript("type([]);").data), "array");
+  }
+
+  TEST(Evaluator, StrConversion) {
+    // toString strips trailing zeros: 42.0 -> "42"
+    EXPECT_EQ(std::get<std::string>(runScript("str(42);").data), "42");
+    EXPECT_EQ(std::get<std::string>(runScript("str(1.5);").data), "1.5");
+    EXPECT_EQ(std::get<std::string>(runScript("str(true);").data), "true");
+    EXPECT_EQ(std::get<std::string>(runScript("str(null);").data), "null");
+  }
+
+  TEST(Evaluator, NumFromString) {
+    EXPECT_DOUBLE_EQ(std::get<double>(runScript(R"(num("3.14");)").data), 3.14);
+  }
+
+  TEST(Evaluator, NumFromBool) {
+    EXPECT_DOUBLE_EQ(std::get<double>(runScript("num(true);").data), 1.0);
+    EXPECT_DOUBLE_EQ(std::get<double>(runScript("num(false);").data), 0.0);
+  }
+
+  TEST(Evaluator, NumFromNumber) {
+    EXPECT_DOUBLE_EQ(std::get<double>(runScript("num(7);").data), 7.0);
+  }
+
+} // namespace
