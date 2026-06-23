@@ -285,3 +285,70 @@ namespace { // If / else
   }
 
 } // namespace
+
+namespace { // While / For loop
+
+  TEST(Evaluator, WhileBasicCount) {
+    auto v = runScript("pin i = 0; while (i < 5) { i += 1; } i;");
+    EXPECT_DOUBLE_EQ(std::get<double>(v.data), 5.0);
+  }
+
+  TEST(Evaluator, WhileBodySkippedWhenFalse) {
+    auto v = runScript("pin i = 0; while (false) { i += 1; } i;");
+    EXPECT_DOUBLE_EQ(std::get<double>(v.data), 0.0);
+  }
+
+  TEST(Evaluator, WhileBreak) {
+    auto v = runScript("pin i = 0; while (true) { i += 1; if (i == 3) { break; } } i;");
+    EXPECT_DOUBLE_EQ(std::get<double>(v.data), 3.0);
+  }
+
+  TEST(Evaluator, WhileContinue) {
+    // sum only even numbers from 1 to 4 => 2 + 4 = 6
+    auto v = runScript("pin sum = 0; pin i = 0;"
+                       "while (i < 5) { i += 1; if (i % 2 != 0) { continue; } sum += i; }"
+                       "sum;");
+    EXPECT_DOUBLE_EQ(std::get<double>(v.data), 6.0);
+  }
+
+  TEST(Evaluator, ReturnInsideWhileExitsFunction) {
+    // return should propagate past the loop boundary and exit the function
+    auto v = runScript("fn f() {"
+                       "  pin i = 0;"
+                       "  while (true) { i += 1; if (i == 2) { return i; } }"
+                       "}"
+                       "f();");
+    EXPECT_DOUBLE_EQ(std::get<double>(v.data), 2.0);
+  }
+
+  TEST(Evaluator, ForBasicSum) {
+    // 0 + 1 + 2 + 3 = 6
+    auto v = runScript("pin acc = 0; for (pin i = 0; i < 4; i += 1) { acc += i; } acc;");
+    EXPECT_DOUBLE_EQ(std::get<double>(v.data), 6.0);
+  }
+
+  TEST(Evaluator, ForInitDoesNotLeakScope) {
+    EXPECT_THROW(runScript("for (pin i = 0; i < 1; i += 1) {} i;"), std::runtime_error);
+  }
+
+  TEST(Evaluator, ForBreak) {
+    auto v = runScript("pin acc = 0;"
+                       "for (pin i = 0; i < 10; i += 1) { if (i == 3) { break; } acc += 1; }"
+                       "acc;");
+    EXPECT_DOUBLE_EQ(std::get<double>(v.data), 3.0);
+  }
+
+  TEST(Evaluator, ForContinueRunsIncrement) {
+    // skip even i; odd values 1+3+5+7+9 = 25
+    auto v = runScript("pin sum = 0;"
+                       "for (pin i = 0; i < 10; i += 1) { if (i % 2 == 0) { continue; } sum += i; }"
+                       "sum;");
+    EXPECT_DOUBLE_EQ(std::get<double>(v.data), 25.0);
+  }
+
+  TEST(Evaluator, ForInfiniteWithBreak) {
+    auto v = runScript("pin x = 0; for (;;) { x += 1; if (x == 5) { break; } } x;");
+    EXPECT_DOUBLE_EQ(std::get<double>(v.data), 5.0);
+  }
+
+} // namespace
