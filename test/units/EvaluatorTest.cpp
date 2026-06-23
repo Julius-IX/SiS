@@ -59,3 +59,36 @@ namespace { // Literals
   }
 
 } // namespace
+
+namespace { // Arithmetic
+
+  TEST(Evaluator, Addition) {
+    EXPECT_DOUBLE_EQ(std::get<double>(runScript("1 + 2;").data), 3.0);
+  }
+
+  TEST(Evaluator, Subtraction) {
+    EXPECT_DOUBLE_EQ(std::get<double>(runScript("10 - 3;").data), 7.0);
+  }
+
+  TEST(Evaluator, Multiplication) {
+    EXPECT_DOUBLE_EQ(std::get<double>(runScript("4 * 5;").data), 20.0);
+  }
+
+  TEST(Evaluator, Division) {
+    EXPECT_DOUBLE_EQ(std::get<double>(runScript("10 / 4;").data), 2.5);
+  }
+
+  TEST(Evaluator, Modulo) {
+    EXPECT_DOUBLE_EQ(std::get<double>(runScript("10 % 3;").data), 1.0);
+  }
+
+  TEST(Evaluator, OperatorPrecedence) {
+    // 2 + 3 * 4 = 14, not 20
+    EXPECT_DOUBLE_EQ(std::get<double>(runScript("2 + 3 * 4;").data), 14.0);
+  }
+
+  TEST(Evaluator, GroupedExpressionOverridesPrecedence) {
+    EXPECT_DOUBLE_EQ(std::get<double>(runScript("(2 + 3) * 4;").data), 20.0);
+  }
+
+} // namespace
