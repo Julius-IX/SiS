@@ -123,7 +123,7 @@ namespace eval {
     }
 
 #ifdef __unix__
-    void* handle = dlopen(path.c_str(), RTLD_LAZY);
+    void* handle = dlopen(path.c_str(),  RTLD_LAZY | RTLD_GLOBAL);
     if (handle == nullptr) throw std::runtime_error(std::string("failed to load: ") + dlerror());
 
     using InitFn = void (*)(eval::SisRegistry*);
