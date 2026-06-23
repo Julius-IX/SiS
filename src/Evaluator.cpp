@@ -204,7 +204,78 @@ namespace eval {
     registerBuiltins(m_global);
   }
 
-  Value Evaluator::run(const par::Block& program) { return evalBlock(&program, m_global); }
+  void Evaluator::mergeIntoEnv(const std::shared_ptr<Environment>& src, const std::shared_ptr<Environment>& dst) {
+    for (auto& [name, val] : src->snapshot()) {
+      dst->define(name, val);
+    }
+  }
+
+  std::shared_ptr<Environment> Evaluator::loadFile(const Path& path, const par::Block& block, const std::vector<Path>& deps, Value* out_last) {
+    LOG_DEBUG_FLUSH("loading .sis file");
+    if (auto it = m_file_cache.find(path); it != m_file_cache.end()) {
+      return it->second;
+    }
+
+    auto file_env = std::make_shared<Environment>(m_global);
+
+    for (const Path& dep : deps) {
+      if (auto it = m_file_cache.find(dep); it != m_file_cache.end()) mergeIntoEnv(it->second, file_env);
+    }
+
+    Value last{};
+    for (const auto& stmt : block.statements) {
+      last = evaluate(stmt.get(), file_env);
+    }
+    if (out_last != nullptr) *out_last = last;
+
+    m_file_cache[path] = file_env;
+    return file_env;
+  }
+
+  std::shared_ptr<Environment> Evaluator::loadNativeLib(const Path& path, const std::vector<Path>& deps) {
+    LOG_DEBUG_FLUSH("loading dynamic dir");
+    if (auto it = m_file_cache.find(path); it != m_file_cache.end()) return it->second;
+
+    auto lib_env = std::make_shared<Environment>(m_global);
+
+    for (const Path& dep : deps) {
+      if (auto it = m_file_cache.find(dep); it != m_file_cache.end()) mergeIntoEnv(it->second, lib_env);
+    }
+
+#ifdef __unix__
+    void* handle = dlopen(path.c_str(), RTLD_LAZY);
+    if (handle == nullptr) throw std::runtime_error(std::string("failed to load: ") + dlerror());
+
+    using InitFn = void (*)(eval::SisRegistry*);
+    auto init = reinterpret_cast<InitFn>(dlsym(handle, "sis_module_init"));
+    if (init == nullptr) {
+      dlclose(handle);
+      throw std::runtime_error("sis_module_init not found in: " + path.string());
+    }
+
+    eval::SisRegistry registry{.env = lib_env, .classes = m_classes};
+    init(&registry);
+#elif _WIN32
+    throw std::runtime_error("native libs not yet supported on windows");
+#endif
+
+    m_file_cache[path] = lib_env;
+    return lib_env;
+  }
+
+  Value Evaluator::run(const par::Parser& parser) {
+    Value last{};
+    for (const Path& path : parser.loadOrder()) {
+      const par::State& state = parser.getState(path);
+
+      bool is_native = path.extension() == ".so" || path.extension() == ".dll" || path.extension() == ".dylib";
+
+      std::shared_ptr<Environment> file_env = is_native ? loadNativeLib(path, state.includes) : loadFile(path, *state.block, state.includes, &last);
+
+      mergeIntoEnv(file_env, m_global);
+    }
+    return last;
+  }
 
   // Central dispatch. Every parseX function in the parser has a matching
   // evalX function here, same shape as Parser::printNode, switch on
