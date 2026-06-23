@@ -399,3 +399,59 @@ namespace { // Ternary
   }
 
 } // namespace
+
+namespace { // Functions and closures
+
+  TEST(Evaluator, BasicFunctionCall) {
+    EXPECT_DOUBLE_EQ(std::get<double>(runScript("fn double(x) { return x * 2; } double(5);").data), 10.0);
+  }
+
+  TEST(Evaluator, ReturnExitsEarly) {
+    // the 2 is never reached
+    EXPECT_DOUBLE_EQ(std::get<double>(runScript("fn f() { return 1; 2; } f();").data), 1.0);
+  }
+
+  TEST(Evaluator, ReturnNoValueIsNull) {
+    EXPECT_TRUE(std::holds_alternative<std::monostate>(runScript("fn f() { return; } f();").data));
+  }
+
+  TEST(Evaluator, ImplicitReturnLastExpression) {
+    EXPECT_DOUBLE_EQ(std::get<double>(runScript("fn add(a, b) { a + b; } add(3, 4);").data), 7.0);
+  }
+
+  TEST(Evaluator, ClosureCapturesEnvironment) {
+    // getX closes over the environment; mutation after definition is visible
+    auto v = runScript("pin x = 10;"
+                       "fn getX() { return x; }"
+                       "x = 42;"
+                       "getX();");
+    EXPECT_DOUBLE_EQ(std::get<double>(v.data), 42.0);
+  }
+
+  TEST(Evaluator, ClosurePreservesScope) {
+    // makeAdder returns a fn that closes over n; n stays alive after makeAdder returns
+    auto v = runScript("fn makeAdder(n) { return fn(x) { return x + n; }; }"
+                       "pin add5 = makeAdder(5);"
+                       "add5(3);");
+    EXPECT_DOUBLE_EQ(std::get<double>(v.data), 8.0);
+  }
+
+  TEST(Evaluator, Recursion) {
+    EXPECT_DOUBLE_EQ(std::get<double>(
+      runScript("fn fact(n) { if (n <= 1) { return 1; } return n * fact(n - 1); } fact(5);").data), 120.0);
+  }
+
+  TEST(Evaluator, FunctionAsFirstClassValue) {
+    auto v = runScript("fn apply(f, x) { return f(x); }"
+                       "fn double(x) { return x * 2; }"
+                       "apply(double, 7);");
+    EXPECT_DOUBLE_EQ(std::get<double>(v.data), 14.0);
+  }
+
+  TEST(Evaluator, AnonymousFnLiteral) {
+    auto v = runScript("pin add = fn(a, b) { return a + b; };"
+                       "add(10, 20);");
+    EXPECT_DOUBLE_EQ(std::get<double>(v.data), 30.0);
+  }
+
+} // namespace
