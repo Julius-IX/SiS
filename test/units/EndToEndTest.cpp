@@ -111,3 +111,62 @@ namespace {
   const ::testing::Environment* const m_path_env = ::testing::AddGlobalTestEnvironment(new PathSetup);
 
 } // namespace
+
+namespace { // Arithmetic and operators
+
+  TEST_F(E2E, BasicArithmetic) {
+    auto out = run("arithmetic/basic.sis");
+    EXPECT_EQ(out[0], "5");  // 2 + 3
+    EXPECT_EQ(out[1], "5");  // 7 - 2
+    EXPECT_EQ(out[2], "12"); // 3 * 4
+    EXPECT_EQ(out[3], "4");  // 12 / 3
+  }
+
+  TEST_F(E2E, ModuloOperator) {
+    auto out = run("arithmetic/modulo.sis");
+    EXPECT_EQ(out[0], "1"); // 7 % 3
+    EXPECT_EQ(out[1], "0"); // 6 % 2
+  }
+
+  TEST_F(E2E, CompoundAssignment) {
+    auto out = run("arithmetic/compound_assign.sis");
+    EXPECT_EQ(out[0], "15"); // x = 10; x += 5
+    EXPECT_EQ(out[1], "10"); // x -= 5
+    EXPECT_EQ(out[2], "20"); // x *= 2
+    EXPECT_EQ(out[3], "10"); // x /= 2
+    EXPECT_EQ(out[4], "1");  // x %= 3
+  }
+
+  TEST_F(E2E, ComparisonOperators) {
+    auto out = run("arithmetic/comparisons.sis");
+    EXPECT_EQ(out[0], "true"); // 5 > 3
+    EXPECT_EQ(out[1], "true"); // 3 < 5
+    EXPECT_EQ(out[2], "true"); // 5 >= 5
+    EXPECT_EQ(out[3], "true"); // 5 <= 5
+    EXPECT_EQ(out[4], "true"); // 5 != 4
+    EXPECT_EQ(out[5], "true"); // 5 == 5
+  }
+
+} // namespace
+
+namespace { // Variables and scoping
+
+  TEST_F(E2E, GlobalVariableDeclarationAndMutation) {
+    auto out = run("variables/globals.sis");
+    EXPECT_EQ(out[0], "42");
+    EXPECT_EQ(out[1], "99");
+  }
+
+  TEST_F(E2E, BlockScopeShadowing) {
+    // Inner pin x shadows outer x; outer is unchanged afterwards.
+    auto out = run("variables/shadowing.sis");
+    EXPECT_EQ(out[0], "inner");
+    EXPECT_EQ(out[1], "outer");
+  }
+
+  TEST_F(E2E, NullIsDefaultUninitialised) {
+    auto out = run("variables/null_default.sis");
+    EXPECT_EQ(out[0], "null");
+  }
+
+} // namespace

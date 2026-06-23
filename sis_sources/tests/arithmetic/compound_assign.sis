@@ -1,0 +1,6 @@
+pin x = 10;
+x += 5; print(str(x));
+x -= 5; print(str(x));
+x *= 2; print(str(x));
+x /= 2; print(str(x));
+x %= 3; print(str(x));
