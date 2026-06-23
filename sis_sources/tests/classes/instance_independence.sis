@@ -1,0 +1,11 @@
+class Counter {
+    pin n = 0;
+    fn set(v) { this->n = v; }
+    fn get() { return this->n; }
+}
+pin a = new Counter();
+pin b = new Counter();
+a.set(1);
+b.set(2);
+print(str(a.get()));
+print(str(b.get()));

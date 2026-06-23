@@ -1,0 +1,6 @@
+class Foo {
+    fn greet() { return "ok"; }
+}
+pin C = Foo;
+pin obj = new Foo();
+print(obj.greet());

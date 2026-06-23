@@ -312,3 +312,43 @@ namespace { // Arrays
   }
 
 } // namespace
+
+namespace { // Classes and OOP
+
+  TEST_F(E2E, BasicClassInstantiation) {
+    auto out = run("classes/basic.sis");
+    EXPECT_EQ(out[0], "hello");
+  }
+
+  TEST_F(E2E, FieldDefaultValues) {
+    auto out = run("classes/field_defaults.sis");
+    EXPECT_EQ(out[0], "0");
+    EXPECT_EQ(out[1], "unnamed");
+  }
+
+  TEST_F(E2E, MethodCanReadAndWriteField) {
+    auto out = run("classes/field_access.sis");
+    EXPECT_EQ(out[0], "10");
+    EXPECT_EQ(out[1], "20");
+  }
+
+  TEST_F(E2E, ConstructorRunsOnNew) {
+    auto out = run("classes/constructor.sis");
+    EXPECT_EQ(out[0], "constructed");
+    EXPECT_EQ(out[1], "42");
+  }
+
+  TEST_F(E2E, TwoInstancesAreIndependent) {
+    // Mutating a field on one instance must not affect the other.
+    auto out = run("classes/instance_independence.sis");
+    EXPECT_EQ(out[0], "1");
+    EXPECT_EQ(out[1], "2");
+  }
+
+  TEST_F(E2E, ClassIsFirstClassValue) {
+    // A class can be stored in a pin and used to construct an instance.
+    auto out = run("classes/first_class_class.sis");
+    EXPECT_EQ(out[0], "ok");
+  }
+
+} // namespace
