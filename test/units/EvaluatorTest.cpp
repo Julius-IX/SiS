@@ -115,3 +115,41 @@ namespace { // String operations
   }
 
 } // namespace
+
+namespace { // Comparison and equality
+
+  TEST(Evaluator, LessThan) {
+    EXPECT_TRUE(std::get<bool>(runScript("1 < 2;").data));
+    EXPECT_FALSE(std::get<bool>(runScript("2 < 1;").data));
+  }
+
+  TEST(Evaluator, LessThanOrEqual) {
+    EXPECT_TRUE(std::get<bool>(runScript("2 <= 2;").data));
+    EXPECT_FALSE(std::get<bool>(runScript("3 <= 2;").data));
+  }
+
+  TEST(Evaluator, GreaterThan) {
+    EXPECT_TRUE(std::get<bool>(runScript("3 > 2;").data));
+    EXPECT_FALSE(std::get<bool>(runScript("1 > 2;").data));
+  }
+
+  TEST(Evaluator, GreaterThanOrEqual) {
+    EXPECT_TRUE(std::get<bool>(runScript("2 >= 2;").data));
+  }
+
+  TEST(Evaluator, Equality) {
+    EXPECT_TRUE(std::get<bool>(runScript("1 == 1;").data));
+    EXPECT_FALSE(std::get<bool>(runScript("1 == 2;").data));
+  }
+
+  TEST(Evaluator, Inequality) {
+    EXPECT_TRUE(std::get<bool>(runScript("1 != 2;").data));
+    EXPECT_FALSE(std::get<bool>(runScript("1 != 1;").data));
+  }
+
+  TEST(Evaluator, DifferentTypesNeverEqual) {
+    // number 0 and bool false have the same logical falsiness but are distinct types
+    EXPECT_FALSE(std::get<bool>(runScript("0 == false;").data));
+  }
+
+} // namespace
