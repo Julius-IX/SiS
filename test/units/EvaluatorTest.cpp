@@ -241,3 +241,25 @@ namespace { // Variable declaration and assignment
   }
 
 } // namespace
+
+namespace { // Scope
+
+  TEST(Evaluator, InnerBlockSeesOuterVariable) {
+    EXPECT_DOUBLE_EQ(std::get<double>(runScript("pin x = 10; { x; }").data), 10.0);
+  }
+
+  TEST(Evaluator, InnerBlockDoesNotLeakToOuter) {
+    EXPECT_THROW(runScript("{ pin x = 1; } x;"), std::runtime_error);
+  }
+
+  TEST(Evaluator, InnerBlockShadowsOuter) {
+    // inner pin x is a separate binding; outer x is unchanged after the block
+    EXPECT_DOUBLE_EQ(std::get<double>(runScript("pin x = 1; { pin x = 2; } x;").data), 1.0);
+  }
+
+  TEST(Evaluator, InnerBlockMutationVisibleOutside) {
+    // assigning (not declaring) x inside the block changes the outer one
+    EXPECT_DOUBLE_EQ(std::get<double>(runScript("pin x = 1; { x = 2; } x;").data), 2.0);
+  }
+
+} // namespace
