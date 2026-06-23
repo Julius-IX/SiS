@@ -1,0 +1,3 @@
+print(str(123));
+print(str(true));
+print(str(null));

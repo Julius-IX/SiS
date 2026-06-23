@@ -384,3 +384,39 @@ namespace { // Inheritance and super
   }
 
 } // namespace
+
+namespace { // Built-in functions
+
+  TEST_F(E2E, PrintOutputsToStdout) {
+    auto out = run("builtins/print.sis");
+    EXPECT_EQ(out[0], "hello world");
+  }
+
+  TEST_F(E2E, StrConvertsToString) {
+    auto out = run("builtins/str.sis");
+    EXPECT_EQ(out[0], "123");
+    EXPECT_EQ(out[1], "true");
+    EXPECT_EQ(out[2], "null");
+  }
+
+  TEST_F(E2E, NumConvertsToNumber) {
+    auto out = run("builtins/num.sis");
+    EXPECT_EQ(out[0], "456");
+  }
+
+  TEST_F(E2E, TypeReturnsTypeName) {
+    auto out = run("builtins/type.sis");
+    EXPECT_EQ(out[0], "num");
+    EXPECT_EQ(out[1], "string");
+    EXPECT_EQ(out[2], "bool");
+    EXPECT_EQ(out[3], "null");
+    EXPECT_EQ(out[4], "array");
+  }
+
+  TEST_F(E2E, LenOnArrayAndString) {
+    auto out = run("builtins/len.sis");
+    EXPECT_EQ(out[0], "3"); // array
+    EXPECT_EQ(out[1], "5"); // "hello"
+  }
+
+} // namespace
