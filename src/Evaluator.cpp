@@ -429,7 +429,6 @@ namespace eval {
     // instance.field = ... / this->field = ... (both MemberAccess targets)
     if (node->left->type == par::NodeType::MEMBER_ACCESS) {
       const auto* member = static_cast<const par::MemberAccess*>(node->left.get());
-
       Value object;
       if (member->object->type == par::NodeType::SELF) {
         const auto* self_node = static_cast<const par::Self*>(member->object.get());
@@ -444,12 +443,10 @@ namespace eval {
       } else {
         object = evaluate(member->object.get(), env);
       }
-
       const auto* inst_ptr = std::get_if<std::shared_ptr<Instance>>(&object.data);
       if (inst_ptr == nullptr) {
         throw std::runtime_error("Cannot assign to a field on a non-instance value (" + object.typeName() + ")");
       }
-
       Value new_value;
       if (node->operation == lex::TokenType::ASSIGN) {
         new_value = evaluate(node->right.get(), env);
@@ -461,8 +458,38 @@ namespace eval {
         Value rhs = evaluate(node->right.get(), env);
         new_value = applyCompoundOp(node->operation, it->second, rhs);
       }
-
       (*inst_ptr->get()->fields)[member->field] = new_value;
+      return new_value;
+    }
+
+    // arr[index] = ... / arr[index] += ...
+    if (node->left->type == par::NodeType::SUBSCRIPT) {
+      const auto* subscript = static_cast<const par::Subscript*>(node->left.get());
+
+      Value object = evaluate(subscript->object.get(), env);
+      const auto* arr = std::get_if<Array>(&object.data);
+      if (!arr || !*arr) {
+        throw std::runtime_error("Subscript assignment requires an array, got " + object.typeName());
+      }
+
+      Value idx = evaluate(subscript->index.get(), env);
+      const auto* d = std::get_if<double>(&idx.data);
+      if (!d) {
+        throw std::runtime_error("Array index must be a number, got " + idx.typeName());
+      }
+      const auto i = static_cast<size_t>(*d);
+      if (i >= (*arr)->size()) {
+        throw std::runtime_error("Array index " + std::to_string(i) + " out of bounds (size " + std::to_string((*arr)->size()) + ")");
+      }
+
+      Value new_value;
+      if (node->operation == lex::TokenType::ASSIGN) {
+        new_value = evaluate(node->right.get(), env);
+      } else {
+        Value rhs = evaluate(node->right.get(), env);
+        new_value = applyCompoundOp(node->operation, (**arr)[i], rhs);
+      }
+      (**arr)[i] = new_value;
       return new_value;
     }
 
