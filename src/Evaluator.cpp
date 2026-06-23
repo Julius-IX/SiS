@@ -1,4 +1,5 @@
 #include <Evaluator.h>
+#include <NativeFunctions.h>
 #include <Token.h>
 #include <algorithm>
 #include <cmath>
@@ -6,7 +7,6 @@
 #include <print>
 #include <spdlog/fmt/fmt.h>
 #include <stdexcept>
-#include <NativeFunctions.h>
 
 namespace eval {
   static bool isAssignmentOperator(lex::TokenType type) {
@@ -113,7 +113,7 @@ namespace eval {
   }
 
   std::shared_ptr<Environment> Evaluator::loadDynamicLib(const Path& path, const std::vector<Path>& deps) {
-    LOG_DEBUG_FLUSH("loading dynamic dir");
+    LOG_DEBUG_FLUSH("loading dynamic lib");
     if (auto it = m_file_cache.find(path); it != m_file_cache.end()) return it->second;
 
     auto lib_env = std::make_shared<Environment>(m_global);
@@ -123,7 +123,7 @@ namespace eval {
     }
 
 #ifdef __unix__
-    void* handle = dlopen(path.c_str(),  RTLD_LAZY | RTLD_GLOBAL);
+    void* handle = dlopen(path.c_str(), RTLD_LAZY | RTLD_GLOBAL);
     if (handle == nullptr) throw std::runtime_error(std::string("failed to load: ") + dlerror());
 
     using InitFn = void (*)(eval::SisRegistry*);
@@ -670,8 +670,16 @@ namespace eval {
   // callers (super->) look up methods starting somewhere other than the
   // instance's own runtime class.
   //
-  // Resolution order: fields first, then methods. A class can't have a
-  // field and a method with the same name anyway.
+  // Resolution order: fields → AST methods → native methods.
+  // Fields always win over methods, same as before. AST methods are checked
+  // before native methods so that a .sis subclass can override a native
+  // method simply by declaring a method with the same name.
+  //
+  // Native methods are bound with `this` pre-injected as args[0] —
+  // resolveMember wraps the raw NativeFunction in a new NativeFunction that
+  // prepends the instance before forwarding the call. This means native
+  // method lambdas always receive (instance, user_args...) without any
+  // special dispatch needed in evalCall.
   Value Evaluator::resolveMember(const Value& object, const std::string& field, const par::Node* node, const std::shared_ptr<Class>& search_class) {
     if (const auto* arr = std::get_if<Array>(&object.data)) {
       if (field == "length") {
@@ -695,12 +703,9 @@ namespace eval {
       }
 
       std::shared_ptr<Class> lookup_class = search_class ? search_class : instance->get()->klass;
-      std::shared_ptr<Class> owner;
-      const Function* method = lookup_class->findMethod(field, &owner);
-      if (method == nullptr) {
-        throw std::runtime_error("'" + instance->get()->klass->name + "' has no field or method '" + field + "'");
-      }
 
+      // AST method path — same as before, creates a bound closure scope so
+      // `this` and `__class__` are available inside the method body.
       // Bind `this` (and `__class__`) by creating a fresh closure scope
       // (parented to the method's original closure, NOT the call site, same
       // lexical-scoping rule as ordinary closures) with both predefined.
@@ -716,12 +721,36 @@ namespace eval {
       // node has no idea it ever came from a MemberAccess. `__class__` is
       // what makes super-> inside an ordinary method (not just inside a
       // constructor) resolve to the right ancestor, see evalSuperAccess.
-      auto bound_scope = std::make_shared<Environment>(method->closure);
-      bound_scope->define("this", object);
-      if (owner) {
-        bound_scope->define("__class__", Value(owner));
+      std::shared_ptr<Class> owner;
+      const Function* method = lookup_class->findMethod(field, &owner);
+      if (method != nullptr) {
+        auto bound_scope = std::make_shared<Environment>(method->closure);
+        bound_scope->define("this", object);
+        if (owner) {
+          bound_scope->define("__class__", Value(owner));
+        }
+        return Value(Function{.declaration = method->declaration, .closure = bound_scope});
       }
-      return Value(Function{.declaration = method->declaration, .closure = bound_scope});
+
+      // Native method path — wrap the raw NativeFunction so that `this`
+      // (the instance) is injected as args[0] before the user's arguments.
+      // The lambda in NativeClassBuilder::method() then unwraps args[0]
+      // back to shared_ptr<Instance> and shifts user args to args[1..n].
+      std::shared_ptr<Class> native_owner;
+      const NativeFunction* native_method = lookup_class->findNativeMethod(field, &native_owner);
+      if (native_method != nullptr) {
+        Value bound_this = object;
+        NativeFunction bound{.name = native_method->name, .fn = [raw_fn = native_method->fn, bound_this](std::vector<Value>& args) mutable -> Value {
+                               std::vector<Value> full_args;
+                               full_args.reserve(args.size() + 1);
+                               full_args.push_back(bound_this);
+                               full_args.insert(full_args.end(), args.begin(), args.end());
+                               return raw_fn(full_args);
+                             }};
+        return Value(std::move(bound));
+      }
+
+      throw std::runtime_error("'" + instance->get()->klass->name + "' has no field or method '" + field + "'");
     }
 
     throw std::runtime_error("Member access on '" + field + "' is not supported on a value of type " + object.typeName());
@@ -787,13 +816,15 @@ namespace eval {
   // defaults can reference sibling fields initialized earlier in the chain.
   // Child field defaults overwrite any same-named field set by an ancestor.
   //
-  // After fields are populated, the constructor is looked up via the normal
-  // method-resolution chain (klass->findMethod, walks up through parents
-  // same as any other method call) and invoked with `this` bound to the new
-  // instance and `defining_class` set to whichever class actually DEFINES
-  // the constructor that ran, so a super->constructor() call inside it
-  // resolves starting from THAT class's parent. If no constructor exists
-  // anywhere in the chain, construction succeeds with only field defaults applied.
+  // Native classes use default_fields instead of declaration->fields since
+  // they have no AST. The two paths are identical in effect: populate the
+  // instance's field map before the constructor runs.
+  //
+  // After fields are populated, the constructor is looked up first via the
+  // normal AST method-resolution chain (klass->findMethod), then via the
+  // native method chain (klass->findNativeMethod) as a fallback. If no
+  // constructor exists anywhere in the chain, construction succeeds with
+  // only field defaults applied.
   Value Evaluator::evalNewExpr(const par::NewExpr* node, const std::shared_ptr<Environment>& env) {
     auto class_it = m_classes.find(node->class_name);
     if (class_it == m_classes.end()) {
@@ -813,14 +844,28 @@ namespace eval {
     Value instance_value(instance);
 
     for (Class* c : chain) {
-      for (const auto& field_decl : c->declaration->fields) {
-        auto field_init_env = std::make_shared<Environment>(env);
-        field_init_env->define("this", instance_value);
-        Value default_value = field_decl->initializer ? evaluate(field_decl->initializer.get(), field_init_env) : Value{};
-        (*fields)[field_decl->name] = std::move(default_value);
+      if (c->declaration != nullptr) {
+        // AST class: evaluate field defaults from the declaration node.
+        // Each field gets its own child env with `this` bound so defaults
+        // can reference sibling fields initialized earlier.
+        for (const auto& field_decl : c->declaration->fields) {
+          auto field_init_env = std::make_shared<Environment>(env);
+          field_init_env->define("this", instance_value);
+          Value default_value = field_decl->initializer ? evaluate(field_decl->initializer.get(), field_init_env) : Value{};
+          (*fields)[field_decl->name] = std::move(default_value);
+        }
+      } else {
+        // Native class: copy default_fields directly — these are plain Values
+        // registered at lib load time via NativeClassBuilder::field(), no
+        // evaluation needed.
+        for (const auto& [fname, fval] : c->default_fields) {
+          (*fields)[fname] = fval;
+        }
       }
     }
 
+    // AST constructor takes priority. Looked up via the normal method chain
+    // so a .sis subclass of a native class can define its own constructor.
     std::shared_ptr<Class> owner;
     const Function* ctor = klass->findMethod("constructor", &owner);
     if (ctor != nullptr) {
@@ -829,10 +874,22 @@ namespace eval {
       for (const auto& arg : node->args) {
         args.push_back(evaluate(arg.get(), env));
       }
-
       callFunction(*ctor, std::move(args), node, instance_value, owner);
-    } else if (!node->args.empty()) {
-      throw std::runtime_error("Class '" + node->class_name + "' has no constructor but was called with arguments");
+    } else {
+      // Native constructor fallback — inject instance as args[0] same as
+      // resolveMember does for regular native method calls.
+      const NativeFunction* native_ctor = klass->findNativeMethod("constructor");
+      if (native_ctor != nullptr) {
+        std::vector<Value> args;
+        args.reserve(node->args.size() + 1);
+        args.push_back(instance_value);
+        for (const auto& arg : node->args) {
+          args.push_back(evaluate(arg.get(), env));
+        }
+        native_ctor->fn(args);
+      } else if (!node->args.empty()) {
+        throw std::runtime_error("Class '" + node->class_name + "' has no constructor but was called with arguments");
+      }
     }
 
     return instance_value;

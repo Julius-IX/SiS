@@ -1,4 +1,5 @@
 #include <Value.h>
+#include <spdlog/fmt/fmt.h>
 
 namespace eval {
   bool Value::isTruthy() const {
