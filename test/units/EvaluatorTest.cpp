@@ -263,3 +263,25 @@ namespace { // Scope
   }
 
 } // namespace
+
+namespace { // If / else
+
+  TEST(Evaluator, IfTrueBranchTaken) {
+    EXPECT_DOUBLE_EQ(std::get<double>(runScript("if (true) { 1; } else { 2; }").data), 1.0);
+  }
+
+  TEST(Evaluator, IfFalseBranchTaken) {
+    EXPECT_DOUBLE_EQ(std::get<double>(runScript("if (false) { 1; } else { 2; }").data), 2.0);
+  }
+
+  TEST(Evaluator, IfFalseNoElseReturnsNull) {
+    EXPECT_TRUE(std::holds_alternative<std::monostate>(runScript("if (false) { 1; }").data));
+  }
+
+  TEST(Evaluator, ElseIf) {
+    auto v = runScript("pin x = 2;"
+                       "if (x == 1) { 10; } else if (x == 2) { 20; } else { 30; }");
+    EXPECT_DOUBLE_EQ(std::get<double>(v.data), 20.0);
+  }
+
+} // namespace
