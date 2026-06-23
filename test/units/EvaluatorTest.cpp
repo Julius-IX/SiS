@@ -153,3 +153,38 @@ namespace { // Comparison and equality
   }
 
 } // namespace
+
+namespace { // Logical operators
+
+  TEST(Evaluator, AndReturnsFalsyLeft) {
+    // false && anything => the falsy left operand
+    auto v = runScript("false && true;");
+    ASSERT_TRUE(std::holds_alternative<bool>(v.data));
+    EXPECT_FALSE(std::get<bool>(v.data));
+  }
+
+  TEST(Evaluator, AndReturnsTruthyRight) {
+    // 1 && 2 => 2 (both truthy, last one wins)
+    EXPECT_DOUBLE_EQ(std::get<double>(runScript("1 && 2;").data), 2.0);
+  }
+
+  TEST(Evaluator, OrReturnsTruthyLeft) {
+    // 1 || 2 => 1 (left is truthy, right never evaluated)
+    EXPECT_DOUBLE_EQ(std::get<double>(runScript("1 || 2;").data), 1.0);
+  }
+
+  TEST(Evaluator, OrReturnsFalsyRight) {
+    // false || 5 => 5
+    EXPECT_DOUBLE_EQ(std::get<double>(runScript("false || 5;").data), 5.0);
+  }
+
+  TEST(Evaluator, AndShortCircuits) {
+    // right operand is never evaluated when left is falsy
+    EXPECT_NO_THROW(runScript("false && undefinedVar;"));
+  }
+
+  TEST(Evaluator, OrShortCircuits) {
+    EXPECT_NO_THROW(runScript("true || undefinedVar;"));
+  }
+
+} // namespace
