@@ -6,9 +6,9 @@
 #include <fstream>
 #include <print>
 
-// NOTE: placeholder
+// WARN: May change at any time, temporary solution is the best permanent solution
 static void panic(const std::string_view msg) {
-  fmt::print("PANIC: {}\n", msg.data());
+  throw std::runtime_error(msg.data());
 }
 
 namespace par { // Hooks
