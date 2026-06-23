@@ -7,9 +7,7 @@
 #include <print>
 
 // WARN: May change at any time, temporary solution is the best permanent solution
-static void panic(const std::string_view msg) {
-  throw std::runtime_error(msg.data());
-}
+static void panic(const std::string_view msg) { throw std::runtime_error(msg.data()); }
 
 namespace par { // Hooks
   static std::optional<std::string> readFileToString(const Path& path) {
@@ -38,21 +36,44 @@ namespace par { // Hooks
     return fmted_msg + fmt::format("{}\n{}", line_content, std::string(token.column - 1, ' ') + std::string(std::max<size_t>(token.length, 1), '^'));
   }
 
-  std::optional<Path> resolveFile(const Path& root, const Path& relative_include_path) {
-    std::filesystem::path full = root / relative_include_path;
-
+  static std::optional<Path> resolveFileOnDisk(const Path& full) {
     std::error_code ec;
     auto canonical = std::filesystem::weakly_canonical(full, ec);
-
-    if (ec) {
-      return std::nullopt;
-    }
-
-    if (!std::filesystem::is_regular_file(canonical)) {
-      return std::nullopt;
-    }
-
+    if (ec || !std::filesystem::is_regular_file(canonical)) return std::nullopt;
     return canonical;
+  }
+
+  std::optional<Path> resolveFile(const Path& root, const Path& relative) {
+    if (relative.has_extension()) {
+      return resolveFileOnDisk(root / relative);
+    }
+
+    const char* sis_path_env = std::getenv("SIS_PATH");
+    if (sis_path_env == nullptr) return std::nullopt;
+
+    std::stringstream ss(sis_path_env);
+    std::string dir;
+
+#ifdef _WIN32
+    const char sep = ';';
+    const std::string dyn_subdir = "dynamic/windows";
+    const std::string dyn_ext = ".dll";
+#elif __APPLE__
+    const char sep = ':';
+    const std::string dyn_subdir = "dynamic/macos";
+    const std::string dyn_ext = ".dylib";
+#else
+    const char sep = ':';
+    const std::string dyn_subdir = "dynamic/linux";
+    const std::string dyn_ext = ".so";
+#endif
+
+    while (std::getline(ss, dir, sep)) {
+      Path b(dir);
+      if (auto p = resolveFileOnDisk(b / "native" / (relative.string() + ".sis"))) return p;
+      if (auto p = resolveFileOnDisk(b / dyn_subdir / (relative.string() + dyn_ext))) return p;
+    }
+    return std::nullopt;
   }
 
   Parser::Parser() {
@@ -136,8 +157,11 @@ namespace par { // Include resolving
 
   void Parser::parseCurrentFile(const Path& current_path) {
     LOG_DEBUG_FLUSH("Parsing full file {}", current_path.string());
-    try { // TODO: remove try/catch after full refactor
-      parse(&m_states[current_path]);
+    try {
+      if (!parse(&m_states[current_path])) {
+        panic(fmt::format("Failed to parse '{}'", current_path.string()));
+      }
+      m_load_order.push_back(current_path);
     } catch (const std::exception& e) {
       panic(fmt::format("Error parsing '{}': {}", current_path.string(), e.what()));
     }
@@ -176,25 +200,41 @@ namespace par { // Include resolving
         continue;
       }
 
-      if (m_states.contains(include_path.value().value())) {
-        panic(fmt::format("Circular include detected at '{}'", include_path.value().value().string()));
+      const Path& resolved = include_path.value().value();
+
+      bool mid_flight = std::ranges::find(m_include_stack, resolved) != m_include_stack.end();
+      if (mid_flight) {
+        panic(fmt::format("Circular include detected at '{}'", resolved.string()));
         break;
       }
 
-      if (!loadIncludeSource(include_path.value().value())) {
-        break;
+      if (m_states.contains(resolved)) {
+        // already loaded, dep recorded in checkForInclude, keep going
+        m_include_stack.push_back(current_path);
+        continue;
       }
+
+      if (!loadIncludeSource(resolved)) break;
       m_include_stack.push_back(current_path);
-      m_include_stack.push_back(include_path.value().value());
+      m_include_stack.push_back(resolved);
     }
 
-    return std::ranges::find(m_root->statements, nullptr) == m_root->statements.end();
+    for (auto& [p, state] : m_states) {
+      if (!state.block) return false;
+    }
+    return true;
   }
 
   std::expected<std::optional<Path>, std::string> Parser::checkForInclude(const Path& path) {
     lex::Lexer* lexer = m_states[path].lexer.get();
+
     if (!check(lexer, lex::TokenType::INCLUDE)) {
+      m_states[path].past_include_zone = true;
       return std::nullopt;
+    }
+
+    if (m_states[path].past_include_zone) {
+      return std::unexpected(m_hooks.format_error(&m_states[path], m_states[path].last_token, "includes must appear at the top of the file"));
     }
 
     advance(&m_states[path]);
@@ -204,7 +244,6 @@ namespace par { // Include resolving
     }
 
     std::optional<Path> include_path = getFromVariant<std::string>(m_states[path].last_token).value();
-
     if (!include_path) {
       return std::unexpected(m_hooks.format_error(&m_states[path], m_states[path].last_token, "Failed to get path from 'include'"));
     }
@@ -218,6 +257,7 @@ namespace par { // Include resolving
       return std::unexpected(m_hooks.format_error(&m_states[path], m_states[path].last_token, "Failed to resolve include path"));
     }
 
+    m_states[path].includes.push_back(include_path.value());
     return include_path;
   }
 
@@ -226,16 +266,12 @@ namespace par { // Include resolving
 namespace par { // Base parsing loop functions
   bool Parser::parse(State* state) {
     std::vector<std::unique_ptr<Node>> statements;
-
     while (!isAtEnd(state->lexer.get())) {
       std::unique_ptr<Node> stmt = parseStatement(state);
       if (stmt == nullptr) return false;
       statements.push_back(std::move(stmt));
     }
-
-    m_root->statements.reserve(m_root->statements.size() + statements.size());
-    m_root->statements.insert(m_root->statements.end(), std::make_move_iterator(statements.begin()), std::make_move_iterator(statements.end()));
-
+    state->block = std::make_unique<Block>(std::move(statements));
     return true;
   }
 
@@ -378,7 +414,7 @@ namespace par { // Base parsing loop functions
       case lex::TokenType::L_BRACK: {
         advance(state);
         std::optional<std::vector<std::unique_ptr<Node>>> elements = parseExpressionList(state, lex::TokenType::R_BRACK);
-        if (elements == std::nullopt) return nullptr; 
+        if (elements == std::nullopt) return nullptr;
         if (!expect(state, lex::TokenType::R_BRACK, "Expected ']' after array elements")) return nullptr;
         return makeNode<ArrayLiteral>(tok.line, tok.column, std::move(elements.value()));
       }
@@ -559,7 +595,7 @@ namespace par { // Base parsing loop functions
 
     while (true) {
       std::unique_ptr<Node> expr = parseExpression(state, 1);
-      if (expr == nullptr) return std::nullopt ;
+      if (expr == nullptr) return std::nullopt;
       list.push_back(std::move(expr));
       if (!match(state, lex::TokenType::COMMA)) break;
     }

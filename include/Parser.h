@@ -13,6 +13,9 @@
 namespace par {
   typedef struct ParserState {
     std::unique_ptr<lex::Lexer> lexer;
+    std::unique_ptr<Block> block;
+    std::vector<Path> includes;
+    bool past_include_zone = false;
     lex::Token last_token;
   } State;
 
@@ -30,13 +33,20 @@ namespace par {
     bool parseRoot(const Path& path);
     bool parse(State* state);
 
-    const Block& peekRoot() const { return *m_root; }
+    const Block& peekRoot() const { return *m_states.at(m_load_order.front()).block; }
+    const std::vector<Path>& loadOrder() const { return m_load_order; }
+    const State& getState(const Path& path) const { return m_states.at(path); }
 
     protected:
     ParserHooks m_hooks; // NOLINT
 
+    void registerTestState(const Path& path, State state) {
+      m_states[path] = std::move(state);
+      m_load_order.push_back(path);
+    }
+
     private:
-    std::unique_ptr<Block> m_root = std::make_unique<Block>(std::vector<std::unique_ptr<Node>>{});
+    std::vector<Path> m_load_order;
     std::deque<Path> m_include_stack;
     std::unordered_map<Path, State> m_states;
 
@@ -54,9 +64,9 @@ namespace par {
 
     // Expression parsing Pratt core
     static int bindingPower(const lex::TokenType& type);
-    std::unique_ptr<Node> parseAtom(State* state);                                                   // nud: things that START an expression
-    std::unique_ptr<Node> parseContinuation(State* state, std::unique_ptr<Node> left);               // led: things that EXTEND an expression
-    std::unique_ptr<Node> parseExpression(State* state, int min_prec = 1);                           // driver loop
+    std::unique_ptr<Node> parseAtom(State* state);                                                                  // nud: things that START an expression
+    std::unique_ptr<Node> parseContinuation(State* state, std::unique_ptr<Node> left);                              // led: things that EXTEND an expression
+    std::unique_ptr<Node> parseExpression(State* state, int min_prec = 1);                                          // driver loop
     std::optional<std::vector<std::unique_ptr<Node>>> parseExpressionList(State* state, lex::TokenType terminator); // comma-sep until terminator
     std::optional<std::vector<std::string>> parseParamList(State* state);
 
