@@ -232,7 +232,7 @@ namespace eval {
     return file_env;
   }
 
-  std::shared_ptr<Environment> Evaluator::loadNativeLib(const Path& path, const std::vector<Path>& deps) {
+  std::shared_ptr<Environment> Evaluator::loadDynamicLib(const Path& path, const std::vector<Path>& deps) {
     LOG_DEBUG_FLUSH("loading dynamic dir");
     if (auto it = m_file_cache.find(path); it != m_file_cache.end()) return it->second;
 
@@ -270,7 +270,7 @@ namespace eval {
 
       bool is_native = path.extension() == ".so" || path.extension() == ".dll" || path.extension() == ".dylib";
 
-      std::shared_ptr<Environment> file_env = is_native ? loadNativeLib(path, state.includes) : loadFile(path, *state.block, state.includes, &last);
+      std::shared_ptr<Environment> file_env = is_native ? loadDynamicLib(path, state.includes) : loadFile(path, *state.block, state.includes, &last);
 
       mergeIntoEnv(file_env, m_global);
     }

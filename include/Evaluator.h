@@ -61,7 +61,7 @@ namespace eval {
     static void registerBuiltins(const std::shared_ptr<Environment>& env);
 
     std::shared_ptr<Environment> loadFile(const Path& path, const par::Block& block, const std::vector<Path>& deps, Value* out_last);
-    std::shared_ptr<Environment> loadNativeLib(const Path& path, const std::vector<Path>& deps);
+    std::shared_ptr<Environment> loadDynamicLib(const Path& path, const std::vector<Path>& deps);
     static void mergeIntoEnv(const std::shared_ptr<Environment>& src, const std::shared_ptr<Environment>& dst);
 
     Value evaluate(const par::Node* node, const std::shared_ptr<Environment>& env);
