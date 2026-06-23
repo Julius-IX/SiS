@@ -494,3 +494,71 @@ namespace { // Arrays
   }
 
 } // namespace
+
+namespace { // Classes
+
+  TEST(Evaluator, FieldDefaultsApplied) {
+    auto v = runScript("class Point { pin x = 0; pin y = 0; }"
+                       "pin p = new Point();"
+                       "p.x;");
+    EXPECT_DOUBLE_EQ(std::get<double>(v.data), 0.0);
+  }
+
+  TEST(Evaluator, ConstructorSetsFields) {
+    auto v = runScript("class Point {"
+                       "  pin x = 0; pin y = 0;"
+                       "  fn constructor(a, b) { this->x = a; this->y = b; }"
+                       "}"
+                       "pin p = new Point(3, 4);"
+                       "p.x;");
+    EXPECT_DOUBLE_EQ(std::get<double>(v.data), 3.0);
+  }
+
+  TEST(Evaluator, MethodCall) {
+    auto v = runScript("class Counter {"
+                       "  pin count = 0;"
+                       "  fn increment() { this->count += 1; }"
+                       "  fn get() { return this->count; }"
+                       "}"
+                       "pin c = new Counter();"
+                       "c.increment(); c.increment();"
+                       "c.get();");
+    EXPECT_DOUBLE_EQ(std::get<double>(v.data), 2.0);
+  }
+
+  TEST(Evaluator, InstancesAreIndependent) {
+    // two instances do not share field storage
+    auto v = runScript("class Box { pin val = 0; }"
+                       "pin a = new Box(); pin b = new Box();"
+                       "a.val = 5;"
+                       "b.val;");
+    EXPECT_DOUBLE_EQ(std::get<double>(v.data), 0.0);
+  }
+
+  TEST(Evaluator, InstanceReferenceSemantics) {
+    // b aliases a; mutation through b is visible through a
+    auto v = runScript("class Box { pin val = 0; }"
+                       "pin a = new Box(); pin b = a;"
+                       "b.val = 99;"
+                       "a.val;");
+    EXPECT_DOUBLE_EQ(std::get<double>(v.data), 99.0);
+  }
+
+  TEST(Evaluator, FieldCompoundAssignInsideMethod) {
+    auto v = runScript("class C { pin x = 10; fn addX(n) { this->x += n; } }"
+                       "pin c = new C();"
+                       "c.addX(5);"
+                       "c.x;");
+    EXPECT_DOUBLE_EQ(std::get<double>(v.data), 15.0);
+  }
+
+  TEST(Evaluator, BoundMethodStoredInVariable) {
+    // binding a method to a variable and calling it later still has the right `this`
+    auto v = runScript("class C { pin v = 7; fn getV() { return this->v; } }"
+                       "pin c = new C();"
+                       "pin m = c.getV;"
+                       "m();");
+    EXPECT_DOUBLE_EQ(std::get<double>(v.data), 7.0);
+  }
+
+} // namespace
