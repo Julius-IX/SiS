@@ -179,6 +179,16 @@ namespace par { // Include resolving
 
   bool Parser::loadIncludeSource(const Path& include_path) {
     LOG_DEBUG_FLUSH("Resolving include path: {}", include_path.string());
+
+    // Native modules (.so/.dll/.dylib) have no source to lex give them a
+    // sentinel empty block so the final validity check in parseRoot passes,
+    // and let the evaluator handle them via loadDynamicLib.
+    auto ext = include_path.extension();
+    if (ext == ".so" || ext == ".dll" || ext == ".dylib") {
+      m_states[include_path] = State{.lexer = nullptr, .block = std::make_unique<Block>(std::vector<std::unique_ptr<Node>>()), .last_token = {}};
+      return true;
+    }
+
     std::optional<std::string> source = m_hooks.read_file(include_path);
     if (source == std::nullopt) {
       panic(fmt::format("Could not open included source file '{}'", include_path.string()));
@@ -198,6 +208,14 @@ namespace par { // Include resolving
     while (!m_include_stack.empty()) { // NOLINT
       Path current_path = m_include_stack.back();
       m_include_stack.pop_back();
+
+      // Native modules have no source to parse sentinel block already set in
+      // loadIncludeSource, just record them in load order for the evaluator.
+      auto ext = current_path.extension();
+      if (ext == ".so" || ext == ".dll" || ext == ".dylib") {
+        m_load_order.push_back(current_path);
+        continue;
+      }
 
       std::expected<std::optional<Path>, std::string> include_path = checkForInclude(current_path);
       if (!include_path.has_value()) {
