@@ -1,0 +1,5 @@
+pin arr = [1, 2, 3];
+push(arr, 4);
+print(str(len(arr)));
+print(str(pop(arr)));
+print(str(len(arr)));

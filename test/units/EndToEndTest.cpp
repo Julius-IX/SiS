@@ -278,3 +278,37 @@ namespace { // Functions
   }
 
 } // namespace
+
+namespace { // Arrays
+
+  TEST_F(E2E, ArrayLiteralAndSubscript) {
+    auto out = run("arrays/literal.sis");
+    EXPECT_EQ(out[0], "1");
+    EXPECT_EQ(out[1], "3");
+  }
+
+  TEST_F(E2E, ArrayPushAndPop) {
+    auto out = run("arrays/push_pop.sis");
+    EXPECT_EQ(out[0], "4"); // len after push
+    EXPECT_EQ(out[1], "4"); // popped value
+    EXPECT_EQ(out[2], "3"); // len after pop
+  }
+
+  TEST_F(E2E, ArrayLength) {
+    auto out = run("arrays/length.sis");
+    EXPECT_EQ(out[0], "3");
+  }
+
+  TEST_F(E2E, ArrayMutationByIndex) {
+    auto out = run("arrays/mutation.sis");
+    EXPECT_EQ(out[0], "99");
+  }
+
+  TEST_F(E2E, ArrayReferenceSemantics) {
+    // Two pins pointing at the same array; mutating through one is visible
+    // through the other.
+    auto out = run("arrays/reference_semantics.sis");
+    EXPECT_EQ(out[0], "42");
+  }
+
+} // namespace
