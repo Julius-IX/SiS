@@ -6,6 +6,7 @@
 #include <print>
 #include <spdlog/fmt/fmt.h>
 #include <stdexcept>
+#include <NativeFunctions.h>
 
 namespace eval {
   static bool isAssignmentOperator(lex::TokenType type) {
@@ -73,130 +74,9 @@ namespace eval {
   // themselves.
   // ---------------------------------------------------------------------
   void Evaluator::registerBuiltins(const std::shared_ptr<Environment>& env) {
-    env->define("print",
-                Value(NativeFunction{
-                  .name = "print",
-                  .fn = [](std::vector<Value>& args) -> Value {
-                    for (size_t i = 0; i < args.size(); ++i) {
-                      fmt::print("{}", args[i].toString());
-                      if (i + 1 < args.size()) fmt::print(" ");
-                    }
-                    fmt::print("\n");
-                    return Value{};
-                  },
-                }));
-
-    env->define("len",
-                Value(NativeFunction{
-                  .name = "len",
-                  .fn = [](std::vector<Value>& args) -> Value {
-                    if (args.size() != 1) {
-                      throw std::runtime_error("len() expects exactly 1 argument, got " + std::to_string(args.size()));
-                    }
-                    if (const auto* arr = std::get_if<Array>(&args[0].data)) {
-                      return Value(static_cast<double>((*arr)->size()));
-                    }
-                    if (const auto* str = std::get_if<std::string>(&args[0].data)) {
-                      return Value(static_cast<double>(str->size()));
-                    }
-                    throw std::runtime_error("len() expects an array or string, got " + args[0].typeName());
-                  },
-                }));
-
-    env->define("type",
-                Value(NativeFunction{
-                  .name = "type",
-                  .fn = [](std::vector<Value>& args) -> Value {
-                    if (args.size() != 1) {
-                      throw std::runtime_error("type() expects exactly 1 argument, got " + std::to_string(args.size()));
-                    }
-                    return Value(args[0].typeName());
-                  },
-                }));
-
-    env->define("str",
-                Value(NativeFunction{
-                  .name = "str",
-                  .fn = [](std::vector<Value>& args) -> Value {
-                    if (args.size() != 1) {
-                      throw std::runtime_error("str() expects exactly 1 argument, got " + std::to_string(args.size()));
-                    }
-                    return Value(args[0].toString());
-                  },
-                }));
-
-    env->define("num",
-                Value(NativeFunction{
-                  .name = "num",
-                  .fn = [](std::vector<Value>& args) -> Value {
-                    if (args.size() != 1) {
-                      throw std::runtime_error("num() expects exactly 1 argument, got " + std::to_string(args.size()));
-                    }
-                    if (const auto* d = std::get_if<double>(&args[0].data)) {
-                      return Value(*d);
-                    }
-                    if (const auto* s = std::get_if<std::string>(&args[0].data)) {
-                      try {
-                        return Value(std::stod(*s));
-                      } catch (const std::exception&) {
-                        throw std::runtime_error("num(): could not convert string '" + *s + "' to a number");
-                      }
-                    }
-                    if (const auto* b = std::get_if<bool>(&args[0].data)) {
-                      return Value(*b ? 1.0 : 0.0);
-                    }
-                    throw std::runtime_error("num() cannot convert a value of type " + args[0].typeName());
-                  },
-                }));
-
-    env->define("push",
-                Value(NativeFunction{
-                  .name = "push",
-                  .fn = [](std::vector<Value>& args) -> Value {
-                    if (args.size() != 2) {
-                      throw std::runtime_error("push() expects exactly 2 arguments (array, value), got " + std::to_string(args.size()));
-                    }
-                    const auto* arr = std::get_if<Array>(&args[0].data);
-                    if (!arr || !*arr) {
-                      throw std::runtime_error("push() expects an array as its first argument, got " + args[0].typeName());
-                    }
-                    (*arr)->push_back(args[1]);
-                    return args[0];
-                  },
-                }));
-
-    env->define("pop",
-                Value(NativeFunction{
-                  .name = "pop",
-                  .fn = [](std::vector<Value>& args) -> Value {
-                    if (args.size() != 1) {
-                      throw std::runtime_error("pop() expects exactly 1 argument, got " + std::to_string(args.size()));
-                    }
-                    const auto* arr = std::get_if<Array>(&args[0].data);
-                    if (!arr || !*arr || (*arr)->empty()) {
-                      throw std::runtime_error("pop() expects a non-empty array");
-                    }
-                    Value back = (*arr)->back();
-                    (*arr)->pop_back();
-                    return back;
-                  },
-                }));
-
-    env->define("read",
-                Value(NativeFunction{
-                  .name = "read",
-                  .fn = [](std::vector<Value>& args) -> Value {
-                    if (args.size() > 1) {
-                      throw std::runtime_error("read() expects at most 1 argument, got " + std::to_string(args.size()));
-                    }
-                    if (args.size() == 1) {
-                      fmt::print("{}", args[0].toString());
-                    }
-                    std::string input;
-                    std::getline(std::cin, input);
-                    return Value{input};
-                  },
-                }));
+    for (const auto& [name, fn] : native_functions) {
+      env->define(name, Value(fn));
+    }
   }
 
   Evaluator::Evaluator()
