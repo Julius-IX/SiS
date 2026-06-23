@@ -40,16 +40,19 @@ namespace par { // Hooks
     std::error_code ec;
     auto canonical = std::filesystem::weakly_canonical(full, ec);
     if (ec || !std::filesystem::is_regular_file(canonical)) return std::nullopt;
+    LOG_DEBUG_FLUSH("resolved file path: {}", canonical.string());
     return canonical;
   }
 
   std::optional<Path> resolveFile(const Path& root, const Path& relative) {
+    LOG_DEBUG_FLUSH("resolving file path: {}", relative.string());
     if (relative.has_extension()) {
       return resolveFileOnDisk(root / relative);
     }
 
     const char* sis_path_env = std::getenv("SIS_PATH");
     if (sis_path_env == nullptr) return std::nullopt;
+    LOG_DEBUG_FLUSH("resolving with env var: {}", sis_path_env);
 
     std::stringstream ss(sis_path_env);
     std::string dir;
@@ -70,9 +73,16 @@ namespace par { // Hooks
 
     while (std::getline(ss, dir, sep)) {
       Path b(dir);
-      if (auto p = resolveFileOnDisk(b / "native" / (relative.string() + ".sis"))) return p;
-      if (auto p = resolveFileOnDisk(b / dyn_subdir / (relative.string() + dyn_ext))) return p;
+      if (auto p = resolveFileOnDisk(b / "native" / (relative.string() + ".sis"))) {
+        LOG_DEBUG_FLUSH("checking native dir: {}", p->string());
+        return p;
+      }
+      if (auto p = resolveFileOnDisk(b / dyn_subdir / (relative.string() + dyn_ext))) {
+        LOG_DEBUG_FLUSH("checking dynamic dir");
+        return p;
+      }
     }
+    LOG_DEBUG_FLUSH("failed to resolve file path: {}", relative.string());
     return std::nullopt;
   }
 
