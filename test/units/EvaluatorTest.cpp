@@ -8,20 +8,23 @@
 class TestEval : public par::Parser {
   public:
   bool parseSource(const std::string& source) {
-    m_hooks.read_file    = [](const Path&) -> std::optional<std::string> { return std::nullopt; };
+    m_hooks.read_file = [](const Path&) -> std::optional<std::string> { return std::nullopt; };
     m_hooks.format_error = [](par::State*, const lex::Token& token, std::string_view msg) -> std::string { return fmt::format("{}:{}: {}", token.line, token.column, msg); };
     m_hooks.resolve_file = [](const Path&, const Path&) -> std::optional<Path> { return std::nullopt; };
 
+    Path dummy("<test>");
     par::State state{
-      .lexer      = std::make_unique<lex::Lexer>(source),
+      .lexer = std::make_unique<lex::Lexer>(source),
       .last_token = {},
     };
-    return parse(&state);
+    bool ok = parse(&state);
+    if (ok) registerTestState(dummy, std::move(state));
+    return ok;
   }
 
   eval::Value run() {
     eval::Evaluator ev;
-    return ev.run(peekRoot());
+    return ev.run(*this);
   }
 };
 
@@ -54,42 +57,28 @@ namespace { // Literals
     EXPECT_FALSE(std::get<bool>(runScript("false;").data));
   }
 
-  TEST(Evaluator, NullLiteral) {
-    EXPECT_TRUE(std::holds_alternative<std::monostate>(runScript("null;").data));
-  }
+  TEST(Evaluator, NullLiteral) { EXPECT_TRUE(std::holds_alternative<std::monostate>(runScript("null;").data)); }
 
 } // namespace
 
 namespace { // Arithmetic
 
-  TEST(Evaluator, Addition) {
-    EXPECT_DOUBLE_EQ(std::get<double>(runScript("1 + 2;").data), 3.0);
-  }
+  TEST(Evaluator, Addition) { EXPECT_DOUBLE_EQ(std::get<double>(runScript("1 + 2;").data), 3.0); }
 
-  TEST(Evaluator, Subtraction) {
-    EXPECT_DOUBLE_EQ(std::get<double>(runScript("10 - 3;").data), 7.0);
-  }
+  TEST(Evaluator, Subtraction) { EXPECT_DOUBLE_EQ(std::get<double>(runScript("10 - 3;").data), 7.0); }
 
-  TEST(Evaluator, Multiplication) {
-    EXPECT_DOUBLE_EQ(std::get<double>(runScript("4 * 5;").data), 20.0);
-  }
+  TEST(Evaluator, Multiplication) { EXPECT_DOUBLE_EQ(std::get<double>(runScript("4 * 5;").data), 20.0); }
 
-  TEST(Evaluator, Division) {
-    EXPECT_DOUBLE_EQ(std::get<double>(runScript("10 / 4;").data), 2.5);
-  }
+  TEST(Evaluator, Division) { EXPECT_DOUBLE_EQ(std::get<double>(runScript("10 / 4;").data), 2.5); }
 
-  TEST(Evaluator, Modulo) {
-    EXPECT_DOUBLE_EQ(std::get<double>(runScript("10 % 3;").data), 1.0);
-  }
+  TEST(Evaluator, Modulo) { EXPECT_DOUBLE_EQ(std::get<double>(runScript("10 % 3;").data), 1.0); }
 
   TEST(Evaluator, OperatorPrecedence) {
     // 2 + 3 * 4 = 14, not 20
     EXPECT_DOUBLE_EQ(std::get<double>(runScript("2 + 3 * 4;").data), 14.0);
   }
 
-  TEST(Evaluator, GroupedExpressionOverridesPrecedence) {
-    EXPECT_DOUBLE_EQ(std::get<double>(runScript("(2 + 3) * 4;").data), 20.0);
-  }
+  TEST(Evaluator, GroupedExpressionOverridesPrecedence) { EXPECT_DOUBLE_EQ(std::get<double>(runScript("(2 + 3) * 4;").data), 20.0); }
 
 } // namespace
 
@@ -106,13 +95,9 @@ namespace { // String operations
     EXPECT_EQ(std::get<std::string>(v.data), "x=42");
   }
 
-  TEST(Evaluator, StringLength) {
-    EXPECT_DOUBLE_EQ(std::get<double>(runScript(R"(pin s = "hello"; s.length;)").data), 5.0);
-  }
+  TEST(Evaluator, StringLength) { EXPECT_DOUBLE_EQ(std::get<double>(runScript(R"(pin s = "hello"; s.length;)").data), 5.0); }
 
-  TEST(Evaluator, StringSubscript) {
-    EXPECT_EQ(std::get<std::string>(runScript(R"("abc"[1];)").data), "b");
-  }
+  TEST(Evaluator, StringSubscript) { EXPECT_EQ(std::get<std::string>(runScript(R"("abc"[1];)").data), "b"); }
 
 } // namespace
 
@@ -133,9 +118,7 @@ namespace { // Comparison and equality
     EXPECT_FALSE(std::get<bool>(runScript("1 > 2;").data));
   }
 
-  TEST(Evaluator, GreaterThanOrEqual) {
-    EXPECT_TRUE(std::get<bool>(runScript("2 >= 2;").data));
-  }
+  TEST(Evaluator, GreaterThanOrEqual) { EXPECT_TRUE(std::get<bool>(runScript("2 >= 2;").data)); }
 
   TEST(Evaluator, Equality) {
     EXPECT_TRUE(std::get<bool>(runScript("1 == 1;").data));
@@ -183,17 +166,13 @@ namespace { // Logical operators
     EXPECT_NO_THROW(runScript("false && undefinedVar;"));
   }
 
-  TEST(Evaluator, OrShortCircuits) {
-    EXPECT_NO_THROW(runScript("true || undefinedVar;"));
-  }
+  TEST(Evaluator, OrShortCircuits) { EXPECT_NO_THROW(runScript("true || undefinedVar;")); }
 
 } // namespace
 
 namespace { // Unary operators
 
-  TEST(Evaluator, UnaryNegation) {
-    EXPECT_DOUBLE_EQ(std::get<double>(runScript("-7;").data), -7.0);
-  }
+  TEST(Evaluator, UnaryNegation) { EXPECT_DOUBLE_EQ(std::get<double>(runScript("-7;").data), -7.0); }
 
   TEST(Evaluator, UnaryNot) {
     EXPECT_FALSE(std::get<bool>(runScript("!true;").data));
@@ -210,17 +189,11 @@ namespace { // Unary operators
 
 namespace { // Variable declaration and assignment
 
-  TEST(Evaluator, VarDeclWithInitializer) {
-    EXPECT_DOUBLE_EQ(std::get<double>(runScript("pin x = 10; x;").data), 10.0);
-  }
+  TEST(Evaluator, VarDeclWithInitializer) { EXPECT_DOUBLE_EQ(std::get<double>(runScript("pin x = 10; x;").data), 10.0); }
 
-  TEST(Evaluator, VarDeclNoInitializerIsNull) {
-    EXPECT_TRUE(std::holds_alternative<std::monostate>(runScript("pin x; x;").data));
-  }
+  TEST(Evaluator, VarDeclNoInitializerIsNull) { EXPECT_TRUE(std::holds_alternative<std::monostate>(runScript("pin x; x;").data)); }
 
-  TEST(Evaluator, Assignment) {
-    EXPECT_DOUBLE_EQ(std::get<double>(runScript("pin x = 1; x = 99; x;").data), 99.0);
-  }
+  TEST(Evaluator, Assignment) { EXPECT_DOUBLE_EQ(std::get<double>(runScript("pin x = 1; x = 99; x;").data), 99.0); }
 
   TEST(Evaluator, CompoundAssignmentOperators) {
     EXPECT_DOUBLE_EQ(std::get<double>(runScript("pin x = 5; x += 3; x;").data), 8.0);
@@ -244,13 +217,9 @@ namespace { // Variable declaration and assignment
 
 namespace { // Scope
 
-  TEST(Evaluator, InnerBlockSeesOuterVariable) {
-    EXPECT_DOUBLE_EQ(std::get<double>(runScript("pin x = 10; { x; }").data), 10.0);
-  }
+  TEST(Evaluator, InnerBlockSeesOuterVariable) { EXPECT_DOUBLE_EQ(std::get<double>(runScript("pin x = 10; { x; }").data), 10.0); }
 
-  TEST(Evaluator, InnerBlockDoesNotLeakToOuter) {
-    EXPECT_THROW(runScript("{ pin x = 1; } x;"), std::runtime_error);
-  }
+  TEST(Evaluator, InnerBlockDoesNotLeakToOuter) { EXPECT_THROW(runScript("{ pin x = 1; } x;"), std::runtime_error); }
 
   TEST(Evaluator, InnerBlockShadowsOuter) {
     // inner pin x is a separate binding; outer x is unchanged after the block
@@ -266,17 +235,11 @@ namespace { // Scope
 
 namespace { // If / else
 
-  TEST(Evaluator, IfTrueBranchTaken) {
-    EXPECT_DOUBLE_EQ(std::get<double>(runScript("if (true) { 1; } else { 2; }").data), 1.0);
-  }
+  TEST(Evaluator, IfTrueBranchTaken) { EXPECT_DOUBLE_EQ(std::get<double>(runScript("if (true) { 1; } else { 2; }").data), 1.0); }
 
-  TEST(Evaluator, IfFalseBranchTaken) {
-    EXPECT_DOUBLE_EQ(std::get<double>(runScript("if (false) { 1; } else { 2; }").data), 2.0);
-  }
+  TEST(Evaluator, IfFalseBranchTaken) { EXPECT_DOUBLE_EQ(std::get<double>(runScript("if (false) { 1; } else { 2; }").data), 2.0); }
 
-  TEST(Evaluator, IfFalseNoElseReturnsNull) {
-    EXPECT_TRUE(std::holds_alternative<std::monostate>(runScript("if (false) { 1; }").data));
-  }
+  TEST(Evaluator, IfFalseNoElseReturnsNull) { EXPECT_TRUE(std::holds_alternative<std::monostate>(runScript("if (false) { 1; }").data)); }
 
   TEST(Evaluator, ElseIf) {
     auto v = runScript("pin x = 2;"
@@ -327,9 +290,7 @@ namespace { // While / For loop
     EXPECT_DOUBLE_EQ(std::get<double>(v.data), 6.0);
   }
 
-  TEST(Evaluator, ForInitDoesNotLeakScope) {
-    EXPECT_THROW(runScript("for (pin i = 0; i < 1; i += 1) {} i;"), std::runtime_error);
-  }
+  TEST(Evaluator, ForInitDoesNotLeakScope) { EXPECT_THROW(runScript("for (pin i = 0; i < 1; i += 1) {} i;"), std::runtime_error); }
 
   TEST(Evaluator, ForBreak) {
     auto v = runScript("pin acc = 0;"
@@ -377,21 +338,15 @@ namespace { // Switch
     EXPECT_DOUBLE_EQ(std::get<double>(v.data), 30.0);
   }
 
-  TEST(Evaluator, SwitchNoMatchNoDefaultReturnsNull) {
-    EXPECT_TRUE(std::holds_alternative<std::monostate>(runScript("switch (99) { case 1: 1; }").data));
-  }
+  TEST(Evaluator, SwitchNoMatchNoDefaultReturnsNull) { EXPECT_TRUE(std::holds_alternative<std::monostate>(runScript("switch (99) { case 1: 1; }").data)); }
 
 } // namespace
 
 namespace { // Ternary
 
-  TEST(Evaluator, TernaryTrueBranch) {
-    EXPECT_DOUBLE_EQ(std::get<double>(runScript("true ? 1 : 2;").data), 1.0);
-  }
+  TEST(Evaluator, TernaryTrueBranch) { EXPECT_DOUBLE_EQ(std::get<double>(runScript("true ? 1 : 2;").data), 1.0); }
 
-  TEST(Evaluator, TernaryFalseBranch) {
-    EXPECT_DOUBLE_EQ(std::get<double>(runScript("false ? 1 : 2;").data), 2.0);
-  }
+  TEST(Evaluator, TernaryFalseBranch) { EXPECT_DOUBLE_EQ(std::get<double>(runScript("false ? 1 : 2;").data), 2.0); }
 
   TEST(Evaluator, TernaryOnlyEvaluatesOneBranch) {
     // else branch has an undefined var; since condition is true it's never reached
@@ -402,22 +357,16 @@ namespace { // Ternary
 
 namespace { // Functions and closures
 
-  TEST(Evaluator, BasicFunctionCall) {
-    EXPECT_DOUBLE_EQ(std::get<double>(runScript("fn double(x) { return x * 2; } double(5);").data), 10.0);
-  }
+  TEST(Evaluator, BasicFunctionCall) { EXPECT_DOUBLE_EQ(std::get<double>(runScript("fn double(x) { return x * 2; } double(5);").data), 10.0); }
 
   TEST(Evaluator, ReturnExitsEarly) {
     // the 2 is never reached
     EXPECT_DOUBLE_EQ(std::get<double>(runScript("fn f() { return 1; 2; } f();").data), 1.0);
   }
 
-  TEST(Evaluator, ReturnNoValueIsNull) {
-    EXPECT_TRUE(std::holds_alternative<std::monostate>(runScript("fn f() { return; } f();").data));
-  }
+  TEST(Evaluator, ReturnNoValueIsNull) { EXPECT_TRUE(std::holds_alternative<std::monostate>(runScript("fn f() { return; } f();").data)); }
 
-  TEST(Evaluator, ImplicitReturnLastExpression) {
-    EXPECT_DOUBLE_EQ(std::get<double>(runScript("fn add(a, b) { a + b; } add(3, 4);").data), 7.0);
-  }
+  TEST(Evaluator, ImplicitReturnLastExpression) { EXPECT_DOUBLE_EQ(std::get<double>(runScript("fn add(a, b) { a + b; } add(3, 4);").data), 7.0); }
 
   TEST(Evaluator, ClosureCapturesEnvironment) {
     // getX closes over the environment; mutation after definition is visible
@@ -436,10 +385,7 @@ namespace { // Functions and closures
     EXPECT_DOUBLE_EQ(std::get<double>(v.data), 8.0);
   }
 
-  TEST(Evaluator, Recursion) {
-    EXPECT_DOUBLE_EQ(std::get<double>(
-      runScript("fn fact(n) { if (n <= 1) { return 1; } return n * fact(n - 1); } fact(5);").data), 120.0);
-  }
+  TEST(Evaluator, Recursion) { EXPECT_DOUBLE_EQ(std::get<double>(runScript("fn fact(n) { if (n <= 1) { return 1; } return n * fact(n - 1); } fact(5);").data), 120.0); }
 
   TEST(Evaluator, FunctionAsFirstClassValue) {
     auto v = runScript("fn apply(f, x) { return f(x); }"
@@ -471,13 +417,9 @@ namespace { // Arrays
     EXPECT_DOUBLE_EQ(std::get<double>((*std::get<eval::Array>(v.data))[0].data), 1.0);
   }
 
-  TEST(Evaluator, ArraySubscript) {
-    EXPECT_DOUBLE_EQ(std::get<double>(runScript("[10, 20, 30][1];").data), 20.0);
-  }
+  TEST(Evaluator, ArraySubscript) { EXPECT_DOUBLE_EQ(std::get<double>(runScript("[10, 20, 30][1];").data), 20.0); }
 
-  TEST(Evaluator, ArrayLength) {
-    EXPECT_DOUBLE_EQ(std::get<double>(runScript("[1, 2, 3].length;").data), 3.0);
-  }
+  TEST(Evaluator, ArrayLength) { EXPECT_DOUBLE_EQ(std::get<double>(runScript("[1, 2, 3].length;").data), 3.0); }
 
   TEST(Evaluator, PushAndPop) {
     auto v = runScript("pin arr = [];"
@@ -630,33 +572,19 @@ namespace { // Inheritance and super
 
 namespace { // Built-ins
 
-  TEST(Evaluator, LenOnArray) {
-    EXPECT_DOUBLE_EQ(std::get<double>(runScript("len([1, 2, 3]);").data), 3.0);
-  }
+  TEST(Evaluator, LenOnArray) { EXPECT_DOUBLE_EQ(std::get<double>(runScript("len([1, 2, 3]);").data), 3.0); }
 
-  TEST(Evaluator, LenOnString) {
-    EXPECT_DOUBLE_EQ(std::get<double>(runScript(R"(len("hello");)").data), 5.0);
-  }
+  TEST(Evaluator, LenOnString) { EXPECT_DOUBLE_EQ(std::get<double>(runScript(R"(len("hello");)").data), 5.0); }
 
-  TEST(Evaluator, TypeOfNumber) {
-    EXPECT_EQ(std::get<std::string>(runScript("type(1);").data), "num");
-  }
+  TEST(Evaluator, TypeOfNumber) { EXPECT_EQ(std::get<std::string>(runScript("type(1);").data), "num"); }
 
-  TEST(Evaluator, TypeOfString) {
-    EXPECT_EQ(std::get<std::string>(runScript(R"(type("x");)").data), "string");
-  }
+  TEST(Evaluator, TypeOfString) { EXPECT_EQ(std::get<std::string>(runScript(R"(type("x");)").data), "string"); }
 
-  TEST(Evaluator, TypeOfBool) {
-    EXPECT_EQ(std::get<std::string>(runScript("type(true);").data), "bool");
-  }
+  TEST(Evaluator, TypeOfBool) { EXPECT_EQ(std::get<std::string>(runScript("type(true);").data), "bool"); }
 
-  TEST(Evaluator, TypeOfNull) {
-    EXPECT_EQ(std::get<std::string>(runScript("type(null);").data), "null");
-  }
+  TEST(Evaluator, TypeOfNull) { EXPECT_EQ(std::get<std::string>(runScript("type(null);").data), "null"); }
 
-  TEST(Evaluator, TypeOfArray) {
-    EXPECT_EQ(std::get<std::string>(runScript("type([]);").data), "array");
-  }
+  TEST(Evaluator, TypeOfArray) { EXPECT_EQ(std::get<std::string>(runScript("type([]);").data), "array"); }
 
   TEST(Evaluator, StrConversion) {
     // toString strips trailing zeros: 42.0 -> "42"
@@ -666,93 +594,53 @@ namespace { // Built-ins
     EXPECT_EQ(std::get<std::string>(runScript("str(null);").data), "null");
   }
 
-  TEST(Evaluator, NumFromString) {
-    EXPECT_DOUBLE_EQ(std::get<double>(runScript(R"(num("3.14");)").data), 3.14);
-  }
+  TEST(Evaluator, NumFromString) { EXPECT_DOUBLE_EQ(std::get<double>(runScript(R"(num("3.14");)").data), 3.14); }
 
   TEST(Evaluator, NumFromBool) {
     EXPECT_DOUBLE_EQ(std::get<double>(runScript("num(true);").data), 1.0);
     EXPECT_DOUBLE_EQ(std::get<double>(runScript("num(false);").data), 0.0);
   }
 
-  TEST(Evaluator, NumFromNumber) {
-    EXPECT_DOUBLE_EQ(std::get<double>(runScript("num(7);").data), 7.0);
-  }
+  TEST(Evaluator, NumFromNumber) { EXPECT_DOUBLE_EQ(std::get<double>(runScript("num(7);").data), 7.0); }
 
 } // namespace
 
 namespace { // Runtime errors
 
-  TEST(Evaluator, UndefinedVariable) {
-    EXPECT_THROW(runScript("undefinedVar;"), std::runtime_error);
-  }
+  TEST(Evaluator, UndefinedVariable) { EXPECT_THROW(runScript("undefinedVar;"), std::runtime_error); }
 
-  TEST(Evaluator, DivisionByZero) {
-    EXPECT_THROW(runScript("1 / 0;"), std::runtime_error);
-  }
+  TEST(Evaluator, DivisionByZero) { EXPECT_THROW(runScript("1 / 0;"), std::runtime_error); }
 
-  TEST(Evaluator, ModuloByZero) {
-    EXPECT_THROW(runScript("5 % 0;"), std::runtime_error);
-  }
+  TEST(Evaluator, ModuloByZero) { EXPECT_THROW(runScript("5 % 0;"), std::runtime_error); }
 
-  TEST(Evaluator, CallNonFunction) {
-    EXPECT_THROW(runScript("pin x = 5; x();"), std::runtime_error);
-  }
+  TEST(Evaluator, CallNonFunction) { EXPECT_THROW(runScript("pin x = 5; x();"), std::runtime_error); }
 
-  TEST(Evaluator, WrongArgCount) {
-    EXPECT_THROW(runScript("fn f(a) {} f(1, 2);"), std::runtime_error);
-  }
+  TEST(Evaluator, WrongArgCount) { EXPECT_THROW(runScript("fn f(a) {} f(1, 2);"), std::runtime_error); }
 
-  TEST(Evaluator, UnaryMinusOnNonNumber) {
-    EXPECT_THROW(runScript(R"(-"hello";)"), std::runtime_error);
-  }
+  TEST(Evaluator, UnaryMinusOnNonNumber) { EXPECT_THROW(runScript(R"(-"hello";)"), std::runtime_error); }
 
-  TEST(Evaluator, ArrayIndexOutOfBounds) {
-    EXPECT_THROW(runScript("[1, 2][5];"), std::runtime_error);
-  }
+  TEST(Evaluator, ArrayIndexOutOfBounds) { EXPECT_THROW(runScript("[1, 2][5];"), std::runtime_error); }
 
-  TEST(Evaluator, ArrayNegativeIndex) {
-    EXPECT_THROW(runScript("[1, 2][-1];"), std::runtime_error);
-  }
+  TEST(Evaluator, ArrayNegativeIndex) { EXPECT_THROW(runScript("[1, 2][-1];"), std::runtime_error); }
 
-  TEST(Evaluator, MemberAccessOnNonInstance) {
-    EXPECT_THROW(runScript("pin x = 5; x.field;"), std::runtime_error);
-  }
+  TEST(Evaluator, MemberAccessOnNonInstance) { EXPECT_THROW(runScript("pin x = 5; x.field;"), std::runtime_error); }
 
-  TEST(Evaluator, NewUnknownClass) {
-    EXPECT_THROW(runScript("new Unknown();"), std::runtime_error);
-  }
+  TEST(Evaluator, NewUnknownClass) { EXPECT_THROW(runScript("new Unknown();"), std::runtime_error); }
 
-  TEST(Evaluator, NewWithArgsButNoConstructor) {
-    EXPECT_THROW(runScript("class Empty {} new Empty(1);"), std::runtime_error);
-  }
+  TEST(Evaluator, NewWithArgsButNoConstructor) { EXPECT_THROW(runScript("class Empty {} new Empty(1);"), std::runtime_error); }
 
-  TEST(Evaluator, SuperOutsideMethod) {
-    EXPECT_THROW(runScript("super->x;"), std::runtime_error);
-  }
+  TEST(Evaluator, SuperOutsideMethod) { EXPECT_THROW(runScript("super->x;"), std::runtime_error); }
 
-  TEST(Evaluator, ExtendsUnknownClass) {
-    EXPECT_THROW(runScript("class Dog extends NoSuchAnimal {}"), std::runtime_error);
-  }
+  TEST(Evaluator, ExtendsUnknownClass) { EXPECT_THROW(runScript("class Dog extends NoSuchAnimal {}"), std::runtime_error); }
 
-  TEST(Evaluator, PopOnEmptyArray) {
-    EXPECT_THROW(runScript("pop([]);"), std::runtime_error);
-  }
+  TEST(Evaluator, PopOnEmptyArray) { EXPECT_THROW(runScript("pop([]);"), std::runtime_error); }
 
-  TEST(Evaluator, LenWrongArgCount) {
-    EXPECT_THROW(runScript("len(1, 2);"), std::runtime_error);
-  }
+  TEST(Evaluator, LenWrongArgCount) { EXPECT_THROW(runScript("len(1, 2);"), std::runtime_error); }
 
-  TEST(Evaluator, LenOnNonArrayOrString) {
-    EXPECT_THROW(runScript("len(42);"), std::runtime_error);
-  }
+  TEST(Evaluator, LenOnNonArrayOrString) { EXPECT_THROW(runScript("len(42);"), std::runtime_error); }
 
-  TEST(Evaluator, NumFromNonConvertible) {
-    EXPECT_THROW(runScript("num(null);"), std::runtime_error);
-  }
+  TEST(Evaluator, NumFromNonConvertible) { EXPECT_THROW(runScript("num(null);"), std::runtime_error); }
 
-  TEST(Evaluator, NumFromInvalidString) {
-    EXPECT_THROW(runScript(R"(num("not a number");)"), std::runtime_error);
-  }
+  TEST(Evaluator, NumFromInvalidString) { EXPECT_THROW(runScript(R"(num("not a number");)"), std::runtime_error); }
 
 } // namespace

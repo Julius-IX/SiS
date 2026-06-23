@@ -8,16 +8,18 @@ class TestParser : public par::Parser {
   public:
   // Parse a raw source string and return whether it succeeded.
   bool parseSource(const std::string& source) {
-    // Wire hooks: no file I/O, dummy error formatter, no include resolution.
     m_hooks.read_file = [](const Path&) -> std::optional<std::string> { return std::nullopt; };
     m_hooks.format_error = [](par::State*, const lex::Token& t, std::string_view msg) -> std::string { return fmt::format("{}:{}: {}", t.line, t.column, msg); };
     m_hooks.resolve_file = [](const Path&, const Path&) -> std::optional<Path> { return std::nullopt; };
 
+    Path dummy("<test>");
     par::State state{
       .lexer = std::make_unique<lex::Lexer>(source),
       .last_token = {},
     };
-    return parse(&state);
+    bool ok = parse(&state);
+    if (ok) registerTestState(dummy, std::move(state));
+    return ok;
   }
 };
 

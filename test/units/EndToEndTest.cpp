@@ -48,7 +48,7 @@ namespace {
     close(out_fd);
 
     eval::Evaluator evaluator;
-    eval::Value result = evaluator.run(parser.peekRoot());
+    eval::Value result = evaluator.run(parser);
 
     fflush(stdout);
     dup2(saved_fd, STDOUT_FILENO);
