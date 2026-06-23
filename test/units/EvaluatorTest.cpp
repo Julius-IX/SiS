@@ -680,3 +680,79 @@ namespace { // Built-ins
   }
 
 } // namespace
+
+namespace { // Runtime errors
+
+  TEST(Evaluator, UndefinedVariable) {
+    EXPECT_THROW(runScript("undefinedVar;"), std::runtime_error);
+  }
+
+  TEST(Evaluator, DivisionByZero) {
+    EXPECT_THROW(runScript("1 / 0;"), std::runtime_error);
+  }
+
+  TEST(Evaluator, ModuloByZero) {
+    EXPECT_THROW(runScript("5 % 0;"), std::runtime_error);
+  }
+
+  TEST(Evaluator, CallNonFunction) {
+    EXPECT_THROW(runScript("pin x = 5; x();"), std::runtime_error);
+  }
+
+  TEST(Evaluator, WrongArgCount) {
+    EXPECT_THROW(runScript("fn f(a) {} f(1, 2);"), std::runtime_error);
+  }
+
+  TEST(Evaluator, UnaryMinusOnNonNumber) {
+    EXPECT_THROW(runScript(R"(-"hello";)"), std::runtime_error);
+  }
+
+  TEST(Evaluator, ArrayIndexOutOfBounds) {
+    EXPECT_THROW(runScript("[1, 2][5];"), std::runtime_error);
+  }
+
+  TEST(Evaluator, ArrayNegativeIndex) {
+    EXPECT_THROW(runScript("[1, 2][-1];"), std::runtime_error);
+  }
+
+  TEST(Evaluator, MemberAccessOnNonInstance) {
+    EXPECT_THROW(runScript("pin x = 5; x.field;"), std::runtime_error);
+  }
+
+  TEST(Evaluator, NewUnknownClass) {
+    EXPECT_THROW(runScript("new Unknown();"), std::runtime_error);
+  }
+
+  TEST(Evaluator, NewWithArgsButNoConstructor) {
+    EXPECT_THROW(runScript("class Empty {} new Empty(1);"), std::runtime_error);
+  }
+
+  TEST(Evaluator, SuperOutsideMethod) {
+    EXPECT_THROW(runScript("super->x;"), std::runtime_error);
+  }
+
+  TEST(Evaluator, ExtendsUnknownClass) {
+    EXPECT_THROW(runScript("class Dog extends NoSuchAnimal {}"), std::runtime_error);
+  }
+
+  TEST(Evaluator, PopOnEmptyArray) {
+    EXPECT_THROW(runScript("pop([]);"), std::runtime_error);
+  }
+
+  TEST(Evaluator, LenWrongArgCount) {
+    EXPECT_THROW(runScript("len(1, 2);"), std::runtime_error);
+  }
+
+  TEST(Evaluator, LenOnNonArrayOrString) {
+    EXPECT_THROW(runScript("len(42);"), std::runtime_error);
+  }
+
+  TEST(Evaluator, NumFromNonConvertible) {
+    EXPECT_THROW(runScript("num(null);"), std::runtime_error);
+  }
+
+  TEST(Evaluator, NumFromInvalidString) {
+    EXPECT_THROW(runScript(R"(num("not a number");)"), std::runtime_error);
+  }
+
+} // namespace
