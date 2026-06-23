@@ -26,6 +26,8 @@ namespace eval {
     explicit Environment(std::shared_ptr<Environment> parent = nullptr)
       : m_parent(std::move(parent)) {}
 
+    [[nodiscard]] std::unordered_map<std::string, Value> snapshot() const { return m_values; }
+
     // Introduces a new variable in THIS scope. Used by VarDecl and for
     // binding function parameters. Always creates/overwrites locally, never
     // touches a parent scope, that's what assign() is for.

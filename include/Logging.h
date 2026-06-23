@@ -125,7 +125,7 @@ class Logger {
   // Constructs the default logger with stdout and stderr color sinks.
   Logger() {
     std::vector<spdlog::sink_ptr> sinks = {
-        std::make_shared<spdlog::sinks::stdout_color_sink_mt>(),
+        std::make_shared<spdlog::sinks::stderr_color_sink_mt>(), // stderr to prevent tests from failing due to stdout capturing in tests
     };
     m_default = std::make_shared<spdlog::logger>(DEFAULT_LOGGER_NAME, sinks.begin(), sinks.end());
     m_default->set_level(DEFAULT_LOG_LEVEL);

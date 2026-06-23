@@ -48,7 +48,7 @@ namespace {
     close(out_fd);
 
     eval::Evaluator evaluator;
-    eval::Value result = evaluator.run(parser.peekRoot());
+    eval::Value result = evaluator.run(parser);
 
     fflush(stdout);
     dup2(saved_fd, STDOUT_FILENO);
@@ -446,7 +446,6 @@ namespace { // Include resolution
   }
 
   TEST_F(E2E, DoubleIncludeThrowsCircularInclude) {
-    // The parser treats re-including an already-included file as a circular
     // include error rather than silently skipping it.
     EXPECT_THROW(run("includes/double_include.sis"), std::runtime_error);
   }

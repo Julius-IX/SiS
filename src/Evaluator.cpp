@@ -1,4 +1,5 @@
 #include <Evaluator.h>
+#include <NativeFunctions.h>
 #include <Token.h>
 #include <algorithm>
 #include <cmath>
@@ -36,9 +37,7 @@ namespace eval {
 
   // Equality between two runtime values. Different variant alternatives are
   // never equal (a number is never == a string, even "0" and 0). Arrays and
-  // instances compare by identity (same underlying storage), not by
-  // contents, that's a deliberate simplification, swap for a deep compare
-  // later if you want value semantics instead.
+  // instances compare by identity (same underlying storage), not by contents
   static bool valuesEqual(const Value& a, const Value& b) {
     if (a.data.index() != b.data.index()) return false;
     return std::visit(
@@ -75,130 +74,9 @@ namespace eval {
   // themselves.
   // ---------------------------------------------------------------------
   void Evaluator::registerBuiltins(const std::shared_ptr<Environment>& env) {
-    env->define("print",
-                Value(NativeFunction{
-                  .name = "print",
-                  .fn = [](std::vector<Value>& args) -> Value {
-                    for (size_t i = 0; i < args.size(); ++i) {
-                      fmt::print("{}", args[i].toString());
-                      if (i + 1 < args.size()) fmt::print(" ");
-                    }
-                    fmt::print("\n");
-                    return Value{};
-                  },
-                }));
-
-    env->define("len",
-                Value(NativeFunction{
-                  .name = "len",
-                  .fn = [](std::vector<Value>& args) -> Value {
-                    if (args.size() != 1) {
-                      throw std::runtime_error("len() expects exactly 1 argument, got " + std::to_string(args.size()));
-                    }
-                    if (const auto* arr = std::get_if<Array>(&args[0].data)) {
-                      return Value(static_cast<double>((*arr)->size()));
-                    }
-                    if (const auto* str = std::get_if<std::string>(&args[0].data)) {
-                      return Value(static_cast<double>(str->size()));
-                    }
-                    throw std::runtime_error("len() expects an array or string, got " + args[0].typeName());
-                  },
-                }));
-
-    env->define("type",
-                Value(NativeFunction{
-                  .name = "type",
-                  .fn = [](std::vector<Value>& args) -> Value {
-                    if (args.size() != 1) {
-                      throw std::runtime_error("type() expects exactly 1 argument, got " + std::to_string(args.size()));
-                    }
-                    return Value(args[0].typeName());
-                  },
-                }));
-
-    env->define("str",
-                Value(NativeFunction{
-                  .name = "str",
-                  .fn = [](std::vector<Value>& args) -> Value {
-                    if (args.size() != 1) {
-                      throw std::runtime_error("str() expects exactly 1 argument, got " + std::to_string(args.size()));
-                    }
-                    return Value(args[0].toString());
-                  },
-                }));
-
-    env->define("num",
-                Value(NativeFunction{
-                  .name = "num",
-                  .fn = [](std::vector<Value>& args) -> Value {
-                    if (args.size() != 1) {
-                      throw std::runtime_error("num() expects exactly 1 argument, got " + std::to_string(args.size()));
-                    }
-                    if (const auto* d = std::get_if<double>(&args[0].data)) {
-                      return Value(*d);
-                    }
-                    if (const auto* s = std::get_if<std::string>(&args[0].data)) {
-                      try {
-                        return Value(std::stod(*s));
-                      } catch (const std::exception&) {
-                        throw std::runtime_error("num(): could not convert string '" + *s + "' to a number");
-                      }
-                    }
-                    if (const auto* b = std::get_if<bool>(&args[0].data)) {
-                      return Value(*b ? 1.0 : 0.0);
-                    }
-                    throw std::runtime_error("num() cannot convert a value of type " + args[0].typeName());
-                  },
-                }));
-
-    env->define("push",
-                Value(NativeFunction{
-                  .name = "push",
-                  .fn = [](std::vector<Value>& args) -> Value {
-                    if (args.size() != 2) {
-                      throw std::runtime_error("push() expects exactly 2 arguments (array, value), got " + std::to_string(args.size()));
-                    }
-                    const auto* arr = std::get_if<Array>(&args[0].data);
-                    if (!arr || !*arr) {
-                      throw std::runtime_error("push() expects an array as its first argument, got " + args[0].typeName());
-                    }
-                    (*arr)->push_back(args[1]);
-                    return args[0];
-                  },
-                }));
-
-    env->define("pop",
-                Value(NativeFunction{
-                  .name = "pop",
-                  .fn = [](std::vector<Value>& args) -> Value {
-                    if (args.size() != 1) {
-                      throw std::runtime_error("pop() expects exactly 1 argument, got " + std::to_string(args.size()));
-                    }
-                    const auto* arr = std::get_if<Array>(&args[0].data);
-                    if (!arr || !*arr || (*arr)->empty()) {
-                      throw std::runtime_error("pop() expects a non-empty array");
-                    }
-                    Value back = (*arr)->back();
-                    (*arr)->pop_back();
-                    return back;
-                  },
-                }));
-
-    env->define("read",
-                Value(NativeFunction{
-                  .name = "read",
-                  .fn = [](std::vector<Value>& args) -> Value {
-                    if (args.size() > 1) {
-                      throw std::runtime_error("read() expects at most 1 argument, got " + std::to_string(args.size()));
-                    }
-                    if (args.size() == 1) {
-                      fmt::print("{}", args[0].toString());
-                    }
-                    std::string input;
-                    std::getline(std::cin, input);
-                    return Value{input};
-                  },
-                }));
+    for (const auto& [name, fn] : native_functions) {
+      env->define(name, Value(fn));
+    }
   }
 
   Evaluator::Evaluator()
@@ -206,7 +84,78 @@ namespace eval {
     registerBuiltins(m_global);
   }
 
-  Value Evaluator::run(const par::Block& program) { return evalBlock(&program, m_global); }
+  void Evaluator::mergeIntoEnv(const std::shared_ptr<Environment>& src, const std::shared_ptr<Environment>& dst) {
+    for (auto& [name, val] : src->snapshot()) {
+      dst->define(name, val);
+    }
+  }
+
+  std::shared_ptr<Environment> Evaluator::loadFile(const Path& path, const par::Block& block, const std::vector<Path>& deps, Value* out_last) {
+    LOG_DEBUG_FLUSH("loading .sis file");
+    if (auto it = m_file_cache.find(path); it != m_file_cache.end()) {
+      return it->second;
+    }
+
+    auto file_env = std::make_shared<Environment>(m_global);
+
+    for (const Path& dep : deps) {
+      if (auto it = m_file_cache.find(dep); it != m_file_cache.end()) mergeIntoEnv(it->second, file_env);
+    }
+
+    Value last{};
+    for (const auto& stmt : block.statements) {
+      last = evaluate(stmt.get(), file_env);
+    }
+    if (out_last != nullptr) *out_last = last;
+
+    m_file_cache[path] = file_env;
+    return file_env;
+  }
+
+  std::shared_ptr<Environment> Evaluator::loadDynamicLib(const Path& path, const std::vector<Path>& deps) {
+    LOG_DEBUG_FLUSH("loading dynamic lib");
+    if (auto it = m_file_cache.find(path); it != m_file_cache.end()) return it->second;
+
+    auto lib_env = std::make_shared<Environment>(m_global);
+
+    for (const Path& dep : deps) {
+      if (auto it = m_file_cache.find(dep); it != m_file_cache.end()) mergeIntoEnv(it->second, lib_env);
+    }
+
+#ifdef __unix__
+    void* handle = dlopen(path.c_str(), RTLD_LAZY | RTLD_GLOBAL);
+    if (handle == nullptr) throw std::runtime_error(std::string("failed to load: ") + dlerror());
+
+    using InitFn = void (*)(eval::SisRegistry*);
+    auto init = reinterpret_cast<InitFn>(dlsym(handle, "sis_module_init"));
+    if (init == nullptr) {
+      dlclose(handle);
+      throw std::runtime_error("sis_module_init not found in: " + path.string());
+    }
+
+    eval::SisRegistry registry{.env = lib_env, .classes = m_classes};
+    init(&registry);
+#elif _WIN32
+    throw std::runtime_error("native libs not yet supported on windows");
+#endif
+
+    m_file_cache[path] = lib_env;
+    return lib_env;
+  }
+
+  Value Evaluator::run(const par::Parser& parser) {
+    Value last{};
+    for (const Path& path : parser.loadOrder()) {
+      const par::State& state = parser.getState(path);
+
+      bool is_dynamic = path.extension() == ".so" || path.extension() == ".dll" || path.extension() == ".dylib";
+
+      std::shared_ptr<Environment> file_env = is_dynamic ? loadDynamicLib(path, state.includes) : loadFile(path, *state.block, state.includes, &last);
+
+      mergeIntoEnv(file_env, m_global);
+    }
+    return last;
+  }
 
   // Central dispatch. Every parseX function in the parser has a matching
   // evalX function here, same shape as Parser::printNode, switch on
@@ -468,13 +417,13 @@ namespace eval {
 
       Value object = evaluate(subscript->object.get(), env);
       const auto* arr = std::get_if<Array>(&object.data);
-      if (!arr || !*arr) {
+      if ((arr == nullptr) || !*arr) {
         throw std::runtime_error("Subscript assignment requires an array, got " + object.typeName());
       }
 
       Value idx = evaluate(subscript->index.get(), env);
       const auto* d = std::get_if<double>(&idx.data);
-      if (!d) {
+      if (d == nullptr) {
         throw std::runtime_error("Array index must be a number, got " + idx.typeName());
       }
       const auto i = static_cast<size_t>(*d);
@@ -639,7 +588,7 @@ namespace eval {
     for (const auto& elem : node->elements) {
       elements->push_back(evaluate(elem.get(), env));
     }
-    return Value(elements);
+    return {elements};
   }
 
   // obj[index]. Arrays index by number (truncated to size_t, bounds
@@ -668,7 +617,7 @@ namespace eval {
       if (i >= str->size()) {
         throw std::runtime_error("String index " + std::to_string(i) + " out of bounds (length " + std::to_string(str->size()) + ")");
       }
-      return Value(std::string(1, (*str)[i]));
+      return {std::string(1, (*str)[i])};
     }
 
     throw std::runtime_error("Subscript is not supported on a value of type " + object.typeName());
@@ -710,7 +659,7 @@ namespace eval {
       throw std::runtime_error("'super' used outside of a method body");
     }
     const auto* defining_class = std::get_if<std::shared_ptr<Class>>(&defining_class_val->data);
-    if (!defining_class || !*defining_class || !(*defining_class)->parent) {
+    if ((defining_class == nullptr) || !*defining_class || !(*defining_class)->parent) {
       throw std::runtime_error("'super' used in a class with no parent (no 'extends')");
     }
 
@@ -721,22 +670,27 @@ namespace eval {
   // callers (super->) look up methods starting somewhere other than the
   // instance's own runtime class.
   //
-  // Resolution order: fields first, then methods. A class can't have a
-  // field and a method with the same name anyway (nothing stops you from
-  // writing one today, but field lookup always wins since it's checked
-  // first, consider that a "first one wins" rule rather than an error if
-  // you ever add a name clash, no validation exists for it yet).
+  // Resolution order: fields → AST methods → native methods.
+  // Fields always win over methods, same as before. AST methods are checked
+  // before native methods so that a .sis subclass can override a native
+  // method simply by declaring a method with the same name.
+  //
+  // Native methods are bound with `this` pre-injected as args[0] —
+  // resolveMember wraps the raw NativeFunction in a new NativeFunction that
+  // prepends the instance before forwarding the call. This means native
+  // method lambdas always receive (instance, user_args...) without any
+  // special dispatch needed in evalCall.
   Value Evaluator::resolveMember(const Value& object, const std::string& field, const par::Node* node, const std::shared_ptr<Class>& search_class) {
     if (const auto* arr = std::get_if<Array>(&object.data)) {
       if (field == "length") {
-        return Value(static_cast<double>((*arr)->size()));
+        return {static_cast<double>((*arr)->size())};
       }
       throw std::runtime_error("Array has no member '" + field + "'");
     }
 
     if (const auto* str = std::get_if<std::string>(&object.data)) {
       if (field == "length") {
-        return Value(static_cast<double>(str->size()));
+        return {static_cast<double>(str->size())};
       }
       throw std::runtime_error("String has no member '" + field + "'");
     }
@@ -749,12 +703,9 @@ namespace eval {
       }
 
       std::shared_ptr<Class> lookup_class = search_class ? search_class : instance->get()->klass;
-      std::shared_ptr<Class> owner;
-      const Function* method = lookup_class->findMethod(field, &owner);
-      if (method == nullptr) {
-        throw std::runtime_error("'" + instance->get()->klass->name + "' has no field or method '" + field + "'");
-      }
 
+      // AST method path — same as before, creates a bound closure scope so
+      // `this` and `__class__` are available inside the method body.
       // Bind `this` (and `__class__`) by creating a fresh closure scope
       // (parented to the method's original closure, NOT the call site, same
       // lexical-scoping rule as ordinary closures) with both predefined.
@@ -770,12 +721,36 @@ namespace eval {
       // node has no idea it ever came from a MemberAccess. `__class__` is
       // what makes super-> inside an ordinary method (not just inside a
       // constructor) resolve to the right ancestor, see evalSuperAccess.
-      auto bound_scope = std::make_shared<Environment>(method->closure);
-      bound_scope->define("this", object);
-      if (owner) {
-        bound_scope->define("__class__", Value(owner));
+      std::shared_ptr<Class> owner;
+      const Function* method = lookup_class->findMethod(field, &owner);
+      if (method != nullptr) {
+        auto bound_scope = std::make_shared<Environment>(method->closure);
+        bound_scope->define("this", object);
+        if (owner) {
+          bound_scope->define("__class__", Value(owner));
+        }
+        return Value(Function{.declaration = method->declaration, .closure = bound_scope});
       }
-      return Value(Function{.declaration = method->declaration, .closure = bound_scope});
+
+      // Native method path — wrap the raw NativeFunction so that `this`
+      // (the instance) is injected as args[0] before the user's arguments.
+      // The lambda in NativeClassBuilder::method() then unwraps args[0]
+      // back to shared_ptr<Instance> and shifts user args to args[1..n].
+      std::shared_ptr<Class> native_owner;
+      const NativeFunction* native_method = lookup_class->findNativeMethod(field, &native_owner);
+      if (native_method != nullptr) {
+        Value bound_this = object;
+        NativeFunction bound{.name = native_method->name, .fn = [raw_fn = native_method->fn, bound_this](std::vector<Value>& args) mutable -> Value {
+                               std::vector<Value> full_args;
+                               full_args.reserve(args.size() + 1);
+                               full_args.push_back(bound_this);
+                               full_args.insert(full_args.end(), args.begin(), args.end());
+                               return raw_fn(full_args);
+                             }};
+        return Value(std::move(bound));
+      }
+
+      throw std::runtime_error("'" + instance->get()->klass->name + "' has no field or method '" + field + "'");
     }
 
     throw std::runtime_error("Member access on '" + field + "' is not supported on a value of type " + object.typeName());
@@ -829,7 +804,7 @@ namespace eval {
 
     m_classes[node->name] = klass;
     env->define(node->name, Value(klass));
-    return Value(klass);
+    return {klass};
   }
 
   // new ClassName(args)
@@ -841,13 +816,15 @@ namespace eval {
   // defaults can reference sibling fields initialized earlier in the chain.
   // Child field defaults overwrite any same-named field set by an ancestor.
   //
-  // After fields are populated, the constructor is looked up via the normal
-  // method-resolution chain (klass->findMethod, walks up through parents
-  // same as any other method call) and invoked with `this` bound to the new
-  // instance and `defining_class` set to whichever class actually DEFINES
-  // the constructor that ran, so a super->constructor() call inside it
-  // resolves starting from THAT class's parent. If no constructor exists
-  // anywhere in the chain, construction succeeds with only field defaults applied.
+  // Native classes use default_fields instead of declaration->fields since
+  // they have no AST. The two paths are identical in effect: populate the
+  // instance's field map before the constructor runs.
+  //
+  // After fields are populated, the constructor is looked up first via the
+  // normal AST method-resolution chain (klass->findMethod), then via the
+  // native method chain (klass->findNativeMethod) as a fallback. If no
+  // constructor exists anywhere in the chain, construction succeeds with
+  // only field defaults applied.
   Value Evaluator::evalNewExpr(const par::NewExpr* node, const std::shared_ptr<Environment>& env) {
     auto class_it = m_classes.find(node->class_name);
     if (class_it == m_classes.end()) {
@@ -867,14 +844,28 @@ namespace eval {
     Value instance_value(instance);
 
     for (Class* c : chain) {
-      for (const auto& field_decl : c->declaration->fields) {
-        auto field_init_env = std::make_shared<Environment>(env);
-        field_init_env->define("this", instance_value);
-        Value default_value = field_decl->initializer ? evaluate(field_decl->initializer.get(), field_init_env) : Value{};
-        (*fields)[field_decl->name] = std::move(default_value);
+      if (c->declaration != nullptr) {
+        // AST class: evaluate field defaults from the declaration node.
+        // Each field gets its own child env with `this` bound so defaults
+        // can reference sibling fields initialized earlier.
+        for (const auto& field_decl : c->declaration->fields) {
+          auto field_init_env = std::make_shared<Environment>(env);
+          field_init_env->define("this", instance_value);
+          Value default_value = field_decl->initializer ? evaluate(field_decl->initializer.get(), field_init_env) : Value{};
+          (*fields)[field_decl->name] = std::move(default_value);
+        }
+      } else {
+        // Native class: copy default_fields directly — these are plain Values
+        // registered at lib load time via NativeClassBuilder::field(), no
+        // evaluation needed.
+        for (const auto& [fname, fval] : c->default_fields) {
+          (*fields)[fname] = fval;
+        }
       }
     }
 
+    // AST constructor takes priority. Looked up via the normal method chain
+    // so a .sis subclass of a native class can define its own constructor.
     std::shared_ptr<Class> owner;
     const Function* ctor = klass->findMethod("constructor", &owner);
     if (ctor != nullptr) {
@@ -883,10 +874,22 @@ namespace eval {
       for (const auto& arg : node->args) {
         args.push_back(evaluate(arg.get(), env));
       }
-
       callFunction(*ctor, std::move(args), node, instance_value, owner);
-    } else if (!node->args.empty()) {
-      throw std::runtime_error("Class '" + node->class_name + "' has no constructor but was called with arguments");
+    } else {
+      // Native constructor fallback — inject instance as args[0] same as
+      // resolveMember does for regular native method calls.
+      const NativeFunction* native_ctor = klass->findNativeMethod("constructor");
+      if (native_ctor != nullptr) {
+        std::vector<Value> args;
+        args.reserve(node->args.size() + 1);
+        args.push_back(instance_value);
+        for (const auto& arg : node->args) {
+          args.push_back(evaluate(arg.get(), env));
+        }
+        native_ctor->fn(args);
+      } else if (!node->args.empty()) {
+        throw std::runtime_error("Class '" + node->class_name + "' has no constructor but was called with arguments");
+      }
     }
 
     return instance_value;

@@ -1,12 +1,16 @@
 #pragma once
 
-#include <ParserNodeTypes.h>
 #include <functional>
 #include <memory>
 #include <string>
 #include <unordered_map>
 #include <variant>
 #include <vector>
+
+namespace par {
+  struct FnLiteral;
+  struct ClassDecl;
+}
 
 namespace eval {
   class Environment;
@@ -44,10 +48,12 @@ namespace eval {
   // first-class Value that can be passed around independent of any instance.
   struct Class : std::enable_shared_from_this<Class> {
     std::string name;
-    std::shared_ptr<Class> parent;     // nullptr if no `extends`
-    const par::ClassDecl* declaration; // non-owning, AST outlives evaluation
+    std::shared_ptr<Class> parent;
+    const par::ClassDecl* declaration; // nullptr for native classes
     std::unordered_map<std::string, Function> methods;
-
+    std::unordered_map<std::string, NativeFunction> native_methods; // methods implemented in C++
+    std::unordered_map<std::string, Value> default_fields;          // field defaults for native classes
+                                                                    // (AST classes use declaration->fields)
     // Walks up the parent chain looking for a method named `name`, declared
     // directly on this class or inherited. Returns nullptr if nobody in the
     // chain defines it. If `owner_out` is non-null, it's set to the class
@@ -58,10 +64,22 @@ namespace eval {
     [[nodiscard]] const Function* findMethod(const std::string& method_name, std::shared_ptr<Class>* owner_out = nullptr) {
       auto it = methods.find(method_name);
       if (it != methods.end()) {
-        if (owner_out) *owner_out = shared_from_this();
+        if (owner_out != nullptr) *owner_out = shared_from_this();
         return &it->second;
       }
       if (parent) return parent->findMethod(method_name, owner_out);
+      return nullptr;
+    }
+
+    // Same walk as findMethod but for native methods. Used by resolveMember
+    // and evalNewExpr to dispatch to C++-implemented methods/constructors.
+    [[nodiscard]] const NativeFunction* findNativeMethod(const std::string& method_name, std::shared_ptr<Class>* owner_out = nullptr) {
+      auto it = native_methods.find(method_name);
+      if (it != native_methods.end()) {
+        if (owner_out) *owner_out = shared_from_this();
+        return &it->second;
+      }
+      if (parent) return parent->findNativeMethod(method_name, owner_out);
       return nullptr;
     }
   };

@@ -1,9 +1,17 @@
 #pragma once
 
 #include <Environment.h>
+#include <Parser.h>
 #include <ParserNodeTypes.h>
+#include <SisRegistry.h>
 #include <Value.h>
+
+#include <filesystem>
 #include <memory>
+#include <unordered_map>
+#ifdef __unix__
+#include <dlfcn.h>
+#endif
 
 namespace eval {
   // Thrown to unwind the C++ call stack back up to the nearest enclosing
@@ -29,10 +37,11 @@ namespace eval {
     // in the global environment. Returns the value of the last statement,
     // mostly useful for REPL style usage, the return value doesn't matter for
     // running a script for its side effects.
-    Value run(const par::Block& program);
+    Value run(const par::Parser& parser);
 
     private:
     std::shared_ptr<Environment> m_global;
+    std::unordered_map<Path, std::shared_ptr<Environment>> m_file_cache;
 
     // Name -> runtime Class, populated as ClassDecl statements are
     // evaluated. Looked up by name from evalNewExpr and from MemberAccess
@@ -50,6 +59,10 @@ namespace eval {
     // single place to add a new built-in: define a NativeFunction and
     // env->define() it.
     static void registerBuiltins(const std::shared_ptr<Environment>& env);
+
+    std::shared_ptr<Environment> loadFile(const Path& path, const par::Block& block, const std::vector<Path>& deps, Value* out_last);
+    std::shared_ptr<Environment> loadDynamicLib(const Path& path, const std::vector<Path>& deps);
+    static void mergeIntoEnv(const std::shared_ptr<Environment>& src, const std::shared_ptr<Environment>& dst);
 
     Value evaluate(const par::Node* node, const std::shared_ptr<Environment>& env);
 
@@ -124,9 +137,11 @@ namespace eval {
     // is set, it's defined as "this" in that fresh scope (method call), and
     // `defining_class` (when set) is stashed as "__class__" so
     // evalSelfMemberAccess knows which class's parent to start searching from.
-    Value callFunction(
-      const Function& fn, std::vector<Value> args, const par::Node* call_node, const std::optional<Value>& bound_this = std::nullopt,
-      const std::shared_ptr<Class>& defining_class = nullptr);
+    Value callFunction(const Function& fn,
+                       std::vector<Value> args,
+                       const par::Node* call_node,
+                       const std::optional<Value>& bound_this = std::nullopt,
+                       const std::shared_ptr<Class>& defining_class = nullptr);
 
     // Shared implementation behind evalMemberAccess and evalSelfMemberAccess:
     // given an already-evaluated `object` Value and a field name, returns the
