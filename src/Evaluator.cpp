@@ -36,9 +36,7 @@ namespace eval {
 
   // Equality between two runtime values. Different variant alternatives are
   // never equal (a number is never == a string, even "0" and 0). Arrays and
-  // instances compare by identity (same underlying storage), not by
-  // contents, that's a deliberate simplification, swap for a deep compare
-  // later if you want value semantics instead.
+  // instances compare by identity (same underlying storage), not by contents
   static bool valuesEqual(const Value& a, const Value& b) {
     if (a.data.index() != b.data.index()) return false;
     return std::visit(
@@ -468,13 +466,13 @@ namespace eval {
 
       Value object = evaluate(subscript->object.get(), env);
       const auto* arr = std::get_if<Array>(&object.data);
-      if (!arr || !*arr) {
+      if ((arr == nullptr) || !*arr) {
         throw std::runtime_error("Subscript assignment requires an array, got " + object.typeName());
       }
 
       Value idx = evaluate(subscript->index.get(), env);
       const auto* d = std::get_if<double>(&idx.data);
-      if (!d) {
+      if (d == nullptr) {
         throw std::runtime_error("Array index must be a number, got " + idx.typeName());
       }
       const auto i = static_cast<size_t>(*d);
@@ -639,7 +637,7 @@ namespace eval {
     for (const auto& elem : node->elements) {
       elements->push_back(evaluate(elem.get(), env));
     }
-    return Value(elements);
+    return {elements};
   }
 
   // obj[index]. Arrays index by number (truncated to size_t, bounds
@@ -668,7 +666,7 @@ namespace eval {
       if (i >= str->size()) {
         throw std::runtime_error("String index " + std::to_string(i) + " out of bounds (length " + std::to_string(str->size()) + ")");
       }
-      return Value(std::string(1, (*str)[i]));
+      return {std::string(1, (*str)[i])};
     }
 
     throw std::runtime_error("Subscript is not supported on a value of type " + object.typeName());
@@ -710,7 +708,7 @@ namespace eval {
       throw std::runtime_error("'super' used outside of a method body");
     }
     const auto* defining_class = std::get_if<std::shared_ptr<Class>>(&defining_class_val->data);
-    if (!defining_class || !*defining_class || !(*defining_class)->parent) {
+    if ((defining_class == nullptr) || !*defining_class || !(*defining_class)->parent) {
       throw std::runtime_error("'super' used in a class with no parent (no 'extends')");
     }
 
@@ -722,21 +720,18 @@ namespace eval {
   // instance's own runtime class.
   //
   // Resolution order: fields first, then methods. A class can't have a
-  // field and a method with the same name anyway (nothing stops you from
-  // writing one today, but field lookup always wins since it's checked
-  // first, consider that a "first one wins" rule rather than an error if
-  // you ever add a name clash, no validation exists for it yet).
+  // field and a method with the same name anyway.
   Value Evaluator::resolveMember(const Value& object, const std::string& field, const par::Node* node, const std::shared_ptr<Class>& search_class) {
     if (const auto* arr = std::get_if<Array>(&object.data)) {
       if (field == "length") {
-        return Value(static_cast<double>((*arr)->size()));
+        return {static_cast<double>((*arr)->size())};
       }
       throw std::runtime_error("Array has no member '" + field + "'");
     }
 
     if (const auto* str = std::get_if<std::string>(&object.data)) {
       if (field == "length") {
-        return Value(static_cast<double>(str->size()));
+        return {static_cast<double>(str->size())};
       }
       throw std::runtime_error("String has no member '" + field + "'");
     }
@@ -829,7 +824,7 @@ namespace eval {
 
     m_classes[node->name] = klass;
     env->define(node->name, Value(klass));
-    return Value(klass);
+    return {klass};
   }
 
   // new ClassName(args)
