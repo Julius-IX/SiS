@@ -1,0 +1,6 @@
+class Parent {
+    fn value() { return 123; }
+}
+class Child extends Parent {}
+pin c = new Child();
+print(str(c.value()));

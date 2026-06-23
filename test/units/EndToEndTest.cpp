@@ -352,3 +352,35 @@ namespace { // Classes and OOP
   }
 
 } // namespace
+
+namespace { // Inheritance and super
+
+  TEST_F(E2E, ChildInheritsParentMethod) {
+    auto out = run("inheritance/inherit_method.sis");
+    EXPECT_EQ(out[0], "123");
+  }
+
+  TEST_F(E2E, OverriddenMethodDispatchesToChild) {
+    auto out = run("inheritance/override.sis");
+    EXPECT_EQ(out[0], "dog");
+  }
+
+  TEST_F(E2E, SuperCallsParentImplementation) {
+    auto out = run("inheritance/super_call.sis");
+    EXPECT_EQ(out[0], "parent+child");
+  }
+
+  TEST_F(E2E, MultiLevelInheritance) {
+    // Grandchild → Child → Parent; method lookup walks the full chain.
+    auto out = run("inheritance/multi_level.sis");
+    EXPECT_EQ(out[0], "grandchild");
+    EXPECT_EQ(out[1], "parent-value");
+  }
+
+  TEST_F(E2E, ChildFieldsDoNotClobberParentFields) {
+    auto out = run("inheritance/field_layering.sis");
+    EXPECT_EQ(out[0], "parent-field");
+    EXPECT_EQ(out[1], "child-field");
+  }
+
+} // namespace
