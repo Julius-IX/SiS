@@ -73,7 +73,7 @@
 //                constructor arguments, so it reads naturally:
 //                SIS_NATIVE_CTOR(NativeCounter, inst, ctr, initial);
 //
-// Internals (same trick as /stdlib/demo_stdlib.cpp, just hidden):
+// Internals (same trick as /stdlib/demo/demo_stdlib.cpp, just hidden):
 //   - Heap-allocates shared_ptr<CppType> via a "box" so we can recover it
 //     from a raw address stored as a double.
 //   - Puts two elements in the __native Array:
