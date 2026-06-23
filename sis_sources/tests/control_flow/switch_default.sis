@@ -1,0 +1,4 @@
+switch (99) {
+    case 1: { print("one"); break; }
+    default: { print("other"); }
+}

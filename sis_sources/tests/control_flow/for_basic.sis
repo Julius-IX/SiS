@@ -1,0 +1,3 @@
+pin sum = 0;
+for (pin i = 0; i < 5; i += 1) { sum += i; }
+print(str(sum));

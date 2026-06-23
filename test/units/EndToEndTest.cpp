@@ -170,3 +170,71 @@ namespace { // Variables and scoping
   }
 
 } // namespace
+
+namespace { // Control flow
+
+  TEST_F(E2E, IfElseTrueBranch) {
+    auto out = run("control_flow/if_else.sis");
+    EXPECT_EQ(out[0], "yes");
+  }
+
+  TEST_F(E2E, IfElseFalseBranch) {
+    auto out = run("control_flow/if_else_false.sis");
+    EXPECT_EQ(out[0], "no");
+  }
+
+  TEST_F(E2E, ElseIfChain) {
+    auto out = run("control_flow/else_if.sis");
+    EXPECT_EQ(out[0], "second");
+  }
+
+  TEST_F(E2E, TernaryTrueBranch) {
+    auto out = run("control_flow/ternary.sis");
+    EXPECT_EQ(out[0], "yes");
+    EXPECT_EQ(out[1], "no");
+  }
+
+  TEST_F(E2E, WhileLoopAccumulates) {
+    auto out = run("control_flow/while.sis");
+    EXPECT_EQ(out[0], "10"); // 0+1+2+3+4
+  }
+
+  TEST_F(E2E, WhileBreakExitsEarly) {
+    auto out = run("control_flow/while_break.sis");
+    EXPECT_EQ(out[0], "3"); // breaks when count reaches 3
+  }
+
+  TEST_F(E2E, WhileContinueSkipsIteration) {
+    // Skips index 3; sum = 0+1+2+4 = 7 (or whatever the .sis encodes).
+    auto out = run("control_flow/while_continue.sis");
+    EXPECT_EQ(out[0], "7");
+  }
+
+  TEST_F(E2E, ForLoopBasic) {
+    auto out = run("control_flow/for_basic.sis");
+    EXPECT_EQ(out[0], "10"); // 0+1+2+3+4
+  }
+
+  TEST_F(E2E, ForLoopBreak) {
+    auto out = run("control_flow/for_break.sis");
+    EXPECT_EQ(out[0], "3");
+  }
+
+  TEST_F(E2E, SwitchMatchesCase) {
+    auto out = run("control_flow/switch_match.sis");
+    EXPECT_EQ(out[0], "two");
+  }
+
+  TEST_F(E2E, SwitchFallsToDefault) {
+    auto out = run("control_flow/switch_default.sis");
+    EXPECT_EQ(out[0], "other");
+  }
+
+  TEST_F(E2E, SwitchBreakPreventsBleedthrough) {
+    // Only the matched case body runs; subsequent cases must not bleed through.
+    auto out = run("control_flow/switch_no_bleedthrough.sis");
+    ASSERT_EQ(out.size(), 1U);
+    EXPECT_EQ(out[0], "one");
+  }
+
+} // namespace
