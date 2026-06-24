@@ -5,9 +5,13 @@
 #include <cmath>
 #include <iostream>
 #include <print>
-#include <spdlog/fmt/fmt.h>
 #include <ranges>
+#include <spdlog/fmt/fmt.h>
 #include <stdexcept>
+
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 namespace eval {
   static bool isAssignmentOperator(lex::TokenType type) {
@@ -39,11 +43,8 @@ namespace eval {
 
     if (!m_call_stack.empty()) {
       full += "\nCall stack:";
-      for (auto & it : std::views::reverse(m_call_stack)) {
-        full += fmt::format("\n  called from {} [{}:{}]",
-          it.file ? it.file->string() : "<unknown>",
-          it.node ? it.node->line   : 0,
-          it.node ? it.node->column : 0);
+      for (auto& it : std::views::reverse(m_call_stack)) {
+        full += fmt::format("\n  called from {} [{}:{}]", it.file ? it.file->string() : "<unknown>", it.node ? it.node->line : 0, it.node ? it.node->column : 0);
       }
     }
 
@@ -165,7 +166,25 @@ namespace eval {
     eval::SisRegistry registry{.env = lib_env, .classes = m_classes};
     init(&registry);
 #elif _WIN32
-    throw std::runtime_error("native libs not yet supported on windows");
+    HMODULE handle = LoadLibraryA(path.string().c_str());
+    if (handle == nullptr) {
+      DWORD err = GetLastError();
+      throw std::runtime_error("failed to load: " + path.string() + " (error " + std::to_string(err) + ")");
+    }
+
+    using InitFn = void (*)(eval::SisRegistry*);
+    auto init = reinterpret_cast<InitFn>(GetProcAddress(handle, "sis_module_init"));
+
+    if (init == nullptr) {
+      FreeLibrary(handle);
+      throw std::runtime_error("sis_module_init not found in: " + path.string());
+    }
+
+    eval::SisRegistry registry{.env = lib_env, .classes = m_classes};
+    init(&registry);
+
+#else
+#error Unsupported platform
 #endif
 
     m_file_cache[path] = lib_env;
@@ -634,7 +653,7 @@ namespace eval {
   }
 
   // Records which source file each FnLiteral node was declared in. This is
-  // the other half of the file-tracking 
+  // the other half of the file-tracking
   // FIX: when callFunction later executes
   // the body, it looks up the declaration here to switch m_current_eval_file
   // to the right file, so errors inside the function report the correct source
@@ -995,7 +1014,7 @@ namespace eval {
 
     // Push the call site frame BEFORE switching files so the frame records
     // where the call was made from, not where execution is about to go.
-    m_call_stack.push_back({.file=m_current_eval_file, .node=call_node});
+    m_call_stack.push_back({.file = m_current_eval_file, .node = call_node});
 
     // Switch to the file the function was declared in. Falls back to keeping
     // the current file if the declaration isn't in the map (e.g. a Function
@@ -1010,13 +1029,13 @@ namespace eval {
     // A plain try/finally would need duplicated cleanup in every branch; this
     // fires exactly once from the destructor regardless of how we leave.
     struct CallGuard {
-      Evaluator&   self;
-      const Path*  saved;
+      Evaluator& self;
+      const Path* saved;
       ~CallGuard() {
         self.m_current_eval_file = saved;
         self.m_call_stack.pop_back();
       }
-    } guard{.self=*this, .saved=saved_file};
+    } guard{.self = *this, .saved = saved_file};
 
     auto call_env = std::make_shared<Environment>(fn.closure);
     if (bound_this) {
