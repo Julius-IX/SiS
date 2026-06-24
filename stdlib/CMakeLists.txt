@@ -60,10 +60,10 @@ function(sis_add_module name)
   target_include_directories(${name} PRIVATE "${SIS_INCLUDE_DIR}")
   # Modules shouldn't export anything except sis_module_init.
   # Hide everything else to keep the symbol table clean.
-  set_target_properties(${name} PROPERTIES
-    CXX_VISIBILITY_PRESET hidden
-    VISIBILITY_INLINES_HIDDEN ON
-  )
+  # set_target_properties(${name} PROPERTIES
+  #   CXX_VISIBILITY_PRESET hidden
+  #   VISIBILITY_INLINES_HIDDEN ON
+  # )
 endfunction()
 
 # Auto-discovery
