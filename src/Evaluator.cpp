@@ -6,6 +6,7 @@
 #include <iostream>
 #include <print>
 #include <spdlog/fmt/fmt.h>
+#include <ranges>
 #include <stdexcept>
 
 namespace eval {
@@ -19,6 +20,34 @@ namespace eval {
       case lex::TokenType::PERCENT_ASSIGN: return true;
       default: return false;
     }
+  }
+
+  // Formats a single source location as "File: ...\n[line:col] msg".
+  // When m_call_stack is non-empty, appends a call trace so the error shows
+  // not just WHERE something blew up but also the chain of calls that got
+  // there. Frames are printed innermost-first (most recent call at the top),
+  // which matches every mainstream language's stack trace convention.
+  void Evaluator::throwKnownScopeErr(const par::Node* node, std::string msg) {
+    std::string full;
+    if (node == nullptr) {
+      full = msg;
+    } else if (m_current_eval_file == nullptr) {
+      full = fmt::format("[{}:{}] {}", node->line, node->column, msg);
+    } else {
+      full = fmt::format("File: {}\n[{}:{}] {}", m_current_eval_file->string(), node->line, node->column, msg);
+    }
+
+    if (!m_call_stack.empty()) {
+      full += "\nCall stack:";
+      for (auto & it : std::views::reverse(m_call_stack)) {
+        full += fmt::format("\n  called from {} [{}:{}]",
+          it.file ? it.file->string() : "<unknown>",
+          it.node ? it.node->line   : 0,
+          it.node ? it.node->column : 0);
+      }
+    }
+
+    throw std::runtime_error(full);
   }
 
   // Maps a compound assignment operator (PLUS_ASSIGN) to the plain binary
@@ -147,6 +176,7 @@ namespace eval {
     Value last{};
     for (const Path& path : parser.loadOrder()) {
       const par::State& state = parser.getState(path);
+      m_current_eval_file = &path;
 
       bool is_dynamic = path.extension() == ".so" || path.extension() == ".dll" || path.extension() == ".dylib";
 
@@ -199,17 +229,17 @@ namespace eval {
         // super->field is), so that still throws.
         const auto* self_node = static_cast<const par::Self*>(node);
         if (self_node->is_super) {
-          throw std::runtime_error("Evaluator: bare 'super' is not a value; use 'super->field' or 'super->method(...)'");
+          throwKnownScopeErr(node, "Evaluator: bare 'super' is not a value; use 'super->field' or 'super->method(...)'");
         }
         auto this_val = env->get("this");
         if (!this_val) {
-          throw std::runtime_error("'this' used outside of a method body");
+          throwKnownScopeErr(node, "'this' used outside of a method body");
         }
         return *this_val;
       }
     }
 
-    throw std::runtime_error("Evaluator: unhandled NodeType");
+    throwKnownScopeErr(node, "Evaluator: unhandled NodeType");
   }
 
   // Creates a new child scope, runs each statement in order, returns the
@@ -243,7 +273,7 @@ namespace eval {
   Value Evaluator::evalIdentifier(const par::Identifier* node, const std::shared_ptr<Environment>& env) {
     auto value = env->get(node->name);
     if (!value) {
-      throw std::runtime_error("Undefined variable: " + node->name);
+      throwKnownScopeErr(node, "Undefined variable: " + node->name);
     }
     return *value;
   }
@@ -257,8 +287,27 @@ namespace eval {
         if (const auto* d = std::get_if<double>(&operand.data)) {
           return Value(-(*d));
         }
-        throw std::runtime_error("Unary '-' requires a number, got " + operand.typeName());
-      default: throw std::runtime_error("Unsupported unary operator");
+        throwKnownScopeErr(node, "Unary '-' requires a number, got " + operand.typeName());
+      default: throwKnownScopeErr(node, "Unsupported unary operator");
+    }
+  }
+
+  Value Evaluator::cmpDouble(const par::Binary* node, const double* l, const double* r) {
+    switch (node->operation) {
+      case lex::TokenType::PLUS: return Value(*l + *r);
+      case lex::TokenType::MINUS: return Value(*l - *r);
+      case lex::TokenType::STAR: return Value(*l * *r);
+      case lex::TokenType::SLASH:
+        if (*r == 0.0) throwKnownScopeErr(node, "Division by zero");
+        return Value(*l / *r);
+      case lex::TokenType::PERCENT:
+        if (*r == 0.0) throwKnownScopeErr(node, "Modulo by zero");
+        return Value(std::fmod(*l, *r));
+      case lex::TokenType::LESS_THAN: return Value(*l < *r);
+      case lex::TokenType::LESS_THAN_EQUALS: return Value(*l <= *r);
+      case lex::TokenType::GREATER_THAN: return Value(*l > *r);
+      case lex::TokenType::GREATER_THAN_EQUALS: return Value(*l >= *r);
+      default: throwKnownScopeErr(node, "Unsupported binary operator");
     }
   }
 
@@ -297,25 +346,18 @@ namespace eval {
     const auto* l = std::get_if<double>(&left.data);
     const auto* r = std::get_if<double>(&right.data);
     if (!l || !r) {
-      throw std::runtime_error("Operator requires two numbers, got " + left.typeName() + " and " + right.typeName());
+      const auto* lstr = std::get_if<std::string>(&left.data);
+      const auto* rstr = std::get_if<std::string>(&right.data);
+      if (!lstr || !rstr) {
+        throwKnownScopeErr(node, "Operator requires two numbers or strings, got " + left.typeName() + " and " + right.typeName());
+      }
+      switch (node->operation) {
+        case lex::TokenType::LESS_THAN: return Value(*lstr < *rstr);
+        case lex::TokenType::GREATER_THAN: return Value(*lstr <= *rstr);
+        default: throwKnownScopeErr(node, "Unsupported binary operator in string comparison");
+      }
     }
-
-    switch (node->operation) {
-      case lex::TokenType::PLUS: return Value(*l + *r);
-      case lex::TokenType::MINUS: return Value(*l - *r);
-      case lex::TokenType::STAR: return Value(*l * *r);
-      case lex::TokenType::SLASH:
-        if (*r == 0.0) throw std::runtime_error("Division by zero");
-        return Value(*l / *r);
-      case lex::TokenType::PERCENT:
-        if (*r == 0.0) throw std::runtime_error("Modulo by zero");
-        return Value(std::fmod(*l, *r));
-      case lex::TokenType::LESS_THAN: return Value(*l < *r);
-      case lex::TokenType::LESS_THAN_EQUALS: return Value(*l <= *r);
-      case lex::TokenType::GREATER_THAN: return Value(*l > *r);
-      case lex::TokenType::GREATER_THAN_EQUALS: return Value(*l >= *r);
-      default: throw std::runtime_error("Unsupported binary operator");
-    }
+    return cmpDouble(node, l, r);
   }
 
   // Applies a (possibly compound) assignment operator to `current` and
@@ -375,13 +417,13 @@ namespace eval {
       } else {
         auto current = env->get(target->name);
         if (!current) {
-          throw std::runtime_error("Undefined variable: " + target->name);
+          throwKnownScopeErr(node, "Undefined variable: " + target->name);
         }
         Value rhs = evaluate(node->right.get(), env);
         new_value = applyCompoundOp(node->operation, *current, rhs);
       }
       if (!env->assign(target->name, new_value)) {
-        throw std::runtime_error("Undefined variable: " + target->name);
+        throwKnownScopeErr(node, "Undefined variable: " + target->name);
       }
       return new_value;
     }
@@ -393,11 +435,11 @@ namespace eval {
       if (member->object->type == par::NodeType::SELF) {
         const auto* self_node = static_cast<const par::Self*>(member->object.get());
         if (self_node->is_super) {
-          throw std::runtime_error("Cannot assign through 'super->...', fields belong to the instance, assign via 'this->" + member->field + "' instead");
+          throwKnownScopeErr(node, "Cannot assign through 'super->...', fields belong to the instance, assign via 'this->" + member->field + "' instead");
         }
         auto this_val = env->get("this");
         if (!this_val) {
-          throw std::runtime_error("'this' is not defined here (assignment outside of a method body)");
+          throwKnownScopeErr(node, "'this' is not defined here (assignment outside of a method body)");
         }
         object = *this_val;
       } else {
@@ -405,7 +447,7 @@ namespace eval {
       }
       const auto* inst_ptr = std::get_if<std::shared_ptr<Instance>>(&object.data);
       if (inst_ptr == nullptr) {
-        throw std::runtime_error("Cannot assign to a field on a non-instance value (" + object.typeName() + ")");
+        throwKnownScopeErr(node, "Cannot assign to a field on a non-instance value (" + object.typeName() + ")");
       }
       Value new_value;
       if (node->operation == lex::TokenType::ASSIGN) {
@@ -413,7 +455,7 @@ namespace eval {
       } else {
         auto it = inst_ptr->get()->fields->find(member->field);
         if (it == inst_ptr->get()->fields->end()) {
-          throw std::runtime_error("Undefined field '" + member->field + "' on instance of " + inst_ptr->get()->klass->name);
+          throwKnownScopeErr(node, "Undefined field '" + member->field + "' on instance of " + inst_ptr->get()->klass->name);
         }
         Value rhs = evaluate(node->right.get(), env);
         new_value = applyCompoundOp(node->operation, it->second, rhs);
@@ -429,17 +471,17 @@ namespace eval {
       Value object = evaluate(subscript->object.get(), env);
       const auto* arr = std::get_if<Array>(&object.data);
       if ((arr == nullptr) || !*arr) {
-        throw std::runtime_error("Subscript assignment requires an array, got " + object.typeName());
+        throwKnownScopeErr(node, "Subscript assignment requires an array, got " + object.typeName());
       }
 
       Value idx = evaluate(subscript->index.get(), env);
       const auto* d = std::get_if<double>(&idx.data);
       if (d == nullptr) {
-        throw std::runtime_error("Array index must be a number, got " + idx.typeName());
+        throwKnownScopeErr(node, "Array index must be a number, got " + idx.typeName());
       }
       const auto i = static_cast<size_t>(*d);
       if (i >= (*arr)->size()) {
-        throw std::runtime_error("Array index " + std::to_string(i) + " out of bounds (size " + std::to_string((*arr)->size()) + ")");
+        throwKnownScopeErr(node, "Array index " + std::to_string(i) + " out of bounds (size " + std::to_string((*arr)->size()) + ")");
       }
 
       Value new_value;
@@ -453,7 +495,7 @@ namespace eval {
       return new_value;
     }
 
-    throw std::runtime_error("Invalid assignment target");
+    throwKnownScopeErr(node, "Invalid assignment target");
   }
 
   Value Evaluator::evalIf(const par::If* node, const std::shared_ptr<Environment>& env) {
@@ -588,10 +630,19 @@ namespace eval {
       return native->fn(args);
     }
 
-    throw std::runtime_error("Attempted to call a non-function value (" + callee.typeName() + ")");
+    throwKnownScopeErr(node, "Attempted to call a non-function value (" + callee.typeName() + ")");
   }
 
-  Value Evaluator::evalFnLiteral(const par::FnLiteral* node, const std::shared_ptr<Environment>& env) { return Value(Function{.declaration = node, .closure = env}); }
+  // Records which source file each FnLiteral node was declared in. This is
+  // the other half of the file-tracking 
+  // FIX: when callFunction later executes
+  // the body, it looks up the declaration here to switch m_current_eval_file
+  // to the right file, so errors inside the function report the correct source
+  // even if the call site is in a different file.
+  Value Evaluator::evalFnLiteral(const par::FnLiteral* node, const std::shared_ptr<Environment>& env) {
+    m_fn_source_file[node] = m_current_eval_file;
+    return Value(Function{.declaration = node, .closure = env});
+  }
 
   Value Evaluator::evalArrayLiteral(const par::ArrayLiteral* node, const std::shared_ptr<Environment>& env) {
     auto elements = std::make_shared<std::vector<Value>>();
@@ -611,27 +662,27 @@ namespace eval {
 
     const auto* idx = std::get_if<double>(&index.data);
     if (!idx) {
-      throw std::runtime_error("Subscript index must be a number, got " + index.typeName());
+      throwKnownScopeErr(node, "Subscript index must be a number, got " + index.typeName());
     }
     if (*idx < 0) {
-      throw std::runtime_error("Subscript index cannot be negative");
+      throwKnownScopeErr(node, "Subscript index cannot be negative");
     }
     auto i = static_cast<size_t>(*idx);
 
     if (const auto* arr = std::get_if<Array>(&object.data)) {
       if (!*arr || i >= (*arr)->size()) {
-        throw std::runtime_error("Array index " + std::to_string(i) + " out of bounds (size " + std::to_string(*arr ? (*arr)->size() : 0) + ")");
+        throwKnownScopeErr(node, "Array index " + std::to_string(i) + " out of bounds (size " + std::to_string(*arr ? (*arr)->size() : 0) + ")");
       }
       return (**arr)[i];
     }
     if (const auto* str = std::get_if<std::string>(&object.data)) {
       if (i >= str->size()) {
-        throw std::runtime_error("String index " + std::to_string(i) + " out of bounds (length " + std::to_string(str->size()) + ")");
+        throwKnownScopeErr(node, "String index " + std::to_string(i) + " out of bounds (length " + std::to_string(str->size()) + ")");
       }
       return {std::string(1, (*str)[i])};
     }
 
-    throw std::runtime_error("Subscript is not supported on a value of type " + object.typeName());
+    throwKnownScopeErr(node, "Subscript is not supported on a value of type " + object.typeName());
   }
 
   // obj.field, and this->field / super->field once the parser's MemberAccess
@@ -658,7 +709,7 @@ namespace eval {
   Value Evaluator::evalSelfMemberAccess(const par::Self* self_node, const std::string& field, const par::Node* node, const std::shared_ptr<Environment>& env) {
     auto this_val = env->get("this");
     if (!this_val) {
-      throw std::runtime_error("'this'/'super' used outside of a method body");
+      throwKnownScopeErr(node, "'this'/'super' used outside of a method body");
     }
 
     if (!self_node->is_super) {
@@ -667,11 +718,11 @@ namespace eval {
 
     auto defining_class_val = env->get("__class__");
     if (!defining_class_val) {
-      throw std::runtime_error("'super' used outside of a method body");
+      throwKnownScopeErr(node, "'super' used outside of a method body");
     }
     const auto* defining_class = std::get_if<std::shared_ptr<Class>>(&defining_class_val->data);
     if ((defining_class == nullptr) || !*defining_class || !(*defining_class)->parent) {
-      throw std::runtime_error("'super' used in a class with no parent (no 'extends')");
+      throwKnownScopeErr(node, "'super' used in a class with no parent (no 'extends')");
     }
 
     return resolveMember(*this_val, field, node, (*defining_class)->parent);
@@ -696,14 +747,14 @@ namespace eval {
       if (field == "length") {
         return {static_cast<double>((*arr)->size())};
       }
-      throw std::runtime_error("Array has no member '" + field + "'");
+      throwKnownScopeErr(node, "Array has no member '" + field + "'");
     }
 
     if (const auto* str = std::get_if<std::string>(&object.data)) {
       if (field == "length") {
         return {static_cast<double>(str->size())};
       }
-      throw std::runtime_error("String has no member '" + field + "'");
+      throwKnownScopeErr(node, "String has no member '" + field + "'");
     }
 
     if (const auto* instance = std::get_if<std::shared_ptr<Instance>>(&object.data)) {
@@ -761,10 +812,10 @@ namespace eval {
         return Value(std::move(bound));
       }
 
-      throw std::runtime_error("'" + instance->get()->klass->name + "' has no field or method '" + field + "'");
+      throwKnownScopeErr(node, "'" + instance->get()->klass->name + "' has no field or method '" + field + "'");
     }
 
-    throw std::runtime_error("Member access on '" + field + "' is not supported on a value of type " + object.typeName());
+    throwKnownScopeErr(node, "Member access on '" + field + "' is not supported on a value of type " + object.typeName());
   }
 
   Value Evaluator::evalReturn(const par::Return* node, const std::shared_ptr<Environment>& env) {
@@ -804,13 +855,17 @@ namespace eval {
     if (!node->parent_name.empty()) {
       auto parent_it = m_classes.find(node->parent_name);
       if (parent_it == m_classes.end()) {
-        throw std::runtime_error("Class '" + node->name + "' extends unknown class '" + node->parent_name + "'");
+        throwKnownScopeErr(node, "Class '" + node->name + "' extends unknown class '" + node->parent_name + "'");
       }
       klass->parent = parent_it->second;
     }
 
     for (size_t i = 0; i < node->methods.size(); ++i) {
       klass->methods[node->method_names[i]] = Function{.declaration = node->methods[i].get(), .closure = env};
+      // Record each method's source file the same way evalFnLiteral does for
+      // free functions, so callFunction can switch m_current_eval_file
+      // correctly when a method defined in an included file is called.
+      m_fn_source_file[node->methods[i].get()] = m_current_eval_file;
     }
 
     m_classes[node->name] = klass;
@@ -839,7 +894,7 @@ namespace eval {
   Value Evaluator::evalNewExpr(const par::NewExpr* node, const std::shared_ptr<Environment>& env) {
     auto class_it = m_classes.find(node->class_name);
     if (class_it == m_classes.end()) {
-      throw std::runtime_error("Unknown class '" + node->class_name + "'");
+      throwKnownScopeErr(node, "Unknown class '" + node->class_name + "'");
     }
     std::shared_ptr<Class> klass = class_it->second;
 
@@ -899,7 +954,7 @@ namespace eval {
         }
         native_ctor->fn(args);
       } else if (!node->args.empty()) {
-        throw std::runtime_error("Class '" + node->class_name + "' has no constructor but was called with arguments");
+        throwKnownScopeErr(node, "Class '" + node->class_name + "' has no constructor but was called with arguments");
       }
     }
 
@@ -922,11 +977,46 @@ namespace eval {
   // resolveMember and evalNewExpr): "this" and "__class__" get defined in
   // the fresh call scope alongside the regular parameters, using the exact
   // same Environment mechanism, no special-casing needed elsewhere.
+  //
+  // File tracking: before entering the body we push a CallFrame recording
+  // the call site (current file + call_node), then switch m_current_eval_file
+  // to the file the function was declared in (looked up from m_fn_source_file,
+  // populated by evalFnLiteral/evalClassDecl). Both are restored on exit via
+  // the RAII guard, so ANY exit path — normal return, ReturnSignal, or a
+  // runtime error exception — leaves the state consistent. This means
+  // throwKnownScopeErr always sees the right file, and the call stack in
+  // error messages correctly identifies the chain of cross-file calls that
+  // led to the failure.
   Value Evaluator::callFunction(
-    const Function& fn, std::vector<Value> args, const par::Node* /*call_node*/, const std::optional<Value>& bound_this, const std::shared_ptr<Class>& defining_class) {
+    const Function& fn, std::vector<Value> args, const par::Node* call_node, const std::optional<Value>& bound_this, const std::shared_ptr<Class>& defining_class) {
     if (args.size() != fn.declaration->params.size()) {
-      throw std::runtime_error("Expected " + std::to_string(fn.declaration->params.size()) + " arguments but got " + std::to_string(args.size()));
+      throwKnownScopeErr(call_node, "Expected " + std::to_string(fn.declaration->params.size()) + " arguments but got " + std::to_string(args.size()));
     }
+
+    // Push the call site frame BEFORE switching files so the frame records
+    // where the call was made from, not where execution is about to go.
+    m_call_stack.push_back({.file=m_current_eval_file, .node=call_node});
+
+    // Switch to the file the function was declared in. Falls back to keeping
+    // the current file if the declaration isn't in the map (e.g. a Function
+    // value constructed by native code that never went through evalFnLiteral).
+    const Path* saved_file = m_current_eval_file;
+    if (auto it = m_fn_source_file.find(fn.declaration); it != m_fn_source_file.end()) {
+      m_current_eval_file = it->second;
+    }
+
+    // RAII guard: restores both the file pointer and the call stack on every
+    // exit path — normal return, ReturnSignal, BreakSignal, or a thrown error.
+    // A plain try/finally would need duplicated cleanup in every branch; this
+    // fires exactly once from the destructor regardless of how we leave.
+    struct CallGuard {
+      Evaluator&   self;
+      const Path*  saved;
+      ~CallGuard() {
+        self.m_current_eval_file = saved;
+        self.m_call_stack.pop_back();
+      }
+    } guard{.self=*this, .saved=saved_file};
 
     auto call_env = std::make_shared<Environment>(fn.closure);
     if (bound_this) {
