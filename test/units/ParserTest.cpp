@@ -331,14 +331,13 @@ namespace { // Array literals
     EXPECT_EQ(as_ArrayLiteral->elements.size(), 3U);
     for (auto& elem : as_ArrayLiteral->elements) {
       EXPECT_NE(elem.value, nullptr);
-      auto* lit = reinterpret_cast<par::Literal*>(elem.value.get());
-      EXPECT_NE(lit, nullptr) << "Element claims ::type == par::NodeType::LITERAL, but value is null";
-      if (lit != nullptr) {
-        if (std::holds_alternative<double>(lit->value)) {
+      ASSERT_NODE(elem.value.get(), Literal);
+      if (as_Literal != nullptr) {
+        if (std::holds_alternative<double>(as_Literal->value)) {
           SUCCEED();
-        } else if (std::holds_alternative<std::monostate>(lit->value)) {
+        } else if (std::holds_alternative<std::monostate>(as_Literal->value)) {
           SUCCEED();
-        } else if (std::holds_alternative<bool>(lit->value)) {
+        } else if (std::holds_alternative<bool>(as_Literal->value)) {
           SUCCEED();
         } else {
           ADD_FAILURE() << "Unexpected element type: " << (int)(elem.value->type);
@@ -356,13 +355,10 @@ namespace { // Array literals
     EXPECT_EQ(as_ArrayLiteral->elements.size(), 3U);
     for (auto i = 0; i < as_ArrayLiteral->elements.size(); i++) {
       EXPECT_NE(as_ArrayLiteral->elements[i].value, nullptr);
-      auto* lit = reinterpret_cast<par::Literal*>(as_ArrayLiteral->elements[i].value.get());
-      EXPECT_NE(lit, nullptr) << "Element claims ::type == par::NodeType::LITERAL, but value is null";
-      if (lit != nullptr) {
-        if (std::holds_alternative<double>(lit->value)) {
-          auto val = std::get<double>(lit->value);
-          EXPECT_EQ(i, val);
-        }
+      ASSERT_NODE(as_ArrayLiteral->elements[i].value.get(), Literal);
+      if (std::holds_alternative<double>(as_Literal->value)) {
+        auto val = std::get<double>(as_Literal->value);
+        EXPECT_EQ(i, val);
       }
     }
   }
