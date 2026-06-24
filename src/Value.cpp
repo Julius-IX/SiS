@@ -66,29 +66,4 @@ namespace eval {
       data);
   }
 
-  std::string Value::typeName() const {
-    return std::visit(
-      [](const auto& v) -> std::string {
-        using T = std::decay_t<decltype(v)>;
-        if constexpr (std::is_same_v<T, std::monostate>)
-          return "null";
-        else if constexpr (std::is_same_v<T, bool>)
-          return "bool";
-        else if constexpr (std::is_same_v<T, double>)
-          return "num";
-        else if constexpr (std::is_same_v<T, std::string>)
-          return "string";
-        else if constexpr (std::is_same_v<T, Array>)
-          return "array";
-        else if constexpr (std::is_same_v<T, Function>)
-          return "function";
-        else if constexpr (std::is_same_v<T, NativeFunction>)
-          return "function";
-        else if constexpr (std::is_same_v<T, std::shared_ptr<Class>>)
-          return "class";
-        else
-          return "instance"; // shared_ptr<Instance>
-      },
-      data);
-  }
 } // namespace eval
