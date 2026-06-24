@@ -1,9 +1,33 @@
 #pragma once
 
 #include <SisRegistry.h>
+#include <cstdint>
 #include <stdexcept>
 #include <string>
-#include <cstdint>
+
+// std::variant<std::monostate, double, bool, std::string, Array, Function, NativeFunction, std::shared_ptr<Class>, std::shared_ptr<Instance>> data;
+
+#define SIS_VALUE_TYPES(X)                                                                                                                                                         \
+  X(Null, std::monostate, "null")                                                                                                                                                  \
+  X(Num, double, "number")                                                                                                                                                         \
+  X(Bool, bool, "bool")                                                                                                                                                            \
+  X(Str, std::string, "string")                                                                                                                                                    \
+  X(Arr, eval::Array, "array")                                                                                                                                                     \
+  X(Func, eval::Function, "function")                                                                                                                                              \
+  X(NativeFunc, eval::NativeFunction, "native function")                                                                                                                           \
+  X(Class, std::shared_ptr<eval::Class>, "class")                                                                                                                                  \
+  X(Instance, std::shared_ptr<eval::Instance>, "instance")
+
+#define DEFINE_REQUIRE(name, type, prettyName)                                                                                                                                     \
+  inline type require##name(const eval::Value& val, const char* ctx) {                                                                                                             \
+    const auto* p = std::get_if<type>(&val.data);                                                                                                                                  \
+    if (p == nullptr) {                                                                                                                                                            \
+      throw std::runtime_error(std::string(ctx) + ": expected a " prettyName ", got " + val.typeName());                                                                           \
+    }                                                                                                                                                                              \
+    return *p;                                                                                                                                                                     \
+  }
+
+SIS_VALUE_TYPES(DEFINE_REQUIRE)
 
 // Usage:
 //   SIS_MODULE_INIT(reg) {

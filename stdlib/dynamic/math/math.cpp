@@ -4,12 +4,6 @@
 #include <cmath>
 #include <cstdlib>
 
-static double requireNum(const eval::Value& val, const char* ctx) {
-  const auto* d = std::get_if<double>(&val.data);
-  if (d == nullptr) throw std::runtime_error(std::string(ctx) + ": expected a number, got " + val.typeName());
-  return *d;
-}
-
 static eval::Value fnAbs(std::vector<eval::Value>& args) {
   if (args.size() != 1) throw std::runtime_error("abs() expects 1 argument (number)");
   return std::abs(requireNum(args[0], "abs"));
