@@ -11,6 +11,14 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Override from the command line:
 #   cmake -DSIS_INCLUDE_DIR=/my/headers -DSIS_OUTPUT_DIR=/my/sis ..
 
+if(MINGW)
+    add_link_options(
+        -static
+        -static-libgcc
+        -static-libstdc++
+    )
+endif()
+
 set(SIS_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/../include"
     CACHE PATH "Path to SiS interpreter headers (SisRegistry.h etc.)")
 get_filename_component(
