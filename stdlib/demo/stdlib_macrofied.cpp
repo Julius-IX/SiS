@@ -26,19 +26,13 @@ class NativeCounter {
   double m_value;
 };
 
-static double requireNum(const eval::Value& val, const char* ctx) {
-  const auto* d = std::get_if<double>(&val.data);
-  if (d == nullptr) throw std::runtime_error(std::string(ctx) + ": expected a number, got " + val.typeName());
-  return *d;
-}
-
 // free functions
-static eval::Value fnAdd(std::vector<eval::Value>& args) {
+FN_SIGNATURE(fnAdd, args) {
   if (args.size() != 2) throw std::runtime_error("add() expects 2 arguments");
   return {requireNum(args[0], "add") + requireNum(args[1], "add")};
 }
 
-static eval::Value fnClamp(std::vector<eval::Value>& args) {
+FN_SIGNATURE(fnClamp, args) {
   if (args.size() != 3) throw std::runtime_error("clamp() expects 3 arguments (value, min, max)");
   double v = requireNum(args[0], "clamp");
   double lo = requireNum(args[1], "clamp");
@@ -47,7 +41,7 @@ static eval::Value fnClamp(std::vector<eval::Value>& args) {
   return {v < lo ? lo : (v > hi ? hi : v)};
 }
 
-static eval::Value fnCounterSum(std::vector<eval::Value>& args) {
+FN_SIGNATURE(fnCounterSum, args) {
   if (args.size() != 1) throw std::runtime_error("counter_sum() expects 1 argument (array)");
   const auto* arr = std::get_if<eval::Array>(&args[0].data);
   if ((arr == nullptr) || !*arr) throw std::runtime_error("counter_sum() expects an array");
