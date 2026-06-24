@@ -320,6 +320,32 @@ namespace { // Array literals
       EXPECT_EQ(elem.value->type, par::NodeType::LITERAL);
     }
   }
+
+  TEST(Parser, ArrayLiteralWithMixedElementTypes) {
+    TestParser p;
+    ASSERT_TRUE(p.parseSource("[1, true, null];"));
+
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, ExprStmt);
+    ASSERT_NODE(as_ExprStmt->expr.get(), ArrayLiteral);
+    EXPECT_EQ(as_ArrayLiteral->elements.size(), 3U);
+    for (auto& elem : as_ArrayLiteral->elements) {
+      EXPECT_NE(elem.value, nullptr);
+      auto* lit = reinterpret_cast<par::Literal*>(elem.value.get());
+      EXPECT_NE(lit, nullptr) << "Element claims ::type == par::NodeType::LITERAL, but value is null";
+      if (lit != nullptr) {
+        if (std::holds_alternative<double>(lit->value)) {
+          SUCCEED();
+        } else if (std::holds_alternative<std::monostate>(lit->value)) {
+          SUCCEED();
+        } else if (std::holds_alternative<bool>(lit->value)) {
+          SUCCEED();
+        } else {
+          ADD_FAILURE() << "Unexpected element type: " << (int)(elem.value->type);
+        }
+      }
+    }
+  }
 } // namespace
 
 namespace { // Function calls
