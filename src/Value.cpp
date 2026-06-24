@@ -15,7 +15,7 @@ namespace eval {
         } else if constexpr (std::is_same_v<T, std::string>) {
           return !v.empty();
         } else if constexpr (std::is_same_v<T, Array>) {
-          return v && !v->empty();
+          return v && !v->elements.empty();
         } else { // Function, NativeFunction, shared_ptr<Class>, shared_ptr<Instance>
           return true;
         }
@@ -46,9 +46,13 @@ namespace eval {
         } else if constexpr (std::is_same_v<T, Array>) {
           std::string out = "[";
           if (v) {
-            for (size_t i = 0; i < v->size(); ++i) {
-              out += (*v)[i].toString();
-              if (i + 1 < v->size()) out += ", ";
+            bool first = true;
+            for (const auto& [key, value] : v->elements) {
+              if (!first) out += ", ";
+              first = false;
+              out += key.toString();
+              out += ": ";
+              out += value.toString();
             }
           }
           out += "]";

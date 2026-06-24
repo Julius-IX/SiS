@@ -96,7 +96,8 @@ namespace eval {
                        if (!arr || !*arr) {
                          throw std::runtime_error("push() expects an array as its first argument, got " + args[0].typeName());
                        }
-                       (*arr)->push_back(args[1]);
+                       Value size = (double)(*arr)->elements.size();
+                       (*arr)->elements.emplace_back(size, args[1]);
                        return args[0];
                      },
                    })),
@@ -109,11 +110,11 @@ namespace eval {
                          throw std::runtime_error("pop() expects exactly 1 argument, got " + std::to_string(args.size()));
                        }
                        const auto* arr = std::get_if<Array>(&args[0].data);
-                       if (!arr || !*arr || (*arr)->empty()) {
+                       if (!arr || !*arr || (*arr)->elements.empty()) {
                          throw std::runtime_error("pop() expects a non-empty array");
                        }
-                       Value back = (*arr)->back();
-                       (*arr)->pop_back();
+                       Value back = (*arr)->elements.back().second;
+                       (*arr)->elements.pop_back();
                        return back;
                      },
                    })),

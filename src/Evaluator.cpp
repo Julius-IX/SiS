@@ -493,24 +493,20 @@ namespace eval {
         throwKnownScopeErr(node, "Subscript assignment requires an array, got " + object.typeName());
       }
 
-      Value idx = evaluate(subscript->index.get(), env);
-      const auto* d = std::get_if<double>(&idx.data);
-      if (d == nullptr) {
-        throwKnownScopeErr(node, "Array index must be a number, got " + idx.typeName());
-      }
-      const auto i = static_cast<size_t>(*d);
-      if (i >= (*arr)->size()) {
-        throwKnownScopeErr(node, "Array index " + std::to_string(i) + " out of bounds (size " + std::to_string((*arr)->size()) + ")");
-      }
+      Value key = evaluate(subscript->index.get(), env);
 
       Value new_value;
       if (node->operation == lex::TokenType::ASSIGN) {
         new_value = evaluate(node->right.get(), env);
       } else {
+        const Value* current = (*arr)->get(key);
+        if (!current) {
+          throwKnownScopeErr(node, "Key " + key.toString() + " not found in array (compound assignment requires existing key)");
+        }
         Value rhs = evaluate(node->right.get(), env);
-        new_value = applyCompoundOp(node->operation, (**arr)[i], rhs);
+        new_value = applyCompoundOp(node->operation, *current, rhs);
       }
-      (**arr)[i] = new_value;
+      (*arr)->set(key, new_value);
       return new_value;
     }
 
@@ -664,12 +660,23 @@ namespace eval {
   }
 
   Value Evaluator::evalArrayLiteral(const par::ArrayLiteral* node, const std::shared_ptr<Environment>& env) {
-    auto elements = std::make_shared<std::vector<Value>>();
-    elements->reserve(node->elements.size());
+    auto arr = std::make_shared<InternalArray>();
+    arr->elements.reserve(node->elements.size());
+
+    // Auto-key counter: only advances for unkeyed entries, matching Lua
+    // semantics so explicit keys don't shift the numbering of subsequent
+    // positional entries.
+    double auto_key = 0.0;
     for (const auto& elem : node->elements) {
-      elements->push_back(evaluate(elem.get(), env));
+      Value val = evaluate(elem.value.get(), env);
+      if (elem.key) {
+        Value key = evaluate(elem.key.get(), env);
+        arr->set(key, std::move(val));
+      } else {
+        arr->set(Value(auto_key++), std::move(val));
+      }
     }
-    return {elements};
+    return {arr};
   }
 
   // obj[index]. Arrays index by number (truncated to size_t, bounds
@@ -679,22 +686,25 @@ namespace eval {
     Value object = evaluate(node->object.get(), env);
     Value index = evaluate(node->index.get(), env);
 
-    const auto* idx = std::get_if<double>(&index.data);
-    if (!idx) {
-      throwKnownScopeErr(node, "Subscript index must be a number, got " + index.typeName());
-    }
-    if (*idx < 0) {
-      throwKnownScopeErr(node, "Subscript index cannot be negative");
-    }
-    auto i = static_cast<size_t>(*idx);
-
     if (const auto* arr = std::get_if<Array>(&object.data)) {
-      if (!*arr || i >= (*arr)->size()) {
-        throwKnownScopeErr(node, "Array index " + std::to_string(i) + " out of bounds (size " + std::to_string(*arr ? (*arr)->size() : 0) + ")");
+      if (!*arr) throwKnownScopeErr(node, "Subscript on null array");
+      const Value* found = (*arr)->get(index);
+      if (!found) {
+        throwKnownScopeErr(node, "Key " + index.toString() + " not found in array");
       }
-      return (**arr)[i];
+      return *found;
     }
+
+    // Strings still index by number and return a one-character string.
     if (const auto* str = std::get_if<std::string>(&object.data)) {
+      const auto* idx = std::get_if<double>(&index.data);
+      if (!idx) {
+        throwKnownScopeErr(node, "String index must be a number, got " + index.typeName());
+      }
+      if (*idx < 0) {
+        throwKnownScopeErr(node, "String index cannot be negative");
+      }
+      auto i = static_cast<size_t>(*idx);
       if (i >= str->size()) {
         throwKnownScopeErr(node, "String index " + std::to_string(i) + " out of bounds (length " + std::to_string(str->size()) + ")");
       }

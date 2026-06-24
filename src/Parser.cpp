@@ -441,10 +441,41 @@ namespace par { // Base parsing loop functions
 
       case lex::TokenType::L_BRACK: {
         advance(state);
-        std::optional<std::vector<std::unique_ptr<Node>>> elements = parseExpressionList(state, lex::TokenType::R_BRACK);
-        if (elements == std::nullopt) return nullptr;
+        std::vector<ArrayElement> elements;
+
+        // Track the next auto-assigned numeric key for unkeyed entries.
+        // Keyed entries don't advance this counter, matching Lua semantics:
+        // [10: "x", "y", "z"] gives "y" key 0 and "z" key 1, not 11 and 12.
+        while (!check(state->lexer.get(), lex::TokenType::R_BRACK)) {
+          if (check(state->lexer.get(), lex::TokenType::SIS_EOF)) {
+            panic("Unterminated array literal, expected ']'");
+            return nullptr;
+          }
+
+          // Parse the first expression. It's either a standalone value, or the
+          // key in a `key: value` pair — we don't know which until we peek at
+          // what follows it.
+          std::unique_ptr<Node> first = parseExpression(state, 1);
+          if (first == nullptr) return nullptr;
+
+          ArrayElement elem;
+          if (match(state, lex::TokenType::COLON)) {
+            // key: value — first expression was the key
+            elem.key = std::move(first);
+            elem.value = parseExpression(state, 1);
+            if (elem.value == nullptr) return nullptr;
+          } else {
+            // bare value — no explicit key
+            elem.key = nullptr;
+            elem.value = std::move(first);
+          }
+
+          elements.push_back(std::move(elem));
+          if (!match(state, lex::TokenType::COMMA)) break;
+        }
+
         if (!expect(state, lex::TokenType::R_BRACK, "Expected ']' after array elements")) return nullptr;
-        return makeNode<ArrayLiteral>(tok.line, tok.column, std::move(elements.value()));
+        return makeNode<ArrayLiteral>(tok.line, tok.column, std::move(elements));
       }
 
       case lex::TokenType::FN: return parseFnLiteral(state);
