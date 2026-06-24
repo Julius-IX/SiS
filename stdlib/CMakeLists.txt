@@ -13,6 +13,12 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(SIS_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/../include"
     CACHE PATH "Path to SiS interpreter headers (SisRegistry.h etc.)")
+get_filename_component(
+    SIS_INCLUDE_DIR
+    "${CMAKE_SOURCE_DIR}/../include"
+    ABSOLUTE
+)
+
 set(SIS_OUTPUT_BASE "${CMAKE_SOURCE_DIR}/../runtime"
     CACHE PATH "Base path; platform subdir is appended (linux/ or windows/)")
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
