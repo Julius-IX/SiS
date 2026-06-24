@@ -29,6 +29,8 @@
 
 SIS_VALUE_TYPES(DEFINE_REQUIRE)
 
+#define FN_SIGNATURE(name, arguments) static eval::Value name(std::vector<eval::Value>& args)
+
 // Usage:
 //   SIS_MODULE_INIT(reg) {
 //     reg->defineFn("add", fnAdd);
