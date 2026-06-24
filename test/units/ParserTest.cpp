@@ -348,17 +348,29 @@ namespace { // Array literals
 
   TEST(Parser, ArrayLiteralWithStringLiteralKeys) {
     TestParser p;
-    ASSERT_TRUE(p.parseSource(R"(["a": 0, "b": 1, "c": 2];)"));
+    ASSERT_TRUE(p.parseSource(R"(["0": 0, "1": 1, "2": 2];)"));
     const par::Block& root = p.peekRoot();
     GET_STMT(root, 0, ExprStmt);
     ASSERT_NODE(as_ExprStmt->expr.get(), ArrayLiteral);
     EXPECT_EQ(as_ArrayLiteral->elements.size(), 3U);
     for (auto i = 0; i < as_ArrayLiteral->elements.size(); i++) {
       EXPECT_NE(as_ArrayLiteral->elements[i].value, nullptr);
-      ASSERT_NODE(as_ArrayLiteral->elements[i].value.get(), Literal);
-      if (std::holds_alternative<double>(as_Literal->value)) {
-        auto val = std::get<double>(as_Literal->value);
-        EXPECT_EQ(i, val);
+      EXPECT_NE(as_ArrayLiteral->elements[i].key, nullptr);
+
+      {
+        ASSERT_NODE(as_ArrayLiteral->elements[i].value.get(), Literal);
+        if (std::holds_alternative<double>(as_Literal->value)) {
+          auto val = std::get<double>(as_Literal->value);
+          EXPECT_EQ(i, val);
+        }
+      }
+      {
+        ASSERT_NODE(as_ArrayLiteral->elements[i].key.get(), Literal);
+        if (std::holds_alternative<std::string>(as_Literal->value)) {
+          auto val = std::get<std::string>(as_Literal->value);
+          EXPECT_EQ(i, std::stoi(val));
+        }
+
       }
     }
   }
