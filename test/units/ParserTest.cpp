@@ -370,7 +370,35 @@ namespace { // Array literals
           auto val = std::get<std::string>(as_Literal->value);
           EXPECT_EQ(i, std::stoi(val));
         }
+      }
+    }
+  }
 
+  TEST(Parser, ArrayKeyValueWithExpressionKey) {
+    TestParser p;
+    ASSERT_TRUE(p.parseSource(R"([1+2: "a"];)"));
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, ExprStmt);
+    ASSERT_NODE(as_ExprStmt->expr.get(), ArrayLiteral);
+    EXPECT_EQ(as_ArrayLiteral->elements.size(), 1U);
+    {
+      ASSERT_NODE(as_ArrayLiteral->elements[0].value.get(), Literal);
+      ASSERT_TRUE(std::holds_alternative<std::string>(as_Literal->value));
+      EXPECT_EQ(std::get<std::string>(as_Literal->value), "a");
+    }
+    {
+      ASSERT_NODE(as_ArrayLiteral->elements[0].key.get(), Binary);
+      EXPECT_EQ(as_Binary->operation, lex::TokenType::PLUS);
+      { // left
+        ASSERT_NODE(as_Binary->left.get(), Literal);
+        ASSERT_TRUE(std::holds_alternative<double>(as_Literal->value));
+        EXPECT_EQ(std::get<double>(as_Literal->value), 1.0);
+      }
+
+      { // right
+        ASSERT_NODE(as_Binary->right.get(), Literal);
+        ASSERT_TRUE(std::holds_alternative<double>(as_Literal->value));
+        EXPECT_EQ(std::get<double>(as_Literal->value), 2.0);
       }
     }
   }
