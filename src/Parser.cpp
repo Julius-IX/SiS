@@ -453,19 +453,19 @@ namespace par { // Base parsing loop functions
           }
 
           // Parse the first expression. It's either a standalone value, or the
-          // key in a `key: value` pair — we don't know which until we peek at
+          // key in a `key: value` pair we don't know which until we peek at
           // what follows it.
           std::unique_ptr<Node> first = parseExpression(state, 1);
           if (first == nullptr) return nullptr;
 
           ArrayElement elem;
           if (match(state, lex::TokenType::COLON)) {
-            // key: value — first expression was the key
+            // key: value first expression was the key
             elem.key = std::move(first);
             elem.value = parseExpression(state, 1);
             if (elem.value == nullptr) return nullptr;
           } else {
-            // bare value — no explicit key
+            // bare value no explicit key
             elem.key = nullptr;
             elem.value = std::move(first);
           }

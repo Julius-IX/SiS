@@ -241,8 +241,8 @@ namespace eval {
         // NOLINTEND
         // The parser normally wraps `this`/`super` in a MemberAccess for field
         // access (this->field), handled by evalMemberAccess. However, a bare
-        // `this` is valid as a standalone expression — e.g. `return this;` for
-        // method chaining — so we handle that here by looking up the "this"
+        // `this` is valid as a standalone expression e.g. `return this;` for
+        // method chaining so we handle that here by looking up the "this"
         // binding that callFunction placed in the call scope.
         // Bare `super` has no standalone meaning (super isn't a value, only
         // super->field is), so that still throws.
@@ -795,7 +795,7 @@ namespace eval {
 
       std::shared_ptr<Class> lookup_class = search_class ? search_class : instance->get()->klass;
 
-      // AST method path — same as before, creates a bound closure scope so
+      // AST method path same as before, creates a bound closure scope so
       // `this` and `__class__` are available inside the method body.
       // Bind `this` (and `__class__`) by creating a fresh closure scope
       // (parented to the method's original closure, NOT the call site, same
@@ -823,7 +823,7 @@ namespace eval {
         return Value(Function{.declaration = method->declaration, .closure = bound_scope});
       }
 
-      // Native method path — wrap the raw NativeFunction so that `this`
+      // Native method path wrap the raw NativeFunction so that `this`
       // (the instance) is injected as args[0] before the user's arguments.
       // The lambda in NativeClassBuilder::method() then unwraps args[0]
       // back to shared_ptr<Instance> and shifts user args to args[1..n].
@@ -950,7 +950,7 @@ namespace eval {
           (*fields)[field_decl->name] = std::move(default_value);
         }
       } else {
-        // Native class: copy default_fields directly — these are plain Values
+        // Native class: copy default_fields directly these are plain Values
         // registered at lib load time via NativeClassBuilder::field(), no
         // evaluation needed.
         for (const auto& [fname, fval] : c->default_fields) {
@@ -971,7 +971,7 @@ namespace eval {
       }
       callFunction(*ctor, std::move(args), node, instance_value, owner);
     } else {
-      // Native constructor fallback — inject instance as args[0] same as
+      // Native constructor fallback inject instance as args[0] same as
       // resolveMember does for regular native method calls.
       const NativeFunction* native_ctor = klass->findNativeMethod("constructor");
       if (native_ctor != nullptr) {
@@ -1011,8 +1011,8 @@ namespace eval {
   // the call site (current file + call_node), then switch m_current_eval_file
   // to the file the function was declared in (looked up from m_fn_source_file,
   // populated by evalFnLiteral/evalClassDecl). Both are restored on exit via
-  // the RAII guard, so ANY exit path — normal return, ReturnSignal, or a
-  // runtime error exception — leaves the state consistent. This means
+  // the RAII guard, so ANY exit path normal return, ReturnSignal, or a
+  // runtime error exception leaves the state consistent. This means
   // throwKnownScopeErr always sees the right file, and the call stack in
   // error messages correctly identifies the chain of cross-file calls that
   // led to the failure.
@@ -1035,7 +1035,7 @@ namespace eval {
     }
 
     // RAII guard: restores both the file pointer and the call stack on every
-    // exit path — normal return, ReturnSignal, BreakSignal, or a thrown error.
+    // exit path normal return, ReturnSignal, BreakSignal, or a thrown error.
     // A plain try/finally would need duplicated cleanup in every branch; this
     // fires exactly once from the destructor regardless of how we leave.
     struct CallGuard {
