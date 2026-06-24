@@ -188,14 +188,25 @@ namespace eval {
       case par::NodeType::JUMP: return evalJump(static_cast<const par::Jump*>(node), env);
       case par::NodeType::CLASS_DECL: return evalClassDecl(static_cast<const par::ClassDecl*>(node), env);
       case par::NodeType::NEW_EXPR: return evalNewExpr(static_cast<const par::NewExpr*>(node), env);
-      case par::NodeType::SELF:
+      case par::NodeType::SELF: {
         // NOLINTEND
-        // Self never appears as its own statement/expression, the parser
-        // only ever produces it as the object child of a MemberAccess
-        // (this->field, super->field), handled by evalMemberAccess. Hitting
-        // this case means a bare `this`/`super` reached evaluate() directly,
-        // which the grammar doesn't allow.
-        throw std::runtime_error("Evaluator: 'this'/'super' used outside of a member access");
+        // The parser normally wraps `this`/`super` in a MemberAccess for field
+        // access (this->field), handled by evalMemberAccess. However, a bare
+        // `this` is valid as a standalone expression — e.g. `return this;` for
+        // method chaining — so we handle that here by looking up the "this"
+        // binding that callFunction placed in the call scope.
+        // Bare `super` has no standalone meaning (super isn't a value, only
+        // super->field is), so that still throws.
+        const auto* self_node = static_cast<const par::Self*>(node);
+        if (self_node->is_super) {
+          throw std::runtime_error("Evaluator: bare 'super' is not a value; use 'super->field' or 'super->method(...)'");
+        }
+        auto this_val = env->get("this");
+        if (!this_val) {
+          throw std::runtime_error("'this' used outside of a method body");
+        }
+        return *this_val;
+      }
     }
 
     throw std::runtime_error("Evaluator: unhandled NodeType");

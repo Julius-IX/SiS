@@ -862,13 +862,28 @@ namespace par { // Complex parsing structures
   // The following ->field or ->method() becomes a MemberAccess/Call wrapped
   // around this Self node, handled automatically by parseContinuation's DOT case.
   // NOTE: grammar uses `->` for this/super access and `.` for regular objects.
-  // accessing a field method on a class REQUIRES '->' usage, `.` is not allowed.
+  // accessing a field or method on a class REQUIRES '->' usage, `.` is not allowed.
+  //
+  // `this` alone is valid as a standalone expression (e.g. `return this;` for
+  // method chaining). `super` alone is not, it has no value without a member
+  // access, so `->` remains mandatory for super.
   std::unique_ptr<Node> Parser::parseThisOrSuper(State* state, bool is_super) {
     lex::Token self_tok = advance(state); // consume this/super
 
-    if (!expect(state, lex::TokenType::ARROW, "Expected '->' after 'this' or 'super'")) {
-      return nullptr;
+    if (!check(state->lexer.get(), lex::TokenType::ARROW)) {
+      if (is_super) {
+        panic(m_hooks.format_error(state, state->lexer->peekToken(), "Expected '->' after 'super'"));
+        return nullptr;
+      }
+      // Bare `this` with no following `->`: return a Self node directly so
+      // `return this;` and similar expressions evaluate to the instance.
+      auto self = std::make_unique<Self>(false);
+      self->line = self_tok.line;
+      self->column = self_tok.column;
+      return self;
     }
+
+    advance(state); // consume '->'
 
     lex::Token member_tok = advance(state);
     if (member_tok.type != lex::TokenType::IDENT) {
