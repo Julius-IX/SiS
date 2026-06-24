@@ -317,7 +317,7 @@ namespace { // Array literals
     ASSERT_NODE(as_ExprStmt->expr.get(), ArrayLiteral);
     EXPECT_EQ(as_ArrayLiteral->elements.size(), 3U);
     for (auto& elem : as_ArrayLiteral->elements) {
-      EXPECT_EQ(elem->type, par::NodeType::LITERAL);
+      EXPECT_EQ(elem.value->type, par::NodeType::LITERAL);
     }
   }
 } // namespace

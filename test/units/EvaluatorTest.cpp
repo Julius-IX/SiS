@@ -414,7 +414,7 @@ namespace { // Arrays
     auto v = runScript("[1, 2, 3];");
     ASSERT_TRUE(std::holds_alternative<eval::Array>(v.data));
     EXPECT_EQ(std::get<eval::Array>(v.data)->size(), 3U);
-    EXPECT_DOUBLE_EQ(std::get<double>((*std::get<eval::Array>(v.data))[0].data), 1.0);
+    EXPECT_DOUBLE_EQ(std::get<double>((*std::get<eval::Array>(v.data)).elements[0].second.data), 1.0);
   }
 
   TEST(Evaluator, ArraySubscript) { EXPECT_DOUBLE_EQ(std::get<double>(runScript("[10, 20, 30][1];").data), 20.0); }
