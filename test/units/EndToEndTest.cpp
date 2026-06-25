@@ -474,4 +474,8 @@ namespace { // Error and edge cases
     EXPECT_EQ(out[0], "was empty");
   }
 
+  TEST_F(E2E, CompoundAssingOnMissingKeyThrows) {
+    EXPECT_THROW(run("errors/missing_key_compound_assign.sis"), std::runtime_error);
+  }
+
 } // namespace
