@@ -5,6 +5,12 @@
 #include <filesystem>
 #include <fstream>
 #include <print>
+#ifdef _WIN32
+#include <windows.h>
+#undef TRUE
+#undef FALSE
+#undef THIS
+#endif
 #ifdef __APPLE__
 #include <mach-o/dyld.h>
 #endif
@@ -55,7 +61,6 @@ namespace par { // Hooks
 
     const char* sis_path_env = std::getenv("SIS_PATH");
     LOG_DEBUG_FLUSH("resolving with env var: {}", sis_path_env ? sis_path_env : "not set");
-
 #ifdef _WIN32
     const char sep = ';';
     const std::string dyn_subdir = "dynamic/";
@@ -82,10 +87,8 @@ namespace par { // Hooks
     const std::string dyn_subdir = "lib/dynamic/";
     const std::string dyn_ext = ".so";
 
-    auto get_fallback_dir = []() -> std::string { return ""; }; // rely on SIS_PATH on linux
+    auto getFallbackDir = []() -> std::string { return ""; };
 #endif
-
-    // Build the list of search dirs: env var entries first, then fallback
     std::vector<std::string> search_dirs;
     if (sis_path_env != nullptr) {
       std::stringstream ss(sis_path_env);
@@ -94,7 +97,7 @@ namespace par { // Hooks
         search_dirs.push_back(dir);
       }
     }
-    if (auto fallback = get_fallback_dir(); !fallback.empty()) search_dirs.push_back(fallback);
+    if (auto fallback = getFallbackDir(); !fallback.empty()) search_dirs.push_back(fallback);
 
     for (const auto& dir : search_dirs) {
       Path b(dir);
