@@ -435,6 +435,14 @@ namespace { // Arrays
     EXPECT_DOUBLE_EQ(std::get<double>(v.data), 2.0);
   }
 
+  TEST(Evaluator, SetOnExistingKeyReplacesValue) {
+    auto v = runScript("pin a = []; a[0] = 1;");
+    EXPECT_DOUBLE_EQ(std::get<double>(v.data), 1.0);
+
+    v = runScript("pin a = []; a[0] = 1; a[0] = 2; a[0];");
+    EXPECT_DOUBLE_EQ(std::get<double>(v.data), 2.0);
+  }
+
 } // namespace
 
 namespace { // Classes
