@@ -165,6 +165,11 @@ namespace eval {
 
     eval::SisRegistry registry{.env = lib_env, .classes = m_classes};
     init(&registry);
+
+    using SetArgsFn = void (*)(int, const char**);
+    auto set_args = reinterpret_cast<SetArgsFn>(dlsym(handle, "sis_set_args"));
+    if (set_args != nullptr) set_args(m_argc, m_argv);
+
 #elif _WIN32
     HMODULE handle = LoadLibraryA(path.string().c_str());
     if (handle == nullptr) {
@@ -174,7 +179,6 @@ namespace eval {
 
     using InitFn = void (*)(eval::SisRegistry*);
     auto init = reinterpret_cast<InitFn>(GetProcAddress(handle, "sis_module_init"));
-
     if (init == nullptr) {
       FreeLibrary(handle);
       throw std::runtime_error("sis_module_init not found in: " + path.string());
@@ -182,6 +186,10 @@ namespace eval {
 
     eval::SisRegistry registry{.env = lib_env, .classes = m_classes};
     init(&registry);
+
+    using SetArgsFn = void (*)(int, const char**);
+    auto set_args = reinterpret_cast<SetArgsFn>(GetProcAddress(handle, "sis_set_args"));
+    if (set_args != nullptr) set_args(m_argc, m_argv);
 
 #else
 #error Unsupported platform

@@ -32,6 +32,11 @@ namespace eval {
   class Evaluator {
     public:
     Evaluator();
+    Evaluator(const int argc, const char* argv[])
+      : Evaluator() {
+      m_argc = argc;
+      m_argv = argv;
+    }
 
     // Runs an entire parsed program (the top level Block from Parser::parse)
     // in the global environment. Returns the value of the last statement,
@@ -43,6 +48,8 @@ namespace eval {
     const Path* m_current_eval_file;
     std::shared_ptr<Environment> m_global;
     std::unordered_map<Path, std::shared_ptr<Environment>> m_file_cache;
+    int m_argc = 0;
+    const char** m_argv = nullptr;
 
     // Maps each FnLiteral AST node to the source file it was declared in.
     // Populated in evalFnLiteral; read in callFunction to switch
