@@ -4,8 +4,7 @@ set -e
 
 SIS_PATH="$HOME/.config/sis/"
 LINK="https://api.github.com/repos/Julius-IX/SiS/releases"
-# ZIP_NAME="sis-linux-x86_64.tar.gz"
-ZIP_NAME="SiS-Linux-x86-v0.1.1" # TODO: remove
+ZIP_NAME="sis-linux-x86_64.tar.gz"
 
 mkdir -p "$SIS_PATH"
 
@@ -28,9 +27,7 @@ echo "Downloading..."
 curl -L "$DOWNLOAD_URL" -o "$TMP_FILE"
 
 echo "Extracting..."
-# tar -xzf "$TMP_FILE" -C "$SIS_PATH"
-mv "$TMP_FILE" "$SIS_PATH" # TODO: remove
-chmod +x "$SIS_PATH/$ZIP_NAME" # TODO: remove
+tar -xzf "$TMP_FILE" -C "$SIS_PATH"
 
 rm -f "$TMP_FILE"
 
