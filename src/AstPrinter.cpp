@@ -132,7 +132,7 @@ namespace par { // Tree-drawing (debugging only don't expect direct access to th
         case NodeType::ARRAY_LITERAL: {
           const auto* n = static_cast<const ArrayLiteral*>(node);
           for (const auto& el : n->elements) {
-            out.push_back({.label = "", .node = el.get()});
+            out.push_back({.label = "", .node = el.value.get()});
           }
           break;
         }

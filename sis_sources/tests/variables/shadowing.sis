@@ -1,0 +1,6 @@
+pin x = "outer";
+{
+    pin x = "inner";
+    print(x);
+}
+print(x);

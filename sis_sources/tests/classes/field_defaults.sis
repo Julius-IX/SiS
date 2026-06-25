@@ -1,0 +1,7 @@
+class Thing {
+    pin count = 0;
+    pin label = "unnamed";
+}
+pin t = new Thing();
+print(str(t.count));
+print(t.label);

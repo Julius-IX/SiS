@@ -174,11 +174,21 @@ namespace par {
         field(std::move(field)) {}
   };
 
-  // [1, 2, 3]
+  // Each entry in an array literal is an optional key expression and a
+  // required value expression. key == nullptr means the entry was written
+  // without an explicit key ([value, value]) and the evaluator will assign
+  // a sequential numeric key automatically.
+  struct ArrayElement {
+    std::unique_ptr<Node> key; // nullptr if no explicit key
+    std::unique_ptr<Node> value;
+  };
+
+  // [key: value, value, key: value]
+  // Elements may mix keyed and unkeyed entries freely.
   struct ArrayLiteral final : Node {
     static constexpr NodeType TYPE = NodeType::ARRAY_LITERAL;
-    std::vector<std::unique_ptr<Node>> elements;
-    explicit ArrayLiteral(std::vector<std::unique_ptr<Node>> elements)
+    std::vector<ArrayElement> elements;
+    explicit ArrayLiteral(std::vector<ArrayElement> elements)
       : Node(TYPE),
         elements(std::move(elements)) {}
   };

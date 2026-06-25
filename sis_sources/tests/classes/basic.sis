@@ -1,0 +1,5 @@
+class Greeter {
+    fn greet() { return "hello"; }
+}
+pin g = new Greeter();
+print(g.greet());

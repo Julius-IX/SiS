@@ -1,0 +1,204 @@
+// Usage:
+//   include "Vector";
+//
+//   pin v = new Vector([1, 2, 3]);
+//   v.push(4);
+//   print(v.len());              // 4
+//   print(v.contains(2));        // true
+//   print(v.slice(1, 3));        // [2, 3]    (returns a new Vector)
+//   pin doubled = l.map(fn(x) { x * 2; });
+//   pin evens   = l.filter(fn(x) { x % 2 == 0; });
+//   pin total   = l.reduce(fn(acc, x) { acc + x; }, 0);
+//   v.sort();
+//   v.sort(fn(a, b) { a > b; });  // descending
+//   v.reverse();
+//   v.remove(0);
+//   v.insert(0, 99);
+//   print(l.flat());              // flattens one level of nested Vectors/arrays
+
+include "math";
+
+class Vector {
+  pin _data = [];
+
+  fn constructor(items) {
+    if (!isNull(items)) {
+      this->_data = items;
+    }
+  }
+
+  // Number of items.
+  fn len() {
+    return len(this->_data);
+  }
+
+  // Append to end.
+  fn push(item) {
+    push(this->_data, item);
+    return this;
+  }
+
+  // Remove and return the last item.
+  fn pop() {
+    return pop(this->_data);
+  }
+
+  // Insert item at index i, shifting everything after it right.
+  fn insert(i, item) {
+    pin result = [];
+    pin n = len(this->_data);
+    for (pin j = 0; j < i; j += 1) {
+      push(result, this->_data[j]);
+    }
+    push(result, item);
+    for (pin j = i; j < n; j += 1) {
+      push(result, this->_data[j]);
+    }
+    this->_data = result;
+    return this;
+  }
+
+  // Remove item at index i, shifting everything after it left.
+  fn remove(i) {
+    pin result = [];
+    pin n = len(this->_data);
+    for (pin j = 0; j < n; j += 1) {
+      if (j != i) {
+        push(result, this->_data[j]);
+      }
+    }
+    this->_data = result;
+    return this;
+  }
+
+  // Reverse in place.
+  fn reverse() {
+    pin n = len(this->_data);
+    pin half = n / 2;
+    for (pin i = 0; i < floor(half); i += 1) {
+      pin tmp = this->_data[i];
+      this->_data[i] = this->_data[n - 1 - i];
+      this->_data[n - 1 - i] = tmp;
+    }
+    return this;
+  }
+
+  // In-place sort. Optional `key` is a comparator fn(a, b) -> bool that
+  // returns true when a should come before b. Defaults to ascending by <.
+  // Uses insertion sort simple, stable, good enough for scripting use.
+  fn sort(key) {
+    pin n = len(this->_data);
+    for (pin i = 1; i < n; i += 1) {
+      pin cur = this->_data[i];
+      pin j = i - 1;
+      if (isNull(key)) {
+        while (j >= 0 && this->_data[j] > cur) {
+          this->_data[j + 1] = this->_data[j];
+          j -= 1;
+        }
+      } else {
+        while (j >= 0 && key(cur, this->_data[j])) {
+          this->_data[j + 1] = this->_data[j];
+          j -= 1;
+        }
+      }
+      this->_data[j + 1] = cur;
+    }
+    return this;
+  }
+
+  // True if any element equals item (value equality for primitives,
+  // identity for arrays/instances same rules as ==).
+  fn contains(item) {
+    pin n = len(this->_data);
+    for (pin i = 0; i < n; i += 1) {
+      if (this->_data[i] == item) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // Returns a new Vector with elements from `start` up to but not
+  // including `end`. Omit `end` (pass null) to slice to the end.
+  fn slice(start, end) {
+    pin n = len(this->_data);
+    pin stop = isNull(end) ? n : end;
+    pin result = new Vector(null);
+    for (pin i = start; i < stop; i += 1) {
+      result.push(this->_data[i]);
+    }
+    return result;
+  }
+
+  // Returns a new Vector of function(item) results.
+  fn map(function) {
+    pin result = new Vector(null);
+    pin n = len(this->_data);
+    for (pin i = 0; i < n; i += 1) {
+      result.push(function(this->_data[i]));
+    }
+    return result;
+  }
+
+  // Returns a new Vector of items where function(item) is truthy.
+  fn filter(function) {
+    pin result = new Vector(null);
+    pin n = len(this->_data);
+    for (pin i = 0; i < n; i += 1) {
+      if (function(this->_data[i])) {
+        result.push(this->_data[i]);
+      }
+    }
+    return result;
+  }
+
+  // Fold left. `init` is the starting accumulator; if null, uses the
+  // first element and starts from index 1.
+  fn reduce(function, init) {
+    pin n = len(this->_data);
+    pin acc = init;
+    pin start = 0;
+    if (isNull(acc)) {
+      if (n == 0) { return null; }
+      acc = this->_data[0];
+      start = 1;
+    }
+    for (pin i = start; i < n; i += 1) {
+      acc = function(acc, this->_data[i]);
+    }
+    return acc;
+  }
+
+  // Flatten one level: nested Vectors unwrap their inner array, plain
+  // arrays are spread in, anything else is appended as-is.
+  fn flat() {
+    pin result = new Vector(null);
+    pin n = len(this->_data);
+    for (pin i = 0; i < n; i += 1) {
+      pin item = this->_data[i];
+      if (isInstance(item)) {
+        // Nested Vector: splice its inner data in
+        pin inner = item._data;
+        pin m = len(inner);
+        for (pin j = 0; j < m; j += 1) {
+          result.push(inner[j]);
+        }
+      } else if (isArray(item)) {
+        // Raw SiS array: spread it in
+        pin m = len(item);
+        for (pin j = 0; j < m; j += 1) {
+          result.push(item[j]);
+        }
+      } else {
+        result.push(item);
+      }
+    }
+    return result;
+  }
+
+  // Raw underlying array, for interop with native builtins.
+  fn data() {
+    return this->_data;
+  }
+}

@@ -1,0 +1,12 @@
+class Parent {
+    pin tag = "parent-field";
+}
+class Child extends Parent {
+    pin childTag = "child-field";
+    fn both() {
+        print(this->tag);
+        print(this->childTag);
+    }
+}
+pin c = new Child();
+c.both();

@@ -1,0 +1,2 @@
+include "circular.sis";
+print("ok");

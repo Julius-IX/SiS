@@ -5,12 +5,18 @@
 #include <filesystem>
 #include <fstream>
 #include <print>
+#ifdef _WIN32
+#include <windows.h>
+#undef TRUE
+#undef FALSE
+#undef THIS
+#endif
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#endif
 
-// NOTE: placeholder
-[[noreturn]] static void panic(const std::string_view msg) {
-  fmt::print("PANIC: {}\n", msg.data());
-  std::exit(1);
-}
+// WARN: May change at any time, temporary solution is the best permanent solution
+static void panic(const std::string_view msg) { throw std::runtime_error(msg.data()); }
 
 namespace par { // Hooks
   static std::optional<std::string> readFileToString(const Path& path) {
@@ -39,21 +45,73 @@ namespace par { // Hooks
     return fmted_msg + fmt::format("{}\n{}", line_content, std::string(token.column - 1, ' ') + std::string(std::max<size_t>(token.length, 1), '^'));
   }
 
-  std::optional<Path> resolveFile(const Path& root, const Path& relative_include_path) {
-    std::filesystem::path full = root / relative_include_path;
-
+  static std::optional<Path> resolveFileOnDisk(const Path& full) {
     std::error_code ec;
     auto canonical = std::filesystem::weakly_canonical(full, ec);
-
-    if (ec) {
-      return std::nullopt;
-    }
-
-    if (!std::filesystem::is_regular_file(canonical)) {
-      return std::nullopt;
-    }
-
+    if (ec || !std::filesystem::is_regular_file(canonical)) return std::nullopt;
+    LOG_DEBUG_FLUSH("resolved file path: {}", canonical.string());
     return canonical;
+  }
+
+  std::optional<Path> resolveFile(const Path& root, const Path& relative) {
+    LOG_DEBUG_FLUSH("resolving file path: {}", relative.string());
+    if (relative.has_extension()) {
+      return resolveFileOnDisk(root / relative);
+    }
+
+    const char* sis_path_env = std::getenv("SIS_PATH");
+    LOG_DEBUG_FLUSH("resolving with env var: {}", sis_path_env ? sis_path_env : "not set");
+#ifdef _WIN32
+    const char sep = ';';
+    const std::string dyn_subdir = "dynamic/";
+    const std::string dyn_ext = ".dll";
+
+    auto getFallbackDir = []() -> std::string {
+      char exe_path[MAX_PATH];
+      GetModuleFileNameA(nullptr, exe_path, MAX_PATH);
+      return Path(exe_path).parent_path().string();
+    };
+#elif __APPLE__
+    const char sep = ':';
+    const std::string dyn_subdir = "dynamic/";
+    const std::string dyn_ext = ".dylib";
+
+    auto getFallbackDir = []() -> std::string {
+      char exe_path[PATH_MAX];
+      uint32_t size = sizeof(exe_path);
+      if (_NSGetExecutablePath(exe_path, &size) != 0) return "";
+      return Path(exe_path).parent_path().string();
+    };
+#else
+    const char sep = ':';
+    const std::string dyn_subdir = "lib/dynamic/";
+    const std::string dyn_ext = ".so";
+
+    auto getFallbackDir = []() -> std::string { return ""; };
+#endif
+    std::vector<std::string> search_dirs;
+    if (sis_path_env != nullptr) {
+      std::stringstream ss(sis_path_env);
+      std::string dir;
+      while (std::getline(ss, dir, sep)) {
+        search_dirs.push_back(dir);
+      }
+    }
+    if (auto fallback = getFallbackDir(); !fallback.empty()) search_dirs.push_back(fallback);
+
+    for (const auto& dir : search_dirs) {
+      Path b(dir);
+      if (auto p = resolveFileOnDisk(b / "lib" / "managed" / (relative.string() + ".sis"))) { // NOTE: ill deff change this and then forget to edit the build script but whatever
+        LOG_DEBUG_FLUSH("checking native dir: {}", p->string());
+        return p;
+      }
+      if (auto p = resolveFileOnDisk(b / dyn_subdir / (relative.string() + dyn_ext))) {
+        LOG_DEBUG_FLUSH("checking dynamic dir");
+        return p;
+      }
+    }
+    LOG_DEBUG_FLUSH("failed to resolve file path: {}", relative.string());
+    return std::nullopt;
   }
 
   Parser::Parser() {
@@ -137,8 +195,11 @@ namespace par { // Include resolving
 
   void Parser::parseCurrentFile(const Path& current_path) {
     LOG_DEBUG_FLUSH("Parsing full file {}", current_path.string());
-    try { // TODO: remove try/catch after full refactor
-      parse(&m_states[current_path]);
+    try {
+      if (!parse(&m_states[current_path])) {
+        panic(fmt::format("Failed to parse '{}'", current_path.string()));
+      }
+      m_load_order.push_back(current_path);
     } catch (const std::exception& e) {
       panic(fmt::format("Error parsing '{}': {}", current_path.string(), e.what()));
     }
@@ -146,6 +207,16 @@ namespace par { // Include resolving
 
   bool Parser::loadIncludeSource(const Path& include_path) {
     LOG_DEBUG_FLUSH("Resolving include path: {}", include_path.string());
+
+    // Native modules (.so/.dll/.dylib) have no source to lex give them a
+    // sentinel empty block so the final validity check in parseRoot passes,
+    // and let the evaluator handle them via loadDynamicLib.
+    auto ext = include_path.extension();
+    if (ext == ".so" || ext == ".dll" || ext == ".dylib") {
+      m_states[include_path] = State{.lexer = nullptr, .block = std::make_unique<Block>(std::vector<std::unique_ptr<Node>>()), .last_token = {}};
+      return true;
+    }
+
     std::optional<std::string> source = m_hooks.read_file(include_path);
     if (source == std::nullopt) {
       panic(fmt::format("Could not open included source file '{}'", include_path.string()));
@@ -166,6 +237,14 @@ namespace par { // Include resolving
       Path current_path = m_include_stack.back();
       m_include_stack.pop_back();
 
+      // Native modules have no source to parse sentinel block already set in
+      // loadIncludeSource, just record them in load order for the evaluator.
+      auto ext = current_path.extension();
+      if (ext == ".so" || ext == ".dll" || ext == ".dylib") {
+        m_load_order.push_back(current_path);
+        continue;
+      }
+
       std::expected<std::optional<Path>, std::string> include_path = checkForInclude(current_path);
       if (!include_path.has_value()) {
         panic(include_path.error());
@@ -177,25 +256,41 @@ namespace par { // Include resolving
         continue;
       }
 
-      if (m_states.contains(include_path.value().value())) {
-        panic(fmt::format("Circular include detected at '{}'", include_path.value().value().string()));
+      const Path& resolved = include_path.value().value();
+
+      bool mid_flight = std::ranges::find(m_include_stack, resolved) != m_include_stack.end();
+      if (mid_flight) {
+        panic(fmt::format("Circular include detected at '{}'", resolved.string()));
         break;
       }
 
-      if (!loadIncludeSource(include_path.value().value())) {
-        break;
+      if (m_states.contains(resolved)) {
+        // already loaded, dep recorded in checkForInclude, keep going
+        m_include_stack.push_back(current_path);
+        continue;
       }
+
+      if (!loadIncludeSource(resolved)) break;
       m_include_stack.push_back(current_path);
-      m_include_stack.push_back(include_path.value().value());
+      m_include_stack.push_back(resolved);
     }
 
-    return std::ranges::find(m_root->statements, nullptr) == m_root->statements.end();
+    for (auto& [p, state] : m_states) {
+      if (!state.block) return false;
+    }
+    return true;
   }
 
   std::expected<std::optional<Path>, std::string> Parser::checkForInclude(const Path& path) {
     lex::Lexer* lexer = m_states[path].lexer.get();
+
     if (!check(lexer, lex::TokenType::INCLUDE)) {
+      m_states[path].past_include_zone = true;
       return std::nullopt;
+    }
+
+    if (m_states[path].past_include_zone) {
+      return std::unexpected(m_hooks.format_error(&m_states[path], m_states[path].last_token, "includes must appear at the top of the file"));
     }
 
     advance(&m_states[path]);
@@ -205,7 +300,6 @@ namespace par { // Include resolving
     }
 
     std::optional<Path> include_path = getFromVariant<std::string>(m_states[path].last_token).value();
-
     if (!include_path) {
       return std::unexpected(m_hooks.format_error(&m_states[path], m_states[path].last_token, "Failed to get path from 'include'"));
     }
@@ -219,6 +313,7 @@ namespace par { // Include resolving
       return std::unexpected(m_hooks.format_error(&m_states[path], m_states[path].last_token, "Failed to resolve include path"));
     }
 
+    m_states[path].includes.push_back(include_path.value());
     return include_path;
   }
 
@@ -227,16 +322,12 @@ namespace par { // Include resolving
 namespace par { // Base parsing loop functions
   bool Parser::parse(State* state) {
     std::vector<std::unique_ptr<Node>> statements;
-
     while (!isAtEnd(state->lexer.get())) {
       std::unique_ptr<Node> stmt = parseStatement(state);
       if (stmt == nullptr) return false;
       statements.push_back(std::move(stmt));
     }
-
-    m_root->statements.reserve(m_root->statements.size() + statements.size());
-    m_root->statements.insert(m_root->statements.end(), std::make_move_iterator(statements.begin()), std::make_move_iterator(statements.end()));
-
+    state->block = std::make_unique<Block>(std::move(statements));
     return true;
   }
 
@@ -378,10 +469,41 @@ namespace par { // Base parsing loop functions
 
       case lex::TokenType::L_BRACK: {
         advance(state);
-        std::optional<std::vector<std::unique_ptr<Node>>> elements = parseExpressionList(state, lex::TokenType::R_BRACK);
-        if (elements == std::nullopt) return nullptr; 
+        std::vector<ArrayElement> elements;
+
+        // Track the next auto-assigned numeric key for unkeyed entries.
+        // Keyed entries don't advance this counter, matching Lua semantics:
+        // [10: "x", "y", "z"] gives "y" key 0 and "z" key 1, not 11 and 12.
+        while (!check(state->lexer.get(), lex::TokenType::R_BRACK)) {
+          if (check(state->lexer.get(), lex::TokenType::SIS_EOF)) {
+            panic("Unterminated array literal, expected ']'");
+            return nullptr;
+          }
+
+          // Parse the first expression. It's either a standalone value, or the
+          // key in a `key: value` pair we don't know which until we peek at
+          // what follows it.
+          std::unique_ptr<Node> first = parseExpression(state, 1);
+          if (first == nullptr) return nullptr;
+
+          ArrayElement elem;
+          if (match(state, lex::TokenType::COLON)) {
+            // key: value first expression was the key
+            elem.key = std::move(first);
+            elem.value = parseExpression(state, 1);
+            if (elem.value == nullptr) return nullptr;
+          } else {
+            // bare value no explicit key
+            elem.key = nullptr;
+            elem.value = std::move(first);
+          }
+
+          elements.push_back(std::move(elem));
+          if (!match(state, lex::TokenType::COMMA)) break;
+        }
+
         if (!expect(state, lex::TokenType::R_BRACK, "Expected ']' after array elements")) return nullptr;
-        return makeNode<ArrayLiteral>(tok.line, tok.column, std::move(elements.value()));
+        return makeNode<ArrayLiteral>(tok.line, tok.column, std::move(elements));
       }
 
       case lex::TokenType::FN: return parseFnLiteral(state);
@@ -560,7 +682,7 @@ namespace par { // Base parsing loop functions
 
     while (true) {
       std::unique_ptr<Node> expr = parseExpression(state, 1);
-      if (expr == nullptr) return std::nullopt ;
+      if (expr == nullptr) return std::nullopt;
       list.push_back(std::move(expr));
       if (!match(state, lex::TokenType::COMMA)) break;
     }
@@ -799,13 +921,28 @@ namespace par { // Complex parsing structures
   // The following ->field or ->method() becomes a MemberAccess/Call wrapped
   // around this Self node, handled automatically by parseContinuation's DOT case.
   // NOTE: grammar uses `->` for this/super access and `.` for regular objects.
-  // accessing a field method on a class REQUIRES '->' usage, `.` is not allowed.
+  // accessing a field or method on a class REQUIRES '->' usage, `.` is not allowed.
+  //
+  // `this` alone is valid as a standalone expression (e.g. `return this;` for
+  // method chaining). `super` alone is not, it has no value without a member
+  // access, so `->` remains mandatory for super.
   std::unique_ptr<Node> Parser::parseThisOrSuper(State* state, bool is_super) {
     lex::Token self_tok = advance(state); // consume this/super
 
-    if (!expect(state, lex::TokenType::ARROW, "Expected '->' after 'this' or 'super'")) {
-      return nullptr;
+    if (!check(state->lexer.get(), lex::TokenType::ARROW)) {
+      if (is_super) {
+        panic(m_hooks.format_error(state, state->lexer->peekToken(), "Expected '->' after 'super'"));
+        return nullptr;
+      }
+      // Bare `this` with no following `->`: return a Self node directly so
+      // `return this;` and similar expressions evaluate to the instance.
+      auto self = std::make_unique<Self>(false);
+      self->line = self_tok.line;
+      self->column = self_tok.column;
+      return self;
     }
+
+    advance(state); // consume '->'
 
     lex::Token member_tok = advance(state);
     if (member_tok.type != lex::TokenType::IDENT) {

@@ -1,0 +1,10 @@
+class Widget {
+    pin value = 0;
+    fn constructor(v) {
+        print("constructed");
+        this->value = v;
+    }
+    fn get() { return this->value; }
+}
+pin w = new Widget(42);
+print(str(w.get()));

@@ -1,0 +1,6 @@
+pin count = 0;
+while (true) {
+    if (count == 3) { break; }
+    count += 1;
+}
+print(str(count));

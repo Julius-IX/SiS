@@ -1,9 +1,17 @@
 #pragma once
 
 #include <Environment.h>
+#include <Parser.h>
 #include <ParserNodeTypes.h>
+#include <SisRegistry.h>
 #include <Value.h>
+
+#include <filesystem>
 #include <memory>
+#include <unordered_map>
+#ifdef __unix__
+#include <dlfcn.h>
+#endif
 
 namespace eval {
   // Thrown to unwind the C++ call stack back up to the nearest enclosing
@@ -24,15 +32,42 @@ namespace eval {
   class Evaluator {
     public:
     Evaluator();
+    Evaluator(const int argc, const char* argv[])
+      : Evaluator() {
+      m_argc = argc;
+      m_argv = argv;
+    }
 
     // Runs an entire parsed program (the top level Block from Parser::parse)
     // in the global environment. Returns the value of the last statement,
     // mostly useful for REPL style usage, the return value doesn't matter for
     // running a script for its side effects.
-    Value run(const par::Block& program);
+    Value run(const par::Parser& parser);
 
     private:
+    const Path* m_current_eval_file;
     std::shared_ptr<Environment> m_global;
+    std::unordered_map<Path, std::shared_ptr<Environment>> m_file_cache;
+    int m_argc = 0;
+    const char** m_argv = nullptr;
+
+    // Maps each FnLiteral AST node to the source file it was declared in.
+    // Populated in evalFnLiteral; read in callFunction to switch
+    // m_current_eval_file to the callee's file before running its body.
+    std::unordered_map<const par::FnLiteral*, const Path*> m_fn_source_file;
+
+    // One frame per active callFunction invocation. Records the CALL SITE
+    // (the caller's file and the Call/NewExpr node), pushed before
+    // m_current_eval_file is updated so it reflects where the call was made,
+    // not where the callee lives. Used by throwKnownScopeErr to print a
+    // "called from ..." stack trace alongside the error location.
+    struct CallFrame {
+      const Path* file;      // source file at the call site
+      const par::Node* node; // Call/NewExpr node — gives line/col of the call
+    };
+    std::vector<CallFrame> m_call_stack;
+
+    [[noreturn]] void throwKnownScopeErr(const par::Node* node, std::string msg);
 
     // Name -> runtime Class, populated as ClassDecl statements are
     // evaluated. Looked up by name from evalNewExpr and from MemberAccess
@@ -50,6 +85,13 @@ namespace eval {
     // single place to add a new built-in: define a NativeFunction and
     // env->define() it.
     static void registerBuiltins(const std::shared_ptr<Environment>& env);
+
+    Value cmpDouble(const par::Binary* node, const double* l, const double* r);
+    Value applyCompoundOp(const par::Node* node, lex::TokenType op, const Value& current, const Value& rhs);
+
+    std::shared_ptr<Environment> loadFile(const Path& path, const par::Block& block, const std::vector<Path>& deps, Value* out_last);
+    std::shared_ptr<Environment> loadDynamicLib(const Path& path, const std::vector<Path>& deps);
+    static void mergeIntoEnv(const std::shared_ptr<Environment>& src, const std::shared_ptr<Environment>& dst);
 
     Value evaluate(const par::Node* node, const std::shared_ptr<Environment>& env);
 
@@ -124,9 +166,11 @@ namespace eval {
     // is set, it's defined as "this" in that fresh scope (method call), and
     // `defining_class` (when set) is stashed as "__class__" so
     // evalSelfMemberAccess knows which class's parent to start searching from.
-    Value callFunction(
-      const Function& fn, std::vector<Value> args, const par::Node* call_node, const std::optional<Value>& bound_this = std::nullopt,
-      const std::shared_ptr<Class>& defining_class = nullptr);
+    Value callFunction(const Function& fn,
+                       std::vector<Value> args,
+                       const par::Node* call_node,
+                       const std::optional<Value>& bound_this = std::nullopt,
+                       const std::shared_ptr<Class>& defining_class = nullptr);
 
     // Shared implementation behind evalMemberAccess and evalSelfMemberAccess:
     // given an already-evaluated `object` Value and a field name, returns the

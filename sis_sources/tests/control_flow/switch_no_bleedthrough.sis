@@ -1,0 +1,4 @@
+switch (1) {
+    case 1: { print("one"); break; }
+    case 2: { print("two"); break; }
+}

@@ -9,11 +9,16 @@ int main(const int argc, const char* argv[]) {
     return 1;
   }
 
-  par::Parser parser;
-  if (!parser.parseRoot(argv[1])) return 1;
+  try {
+    par::Parser parser;
+    if (!parser.parseRoot(argv[1])) return 1;
 
-  eval::Evaluator evaluator;
-  evaluator.run(parser.peekRoot());
+    eval::Evaluator evaluator(argc, argv);
+    evaluator.run(parser);
+  } catch (const std::runtime_error& e) {
+    fmt::print("Error: {}\n", e.what());
+    return 1;
+  }
 
   return 0;
 }

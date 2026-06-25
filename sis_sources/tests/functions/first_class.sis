@@ -1,0 +1,3 @@
+fn invoke(f) { f(); }
+pin sayIt = fn() { print("called"); };
+invoke(sayIt);

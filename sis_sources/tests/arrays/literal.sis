@@ -1,0 +1,4 @@
+pin arr = [1, 2, 3, "key": "value"];
+print(str(arr[0]));
+print(str(arr[2]));
+print(str(arr["key"]));

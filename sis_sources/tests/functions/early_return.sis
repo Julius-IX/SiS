@@ -1,0 +1,6 @@
+fn test() {
+    print("first");
+    return 0;
+    print("second");
+}
+test();

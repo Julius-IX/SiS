@@ -25,7 +25,8 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "BUILD_GMOCK": "OFF",
-        "LOGGING_DISABLED": "ON"
+        "LOGGING_DISABLED": "ON",
+        "BUILD_TESTS": "OFF"
       }
     }
   ],

@@ -1,0 +1,12 @@
+class A {
+    fn fromA() { return "parent-value"; }
+}
+class B extends A {
+    fn speak() { return "child"; }
+}
+class C extends B {
+    fn speak() { return "grandchild"; }
+}
+pin obj = new C();
+print(obj.speak());
+print(obj.fromA());

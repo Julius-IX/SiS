@@ -1,0 +1,2 @@
+pin arr = [];
+pin val = arr[0][0];
