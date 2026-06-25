@@ -443,6 +443,10 @@ namespace { // Arrays
     EXPECT_DOUBLE_EQ(std::get<double>(v.data), 2.0);
   }
 
+  TEST(Evaluator, ExplicitNumericKeyDoesNotShiftAutoKeyCounter) {
+    auto v = runScript(R"(pin a = []; a[1] = 1; a["str"] = "str"; push(a, 2); a;)");
+    EXPECT_EQ("[1: 1, str: str, 0: 2]", v.toString());
+  }
 } // namespace
 
 namespace { // Classes
