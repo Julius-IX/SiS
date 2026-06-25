@@ -1,7 +1,10 @@
 #pragma once
 
+#include <Logging.h>
+#include <algorithm>
 #include <functional>
 #include <memory>
+#include <numeric>
 #include <string>
 #include <unordered_map>
 #include <variant>
@@ -263,6 +266,24 @@ namespace eval {
         }
       }
       elements.emplace_back(key, std::move(value));
+    }
+
+    void emplaceBack(Value value) {
+      // Find the smallest non-negative integer key not already present.
+      // e.g. if keys {0, 2} exist, next auto key is 1; if {0,1,2} exist, it's 3.
+      double next = 0.0;
+      bool found = true;
+      while (found) {
+        found = false;
+        for (const auto& [k, v] : elements) {
+          if (const auto* d = std::get_if<double>(&k.data); (d != nullptr) && *d == next) {
+            found = true;
+            next += 1.0;
+            break;
+          }
+        }
+      }
+      elements.emplace_back(Value(next), std::move(value));
     }
   };
 } // namespace eval

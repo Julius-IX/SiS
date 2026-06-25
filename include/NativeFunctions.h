@@ -96,8 +96,7 @@ namespace eval {
                        if (!arr || !*arr) {
                          throw std::runtime_error("push() expects an array as its first argument, got " + args[0].typeName());
                        }
-                       Value size = (double)(*arr)->elements.size();
-                       (*arr)->elements.emplace_back(size, args[1]);
+                       (*arr)->emplaceBack(args[1]);
                        return args[0];
                      },
                    })),
