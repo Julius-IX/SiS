@@ -72,6 +72,11 @@ namespace eval {
     std::shared_ptr<Environment> env;
     std::unordered_map<std::string, std::shared_ptr<Class>>& classes;
 
+    // Used to define variables in scope
+    void defineVariable(const std::string& name, Value value) {
+      env->define(name, std::move(value));
+    }
+
     // Register a free function directly into scope callable by name
     // like any built-in (print, len, etc.)
     void defineFn(const char* name, std::function<Value(std::vector<Value>&)> fn) {

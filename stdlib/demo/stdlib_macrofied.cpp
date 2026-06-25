@@ -26,19 +26,13 @@ class NativeCounter {
   double m_value;
 };
 
-static double requireNum(const eval::Value& val, const char* ctx) {
-  const auto* d = std::get_if<double>(&val.data);
-  if (d == nullptr) throw std::runtime_error(std::string(ctx) + ": expected a number, got " + val.typeName());
-  return *d;
-}
-
 // free functions
-static eval::Value fnAdd(std::vector<eval::Value>& args) {
+FN_SIGNATURE(fnAdd, args) {
   if (args.size() != 2) throw std::runtime_error("add() expects 2 arguments");
   return {requireNum(args[0], "add") + requireNum(args[1], "add")};
 }
 
-static eval::Value fnClamp(std::vector<eval::Value>& args) {
+FN_SIGNATURE(fnClamp, args) {
   if (args.size() != 3) throw std::runtime_error("clamp() expects 3 arguments (value, min, max)");
   double v = requireNum(args[0], "clamp");
   double lo = requireNum(args[1], "clamp");
@@ -47,12 +41,12 @@ static eval::Value fnClamp(std::vector<eval::Value>& args) {
   return {v < lo ? lo : (v > hi ? hi : v)};
 }
 
-static eval::Value fnCounterSum(std::vector<eval::Value>& args) {
+FN_SIGNATURE(fnCounterSum, args) {
   if (args.size() != 1) throw std::runtime_error("counter_sum() expects 1 argument (array)");
   const auto* arr = std::get_if<eval::Array>(&args[0].data);
   if ((arr == nullptr) || !*arr) throw std::runtime_error("counter_sum() expects an array");
   NativeCounter acc(0.0);
-  for (const eval::Value& elem : **arr) {
+  for (const auto& [key, elem] : arr->get()->elements) {
     acc.add(requireNum(elem, "counter_sum"));
   }
   return {acc.value()};
@@ -67,21 +61,21 @@ SIS_MODULE_INIT(reg) {
   SIS_NATIVE_CLASS_BEGIN(reg, "Counter", NativeCounter)
     .constructor([](std::shared_ptr<eval::Instance> inst, std::vector<eval::Value>& args) {
       double initial = args.empty() ? 0.0 : requireNum(args[0], "Counter()");
-      SIS_NATIVE_CTOR(NativeCounter, inst, ctr, initial);
+      SIS_NATIVE_CTOR(NativeCounter, inst, native_var, initial);
     })
-    .method("increment", [](std::shared_ptr<eval::Instance> inst, std::vector<eval::Value>&) -> eval::Value {
+    .NATIVE_METHOD("increment", inst, args, {
       SIS_GET_NATIVE(NativeCounter, inst)->increment();
       return eval::Value{};
     })
-    .method("add", [](std::shared_ptr<eval::Instance> inst, std::vector<eval::Value>& args) -> eval::Value {
+    .NATIVE_METHOD("add", inst, args, {
       if (args.size() != 1) throw std::runtime_error("Counter.add() expects 1 argument");
       SIS_GET_NATIVE(NativeCounter, inst)->add(requireNum(args[0], "Counter.add"));
       return eval::Value{};
     })
-    .method("value", [](std::shared_ptr<eval::Instance> inst, std::vector<eval::Value>&) -> eval::Value {
+    .NATIVE_METHOD("value", inst, args, {
       return {SIS_GET_NATIVE(NativeCounter, inst)->value()};
     })
-    .method("reset", [](std::shared_ptr<eval::Instance> inst, std::vector<eval::Value>&) -> eval::Value {
+    .NATIVE_METHOD("reset", inst, args, {
       return {SIS_GET_NATIVE(NativeCounter, inst)->reset()};
     })
   SIS_NATIVE_CLASS_END();

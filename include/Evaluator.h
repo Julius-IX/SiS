@@ -32,6 +32,11 @@ namespace eval {
   class Evaluator {
     public:
     Evaluator();
+    Evaluator(const int argc, const char* argv[])
+      : Evaluator() {
+      m_argc = argc;
+      m_argv = argv;
+    }
 
     // Runs an entire parsed program (the top level Block from Parser::parse)
     // in the global environment. Returns the value of the last statement,
@@ -40,8 +45,29 @@ namespace eval {
     Value run(const par::Parser& parser);
 
     private:
+    const Path* m_current_eval_file;
     std::shared_ptr<Environment> m_global;
     std::unordered_map<Path, std::shared_ptr<Environment>> m_file_cache;
+    int m_argc = 0;
+    const char** m_argv = nullptr;
+
+    // Maps each FnLiteral AST node to the source file it was declared in.
+    // Populated in evalFnLiteral; read in callFunction to switch
+    // m_current_eval_file to the callee's file before running its body.
+    std::unordered_map<const par::FnLiteral*, const Path*> m_fn_source_file;
+
+    // One frame per active callFunction invocation. Records the CALL SITE
+    // (the caller's file and the Call/NewExpr node), pushed before
+    // m_current_eval_file is updated so it reflects where the call was made,
+    // not where the callee lives. Used by throwKnownScopeErr to print a
+    // "called from ..." stack trace alongside the error location.
+    struct CallFrame {
+      const Path* file;      // source file at the call site
+      const par::Node* node; // Call/NewExpr node — gives line/col of the call
+    };
+    std::vector<CallFrame> m_call_stack;
+
+    [[noreturn]] void throwKnownScopeErr(const par::Node* node, std::string msg);
 
     // Name -> runtime Class, populated as ClassDecl statements are
     // evaluated. Looked up by name from evalNewExpr and from MemberAccess
@@ -59,6 +85,8 @@ namespace eval {
     // single place to add a new built-in: define a NativeFunction and
     // env->define() it.
     static void registerBuiltins(const std::shared_ptr<Environment>& env);
+
+    Value cmpDouble(const par::Binary* node, const double* l, const double* r);
 
     std::shared_ptr<Environment> loadFile(const Path& path, const par::Block& block, const std::vector<Path>& deps, Value* out_last);
     std::shared_ptr<Environment> loadDynamicLib(const Path& path, const std::vector<Path>& deps);

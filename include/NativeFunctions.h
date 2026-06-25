@@ -96,7 +96,7 @@ namespace eval {
                        if (!arr || !*arr) {
                          throw std::runtime_error("push() expects an array as its first argument, got " + args[0].typeName());
                        }
-                       (*arr)->push_back(args[1]);
+                       (*arr)->emplaceBack(args[1]);
                        return args[0];
                      },
                    })),
@@ -109,11 +109,11 @@ namespace eval {
                          throw std::runtime_error("pop() expects exactly 1 argument, got " + std::to_string(args.size()));
                        }
                        const auto* arr = std::get_if<Array>(&args[0].data);
-                       if (!arr || !*arr || (*arr)->empty()) {
+                       if (!arr || !*arr || (*arr)->elements.empty()) {
                          throw std::runtime_error("pop() expects a non-empty array");
                        }
-                       Value back = (*arr)->back();
-                       (*arr)->pop_back();
+                       Value back = (*arr)->elements.back().second;
+                       (*arr)->elements.pop_back();
                        return back;
                      },
                    })),
@@ -132,5 +132,77 @@ namespace eval {
                        std::getline(std::cin, input);
                        return Value{input};
                      },
-                   }))}; // namespace eval
+                   })),
+    std::make_pair("isNull",
+                   Value(NativeFunction{
+                     .name = "isNull",
+                     .fn = [](std::vector<Value>& args) -> Value {
+                       if (args.size() != 1) throw std::runtime_error("isNull() expects exactly 1 argument, got " + std::to_string(args.size()));
+                       return {args[0].typeName() == "null"};
+                     },
+                   })),
+
+    std::make_pair("isBool",
+                   Value(NativeFunction{
+                     .name = "isBool",
+                     .fn = [](std::vector<Value>& args) -> Value {
+                       if (args.size() != 1) throw std::runtime_error("isBool() expects exactly 1 argument, got " + std::to_string(args.size()));
+                       return {args[0].typeName() == "bool"};
+                     },
+                   })),
+
+    std::make_pair("isNum",
+                   Value(NativeFunction{
+                     .name = "isNum",
+                     .fn = [](std::vector<Value>& args) -> Value {
+                       if (args.size() != 1) throw std::runtime_error("isNum() expects exactly 1 argument, got " + std::to_string(args.size()));
+                       return {args[0].typeName() == "num"};
+                     },
+                   })),
+
+    std::make_pair("isString",
+                   Value(NativeFunction{
+                     .name = "isString",
+                     .fn = [](std::vector<Value>& args) -> Value {
+                       if (args.size() != 1) throw std::runtime_error("isString() expects exactly 1 argument, got " + std::to_string(args.size()));
+                       return {args[0].typeName() == "string"};
+                     },
+                   })),
+
+    std::make_pair("isArray",
+                   Value(NativeFunction{
+                     .name = "isArray",
+                     .fn = [](std::vector<Value>& args) -> Value {
+                       if (args.size() != 1) throw std::runtime_error("isArray() expects exactly 1 argument, got " + std::to_string(args.size()));
+                       return {args[0].typeName() == "array"};
+                     },
+                   })),
+
+    std::make_pair("isFunction",
+                   Value(NativeFunction{
+                     .name = "isFunction",
+                     .fn = [](std::vector<Value>& args) -> Value {
+                       if (args.size() != 1) throw std::runtime_error("isFunction() expects exactly 1 argument, got " + std::to_string(args.size()));
+                       return {args[0].typeName() == "function"};
+                     },
+                   })),
+
+    std::make_pair("isClass",
+                   Value(NativeFunction{
+                     .name = "isClass",
+                     .fn = [](std::vector<Value>& args) -> Value {
+                       if (args.size() != 1) throw std::runtime_error("isClass() expects exactly 1 argument, got " + std::to_string(args.size()));
+                       return {args[0].typeName() == "class"};
+                     },
+                   })),
+
+    std::make_pair("isInstance",
+                   Value(NativeFunction{
+                     .name = "isInstance",
+                     .fn = [](std::vector<Value>& args) -> Value {
+                       if (args.size() != 1) throw std::runtime_error("isInstance() expects exactly 1 argument, got " + std::to_string(args.size()));
+                       return {args[0].typeName() == "instance"};
+                     },
+                   })),
+  };
 } // namespace eval

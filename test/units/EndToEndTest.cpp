@@ -6,6 +6,11 @@
 #include <fcntl.h>
 #include <filesystem>
 #include <fstream>
+#ifdef _WIN32
+#include <io.h> // _open, _dup, _dup2 on Windows
+#else
+#include <unistd.h>
+#endif
 #include <sstream>
 #include <string>
 #include <vector>
@@ -43,7 +48,13 @@ namespace {
     fs::path tmp = fs::temp_directory_path() / "sis_test_capture.txt";
     fflush(stdout);
     int saved_fd = dup(STDOUT_FILENO);
-    int out_fd = open(tmp.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0600);
+
+#ifdef _WIN32
+    int out_fd = open(tmp.string().c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_BINARY, 0600);
+#else
+    int out_fd = open(tmp.string().c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0600);
+#endif
+
     dup2(out_fd, STDOUT_FILENO);
     close(out_fd);
 
@@ -285,6 +296,7 @@ namespace { // Arrays
     auto out = run("arrays/literal.sis");
     EXPECT_EQ(out[0], "1");
     EXPECT_EQ(out[1], "3");
+    EXPECT_EQ(out[2], "value");
   }
 
   TEST_F(E2E, ArrayPushAndPop) {
@@ -472,5 +484,7 @@ namespace { // Error and edge cases
     auto out = run("errors/empty_string_falsy.sis");
     EXPECT_EQ(out[0], "was empty");
   }
+
+  TEST_F(E2E, CompoundAssingOnMissingKeyThrows) { EXPECT_THROW(run("errors/missing_key_compound_assign.sis"), std::runtime_error); }
 
 } // namespace

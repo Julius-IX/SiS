@@ -414,7 +414,7 @@ namespace { // Arrays
     auto v = runScript("[1, 2, 3];");
     ASSERT_TRUE(std::holds_alternative<eval::Array>(v.data));
     EXPECT_EQ(std::get<eval::Array>(v.data)->size(), 3U);
-    EXPECT_DOUBLE_EQ(std::get<double>((*std::get<eval::Array>(v.data))[0].data), 1.0);
+    EXPECT_DOUBLE_EQ(std::get<double>((*std::get<eval::Array>(v.data)).elements[0].second.data), 1.0);
   }
 
   TEST(Evaluator, ArraySubscript) { EXPECT_DOUBLE_EQ(std::get<double>(runScript("[10, 20, 30][1];").data), 20.0); }
@@ -435,6 +435,18 @@ namespace { // Arrays
     EXPECT_DOUBLE_EQ(std::get<double>(v.data), 2.0);
   }
 
+  TEST(Evaluator, SetOnExistingKeyReplacesValue) {
+    auto v = runScript("pin a = []; a[0] = 1;");
+    EXPECT_DOUBLE_EQ(std::get<double>(v.data), 1.0);
+
+    v = runScript("pin a = []; a[0] = 1; a[0] = 2; a[0];");
+    EXPECT_DOUBLE_EQ(std::get<double>(v.data), 2.0);
+  }
+
+  TEST(Evaluator, ExplicitNumericKeyDoesNotShiftAutoKeyCounter) {
+    auto v = runScript(R"(pin a = []; a[1] = 1; a["str"] = "str"; push(a, 2); a;)");
+    EXPECT_EQ("[1: 1, str: str, 0: 2]", v.toString());
+  }
 } // namespace
 
 namespace { // Classes

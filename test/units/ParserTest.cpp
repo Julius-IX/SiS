@@ -317,7 +317,109 @@ namespace { // Array literals
     ASSERT_NODE(as_ExprStmt->expr.get(), ArrayLiteral);
     EXPECT_EQ(as_ArrayLiteral->elements.size(), 3U);
     for (auto& elem : as_ArrayLiteral->elements) {
-      EXPECT_EQ(elem->type, par::NodeType::LITERAL);
+      EXPECT_EQ(elem.value->type, par::NodeType::LITERAL);
+    }
+  }
+
+  TEST(Parser, ArrayLiteralWithMixedElementTypes) {
+    TestParser p;
+    ASSERT_TRUE(p.parseSource("[1, true, null];"));
+
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, ExprStmt);
+    ASSERT_NODE(as_ExprStmt->expr.get(), ArrayLiteral);
+    EXPECT_EQ(as_ArrayLiteral->elements.size(), 3U);
+    for (auto& elem : as_ArrayLiteral->elements) {
+      EXPECT_NE(elem.value, nullptr);
+      ASSERT_NODE(elem.value.get(), Literal);
+      if (as_Literal != nullptr) {
+        if (std::holds_alternative<double>(as_Literal->value)) {
+          SUCCEED();
+        } else if (std::holds_alternative<std::monostate>(as_Literal->value)) {
+          SUCCEED();
+        } else if (std::holds_alternative<bool>(as_Literal->value)) {
+          SUCCEED();
+        } else {
+          ADD_FAILURE() << "Unexpected element type: " << (int)(elem.value->type);
+        }
+      }
+    }
+  }
+
+  TEST(Parser, ArrayLiteralWithStringLiteralKeys) {
+    TestParser p;
+    ASSERT_TRUE(p.parseSource(R"(["0": 0, "1": 1, "2": 2];)"));
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, ExprStmt);
+    ASSERT_NODE(as_ExprStmt->expr.get(), ArrayLiteral);
+    EXPECT_EQ(as_ArrayLiteral->elements.size(), 3U);
+    for (auto i = 0; i < as_ArrayLiteral->elements.size(); i++) {
+      EXPECT_NE(as_ArrayLiteral->elements[i].value, nullptr);
+      EXPECT_NE(as_ArrayLiteral->elements[i].key, nullptr);
+
+      {
+        ASSERT_NODE(as_ArrayLiteral->elements[i].value.get(), Literal);
+        if (std::holds_alternative<double>(as_Literal->value)) {
+          auto val = std::get<double>(as_Literal->value);
+          EXPECT_EQ(i, val);
+        }
+      }
+      {
+        ASSERT_NODE(as_ArrayLiteral->elements[i].key.get(), Literal);
+        if (std::holds_alternative<std::string>(as_Literal->value)) {
+          auto val = std::get<std::string>(as_Literal->value);
+          EXPECT_EQ(i, std::stoi(val));
+        }
+      }
+    }
+  }
+
+  TEST(Parser, ArrayKeyValueWithExpressionKey) {
+    TestParser p;
+    ASSERT_TRUE(p.parseSource(R"([1+2: "a"];)"));
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, ExprStmt);
+    ASSERT_NODE(as_ExprStmt->expr.get(), ArrayLiteral);
+    EXPECT_EQ(as_ArrayLiteral->elements.size(), 1U);
+    {
+      ASSERT_NODE(as_ArrayLiteral->elements[0].value.get(), Literal);
+      ASSERT_TRUE(std::holds_alternative<std::string>(as_Literal->value));
+      EXPECT_EQ(std::get<std::string>(as_Literal->value), "a");
+    }
+    {
+      ASSERT_NODE(as_ArrayLiteral->elements[0].key.get(), Binary);
+      EXPECT_EQ(as_Binary->operation, lex::TokenType::PLUS);
+      { // left
+        ASSERT_NODE(as_Binary->left.get(), Literal);
+        ASSERT_TRUE(std::holds_alternative<double>(as_Literal->value));
+        EXPECT_EQ(std::get<double>(as_Literal->value), 1.0);
+      }
+
+      { // right
+        ASSERT_NODE(as_Binary->right.get(), Literal);
+        ASSERT_TRUE(std::holds_alternative<double>(as_Literal->value));
+        EXPECT_EQ(std::get<double>(as_Literal->value), 2.0);
+      }
+    }
+  }
+
+  TEST(Parser, MixedArrayTableLiteral) {
+    TestParser p;
+    ASSERT_TRUE(p.parseSource(R"(["a": 0, 1, "c": 2];)"));
+    const par::Block& root = p.peekRoot();
+    GET_STMT(root, 0, ExprStmt);
+    ASSERT_NODE(as_ExprStmt->expr.get(), ArrayLiteral);
+    EXPECT_EQ(as_ArrayLiteral->elements.size(), 3U);
+    for (int i = 0; i < as_ArrayLiteral->elements.size(); i++) {
+      if (i != 1) EXPECT_NE(as_ArrayLiteral->elements[i].key, nullptr);
+      ASSERT_NODE(as_ArrayLiteral->elements[i].value.get(), Literal);
+      if (std::holds_alternative<double>(as_Literal->value)) {
+        auto val = std::get<double>(as_Literal->value);
+        EXPECT_EQ(i, val);
+      }
+      if (i == 1) {
+        EXPECT_EQ(as_ArrayLiteral->elements[i].key, nullptr);
+      }
     }
   }
 } // namespace

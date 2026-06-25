@@ -5,6 +5,15 @@
 #include <filesystem>
 #include <fstream>
 #include <print>
+#ifdef _WIN32
+#include <windows.h>
+#undef TRUE
+#undef FALSE
+#undef THIS
+#endif
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#endif
 
 // WARN: May change at any time, temporary solution is the best permanent solution
 static void panic(const std::string_view msg) { throw std::runtime_error(msg.data()); }
@@ -51,29 +60,48 @@ namespace par { // Hooks
     }
 
     const char* sis_path_env = std::getenv("SIS_PATH");
-    if (sis_path_env == nullptr) return std::nullopt;
-    LOG_DEBUG_FLUSH("resolving with env var: {}", sis_path_env);
-
-    std::stringstream ss(sis_path_env);
-    std::string dir;
-
+    LOG_DEBUG_FLUSH("resolving with env var: {}", sis_path_env ? sis_path_env : "not set");
 #ifdef _WIN32
     const char sep = ';';
-    const std::string dyn_subdir = "dynamic/windows";
+    const std::string dyn_subdir = "dynamic/";
     const std::string dyn_ext = ".dll";
+
+    auto getFallbackDir = []() -> std::string {
+      char exe_path[MAX_PATH];
+      GetModuleFileNameA(nullptr, exe_path, MAX_PATH);
+      return Path(exe_path).parent_path().string();
+    };
 #elif __APPLE__
     const char sep = ':';
-    const std::string dyn_subdir = "dynamic/macos";
+    const std::string dyn_subdir = "dynamic/";
     const std::string dyn_ext = ".dylib";
+
+    auto getFallbackDir = []() -> std::string {
+      char exe_path[PATH_MAX];
+      uint32_t size = sizeof(exe_path);
+      if (_NSGetExecutablePath(exe_path, &size) != 0) return "";
+      return Path(exe_path).parent_path().string();
+    };
 #else
     const char sep = ':';
-    const std::string dyn_subdir = "dynamic/linux";
+    const std::string dyn_subdir = "lib/dynamic/";
     const std::string dyn_ext = ".so";
-#endif
 
-    while (std::getline(ss, dir, sep)) {
+    auto getFallbackDir = []() -> std::string { return ""; };
+#endif
+    std::vector<std::string> search_dirs;
+    if (sis_path_env != nullptr) {
+      std::stringstream ss(sis_path_env);
+      std::string dir;
+      while (std::getline(ss, dir, sep)) {
+        search_dirs.push_back(dir);
+      }
+    }
+    if (auto fallback = getFallbackDir(); !fallback.empty()) search_dirs.push_back(fallback);
+
+    for (const auto& dir : search_dirs) {
       Path b(dir);
-      if (auto p = resolveFileOnDisk(b / "native" / (relative.string() + ".sis"))) {
+      if (auto p = resolveFileOnDisk(b / "lib" / "managed" / (relative.string() + ".sis"))) { // NOTE: ill deff change this and then forget to edit the build script but whatever
         LOG_DEBUG_FLUSH("checking native dir: {}", p->string());
         return p;
       }
@@ -441,10 +469,41 @@ namespace par { // Base parsing loop functions
 
       case lex::TokenType::L_BRACK: {
         advance(state);
-        std::optional<std::vector<std::unique_ptr<Node>>> elements = parseExpressionList(state, lex::TokenType::R_BRACK);
-        if (elements == std::nullopt) return nullptr;
+        std::vector<ArrayElement> elements;
+
+        // Track the next auto-assigned numeric key for unkeyed entries.
+        // Keyed entries don't advance this counter, matching Lua semantics:
+        // [10: "x", "y", "z"] gives "y" key 0 and "z" key 1, not 11 and 12.
+        while (!check(state->lexer.get(), lex::TokenType::R_BRACK)) {
+          if (check(state->lexer.get(), lex::TokenType::SIS_EOF)) {
+            panic("Unterminated array literal, expected ']'");
+            return nullptr;
+          }
+
+          // Parse the first expression. It's either a standalone value, or the
+          // key in a `key: value` pair we don't know which until we peek at
+          // what follows it.
+          std::unique_ptr<Node> first = parseExpression(state, 1);
+          if (first == nullptr) return nullptr;
+
+          ArrayElement elem;
+          if (match(state, lex::TokenType::COLON)) {
+            // key: value first expression was the key
+            elem.key = std::move(first);
+            elem.value = parseExpression(state, 1);
+            if (elem.value == nullptr) return nullptr;
+          } else {
+            // bare value no explicit key
+            elem.key = nullptr;
+            elem.value = std::move(first);
+          }
+
+          elements.push_back(std::move(elem));
+          if (!match(state, lex::TokenType::COMMA)) break;
+        }
+
         if (!expect(state, lex::TokenType::R_BRACK, "Expected ']' after array elements")) return nullptr;
-        return makeNode<ArrayLiteral>(tok.line, tok.column, std::move(elements.value()));
+        return makeNode<ArrayLiteral>(tok.line, tok.column, std::move(elements));
       }
 
       case lex::TokenType::FN: return parseFnLiteral(state);
@@ -862,13 +921,28 @@ namespace par { // Complex parsing structures
   // The following ->field or ->method() becomes a MemberAccess/Call wrapped
   // around this Self node, handled automatically by parseContinuation's DOT case.
   // NOTE: grammar uses `->` for this/super access and `.` for regular objects.
-  // accessing a field method on a class REQUIRES '->' usage, `.` is not allowed.
+  // accessing a field or method on a class REQUIRES '->' usage, `.` is not allowed.
+  //
+  // `this` alone is valid as a standalone expression (e.g. `return this;` for
+  // method chaining). `super` alone is not, it has no value without a member
+  // access, so `->` remains mandatory for super.
   std::unique_ptr<Node> Parser::parseThisOrSuper(State* state, bool is_super) {
     lex::Token self_tok = advance(state); // consume this/super
 
-    if (!expect(state, lex::TokenType::ARROW, "Expected '->' after 'this' or 'super'")) {
-      return nullptr;
+    if (!check(state->lexer.get(), lex::TokenType::ARROW)) {
+      if (is_super) {
+        panic(m_hooks.format_error(state, state->lexer->peekToken(), "Expected '->' after 'super'"));
+        return nullptr;
+      }
+      // Bare `this` with no following `->`: return a Self node directly so
+      // `return this;` and similar expressions evaluate to the instance.
+      auto self = std::make_unique<Self>(false);
+      self->line = self_tok.line;
+      self->column = self_tok.column;
+      return self;
     }
+
+    advance(state); // consume '->'
 
     lex::Token member_tok = advance(state);
     if (member_tok.type != lex::TokenType::IDENT) {
