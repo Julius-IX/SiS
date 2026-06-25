@@ -46,7 +46,7 @@ FN_SIGNATURE(fnCounterSum, args) {
   const auto* arr = std::get_if<eval::Array>(&args[0].data);
   if ((arr == nullptr) || !*arr) throw std::runtime_error("counter_sum() expects an array");
   NativeCounter acc(0.0);
-  for (const eval::Value& elem : **arr) {
+  for (const auto& [key, elem] : arr->get()->elements) {
     acc.add(requireNum(elem, "counter_sum"));
   }
   return {acc.value()};
@@ -61,7 +61,7 @@ SIS_MODULE_INIT(reg) {
   SIS_NATIVE_CLASS_BEGIN(reg, "Counter", NativeCounter)
     .constructor([](std::shared_ptr<eval::Instance> inst, std::vector<eval::Value>& args) {
       double initial = args.empty() ? 0.0 : requireNum(args[0], "Counter()");
-      SIS_NATIVE_CTOR(NativeCounter, inst, ctr, initial);
+      SIS_NATIVE_CTOR(NativeCounter, inst, native_var, initial);
     })
     .method("increment", [](std::shared_ptr<eval::Instance> inst, std::vector<eval::Value>&) -> eval::Value {
       SIS_GET_NATIVE(NativeCounter, inst)->increment();

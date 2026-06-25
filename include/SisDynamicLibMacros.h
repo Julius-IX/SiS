@@ -113,14 +113,14 @@ SIS_VALUE_TYPES(DEFINE_REQUIRE)
   auto native_var = std::make_shared<CppType>(__VA_ARGS__);                         \
   {                                                                                 \
     auto* _sis_box = new std::shared_ptr<CppType>(native_var);                      \
-    auto  _sis_handle = std::make_shared<std::vector<eval::Value>>();               \
+    auto  _sis_handle = eval::Array();                                               \
     /* Element 0: raw address of the box as a double */                             \
-    _sis_handle->emplace_back(                                                      \
+    _sis_handle->emplaceBack(                                                      \
       static_cast<double>(reinterpret_cast<uintptr_t>(_sis_box)));                  \
     /* Element 1: keepalive — captures the shared_ptr so the C++ object             \
        stays alive exactly as long as this SiS Instance does.                       \
        Also responsible for delete-ing the box. */                                  \
-    _sis_handle->emplace_back(eval::NativeFunction{                                 \
+    _sis_handle->emplaceBack(eval::NativeFunction{                                 \
       .name = "__sis_keepalive_" #CppType,                                          \
       .fn   = [native_var, _sis_box](std::vector<eval::Value>&) -> eval::Value {    \
         (void)native_var; /* keep ref-count alive */                                \
@@ -151,7 +151,7 @@ SIS_VALUE_TYPES(DEFINE_REQUIRE)
     if (!_arr || !*_arr || (*_arr)->size() < 2) {                                   \
       throw std::runtime_error(#CppType ": __native field is not a valid handle");  \
     }                                                                               \
-    const auto* _addr = std::get_if<double>(&(**_arr)[0].data);                     \
+    const auto* _addr = std::get_if<double>(&(**_arr).elements[0].second.data);     \
     if (!_addr) {                                                                   \
       throw std::runtime_error(#CppType ": __native handle is corrupt");            \
     }                                                                               \
