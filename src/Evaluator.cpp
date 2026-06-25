@@ -301,10 +301,10 @@ namespace eval {
     Value operand = evaluate(node->operand.get(), env);
 
     switch (node->operation) {
-      case lex::TokenType::NOT: return Value(!operand.isTruthy());
+      case lex::TokenType::NOT: return {!operand.isTruthy()};
       case lex::TokenType::MINUS:
         if (const auto* d = std::get_if<double>(&operand.data)) {
-          return Value(-(*d));
+          return {-(*d)};
         }
         throwKnownScopeErr(node, "Unary '-' requires a number, got " + operand.typeName());
       default: throwKnownScopeErr(node, "Unsupported unary operator");
@@ -313,19 +313,19 @@ namespace eval {
 
   Value Evaluator::cmpDouble(const par::Binary* node, const double* l, const double* r) {
     switch (node->operation) {
-      case lex::TokenType::PLUS: return Value(*l + *r);
-      case lex::TokenType::MINUS: return Value(*l - *r);
-      case lex::TokenType::STAR: return Value(*l * *r);
+      case lex::TokenType::PLUS: return {*l + *r};
+      case lex::TokenType::MINUS: return {*l - *r};
+      case lex::TokenType::STAR: return {*l * *r};
       case lex::TokenType::SLASH:
         if (*r == 0.0) throwKnownScopeErr(node, "Division by zero");
-        return Value(*l / *r);
+        return {*l / *r};
       case lex::TokenType::PERCENT:
         if (*r == 0.0) throwKnownScopeErr(node, "Modulo by zero");
-        return Value(std::fmod(*l, *r));
-      case lex::TokenType::LESS_THAN: return Value(*l < *r);
-      case lex::TokenType::LESS_THAN_EQUALS: return Value(*l <= *r);
-      case lex::TokenType::GREATER_THAN: return Value(*l > *r);
-      case lex::TokenType::GREATER_THAN_EQUALS: return Value(*l >= *r);
+        return {std::fmod(*l, *r)};
+      case lex::TokenType::LESS_THAN: return {*l < *r};
+      case lex::TokenType::LESS_THAN_EQUALS: return {*l <= *r};
+      case lex::TokenType::GREATER_THAN: return {*l > *r};
+      case lex::TokenType::GREATER_THAN_EQUALS: return {*l >= *r};
       default: throwKnownScopeErr(node, "Unsupported binary operator");
     }
   }
@@ -352,27 +352,27 @@ namespace eval {
     Value left = evaluate(node->left.get(), env);
     Value right = evaluate(node->right.get(), env);
 
-    if (node->operation == lex::TokenType::EQUALS) return Value(valuesEqual(left, right));
-    if (node->operation == lex::TokenType::NOT_EQUALS) return Value(!valuesEqual(left, right));
+    if (node->operation == lex::TokenType::EQUALS) return {valuesEqual(left, right)};
+    if (node->operation == lex::TokenType::NOT_EQUALS) return {!valuesEqual(left, right)};
 
     // PLUS is overloaded for string concatenation in addition to numeric add.
     if (node->operation == lex::TokenType::PLUS) {
       if (std::holds_alternative<std::string>(left.data) || std::holds_alternative<std::string>(right.data)) {
-        return Value(left.toString() + right.toString());
+        return {left.toString() + right.toString()};
       }
     }
 
     const auto* l = std::get_if<double>(&left.data);
     const auto* r = std::get_if<double>(&right.data);
-    if (!l || !r) {
+    if (l == nullptr || r == nullptr) {
       const auto* lstr = std::get_if<std::string>(&left.data);
       const auto* rstr = std::get_if<std::string>(&right.data);
-      if (!lstr || !rstr) {
+      if (lstr == nullptr || rstr == nullptr) {
         throwKnownScopeErr(node, "Operator requires two numbers or strings, got " + left.typeName() + " and " + right.typeName());
       }
       switch (node->operation) {
-        case lex::TokenType::LESS_THAN: return Value(*lstr < *rstr);
-        case lex::TokenType::GREATER_THAN: return Value(*lstr <= *rstr);
+        case lex::TokenType::LESS_THAN: return {*lstr < *rstr};
+        case lex::TokenType::GREATER_THAN: return {*lstr <= *rstr};
         default: throwKnownScopeErr(node, "Unsupported binary operator in string comparison");
       }
     }
@@ -500,7 +500,7 @@ namespace eval {
         new_value = evaluate(node->right.get(), env);
       } else {
         const Value* current = (*arr)->get(key);
-        if (!current) {
+        if (current == nullptr) {
           throwKnownScopeErr(node, "Key " + key.toString() + " not found in array (compound assignment requires existing key)");
         }
         Value rhs = evaluate(node->right.get(), env);
@@ -689,7 +689,7 @@ namespace eval {
     if (const auto* arr = std::get_if<Array>(&object.data)) {
       if (!*arr) throwKnownScopeErr(node, "Subscript on null array");
       const Value* found = (*arr)->get(index);
-      if (!found) {
+      if (found == nullptr) {
         throwKnownScopeErr(node, "Key " + index.toString() + " not found in array");
       }
       return *found;
@@ -698,7 +698,7 @@ namespace eval {
     // Strings still index by number and return a one-character string.
     if (const auto* str = std::get_if<std::string>(&object.data)) {
       const auto* idx = std::get_if<double>(&index.data);
-      if (!idx) {
+      if (idx == nullptr) {
         throwKnownScopeErr(node, "String index must be a number, got " + index.typeName());
       }
       if (*idx < 0) {
@@ -830,7 +830,7 @@ namespace eval {
       std::shared_ptr<Class> native_owner;
       const NativeFunction* native_method = lookup_class->findNativeMethod(field, &native_owner);
       if (native_method != nullptr) {
-        Value bound_this = object;
+        const Value& bound_this = object;
         NativeFunction bound{.name = native_method->name, .fn = [raw_fn = native_method->fn, bound_this](std::vector<Value>& args) mutable -> Value {
                                std::vector<Value> full_args;
                                full_args.reserve(args.size() + 1);
@@ -838,7 +838,7 @@ namespace eval {
                                full_args.insert(full_args.end(), args.begin(), args.end());
                                return raw_fn(full_args);
                              }};
-        return Value(std::move(bound));
+        return {std::move(bound)};
       }
 
       throwKnownScopeErr(node, "'" + instance->get()->klass->name + "' has no field or method '" + field + "'");
