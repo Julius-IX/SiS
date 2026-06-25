@@ -58,7 +58,7 @@ namespace par { // Hooks
 
 #ifdef _WIN32
     const char sep = ';';
-    const std::string dyn_subdir = "dynamic/windows";
+    const std::string dyn_subdir = "dynamic/";
     const std::string dyn_ext = ".dll";
 
     auto getFallbackDir = []() -> std::string {
@@ -68,7 +68,7 @@ namespace par { // Hooks
     };
 #elif __APPLE__
     const char sep = ':';
-    const std::string dyn_subdir = "dynamic/macos";
+    const std::string dyn_subdir = "dynamic/";
     const std::string dyn_ext = ".dylib";
 
     auto getFallbackDir = []() -> std::string {
@@ -79,7 +79,7 @@ namespace par { // Hooks
     };
 #else
     const char sep = ':';
-    const std::string dyn_subdir = "dynamic/linux";
+    const std::string dyn_subdir = "lib/dynamic/";
     const std::string dyn_ext = ".so";
 
     auto get_fallback_dir = []() -> std::string { return ""; }; // rely on SIS_PATH on linux
@@ -98,7 +98,7 @@ namespace par { // Hooks
 
     for (const auto& dir : search_dirs) {
       Path b(dir);
-      if (auto p = resolveFileOnDisk(b / "managed" / (relative.string() + ".sis"))) { // NOTE: ill deff change this and then forget to edit the build script but whatever
+      if (auto p = resolveFileOnDisk(b / "lib" / "managed" / (relative.string() + ".sis"))) { // NOTE: ill deff change this and then forget to edit the build script but whatever
         LOG_DEBUG_FLUSH("checking native dir: {}", p->string());
         return p;
       }
