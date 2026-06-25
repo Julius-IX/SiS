@@ -62,11 +62,11 @@ package_linux() {
 
     echo "==> Packaging Linux → $(basename "$ARCHIVE")..."
 
-    mkdir -p "$STAGING/dynamic" "$STAGING/managed"
+    mkdir -p "$STAGING/lib/dynamic" "$STAGING/lib/managed"
 
     cp "$PROJECT_ROOT/build/Release/SiS"    "$STAGING/sis"
-    cp -r "$STDLIB_DIR/runtime/linux/."     "$STAGING/dynamic/"
-    cp -r "$STDLIB_DIR/managed/."           "$STAGING/managed/"
+    cp -r "$STDLIB_DIR/runtime/linux/."     "$STAGING/lib/dynamic/"
+    cp -r "$STDLIB_DIR/managed/."           "$STAGING/lib/managed/"
 
     tar -czf "$ARCHIVE" -C "$STAGING" .
 
@@ -81,11 +81,11 @@ package_windows() {
 
     echo "==> Packaging Windows → $(basename "$ARCHIVE")..."
 
-    mkdir -p "$STAGING/dynamic" "$STAGING/managed"
+    mkdir -p "$STAGING/lib/dynamic" "$STAGING/lib/managed"
 
     cp "$PROJECT_ROOT/build/windows/SiS.exe"  "$STAGING/sis.exe"
-    cp -r "$STDLIB_DIR/runtime/windows/."     "$STAGING/dynamic/"
-    cp -r "$STDLIB_DIR/managed/."             "$STAGING/managed/"
+    cp -r "$STDLIB_DIR/runtime/windows/."     "$STAGING/lib/dynamic/"
+    cp -r "$STDLIB_DIR/managed/."             "$STAGING/lib/managed/"
 
     (cd "$STAGING" && zip -r "$ARCHIVE" .)
 
