@@ -63,19 +63,19 @@ SIS_MODULE_INIT(reg) {
       double initial = args.empty() ? 0.0 : requireNum(args[0], "Counter()");
       SIS_NATIVE_CTOR(NativeCounter, inst, native_var, initial);
     })
-    .method("increment", [](std::shared_ptr<eval::Instance> inst, std::vector<eval::Value>&) -> eval::Value {
+    .NATIVE_METHOD("increment", inst, args, {
       SIS_GET_NATIVE(NativeCounter, inst)->increment();
       return eval::Value{};
     })
-    .method("add", [](std::shared_ptr<eval::Instance> inst, std::vector<eval::Value>& args) -> eval::Value {
+    .NATIVE_METHOD("add", inst, args, {
       if (args.size() != 1) throw std::runtime_error("Counter.add() expects 1 argument");
       SIS_GET_NATIVE(NativeCounter, inst)->add(requireNum(args[0], "Counter.add"));
       return eval::Value{};
     })
-    .method("value", [](std::shared_ptr<eval::Instance> inst, std::vector<eval::Value>&) -> eval::Value {
+    .NATIVE_METHOD("value", inst, args, {
       return {SIS_GET_NATIVE(NativeCounter, inst)->value()};
     })
-    .method("reset", [](std::shared_ptr<eval::Instance> inst, std::vector<eval::Value>&) -> eval::Value {
+    .NATIVE_METHOD("reset", inst, args, {
       return {SIS_GET_NATIVE(NativeCounter, inst)->reset()};
     })
   SIS_NATIVE_CLASS_END();

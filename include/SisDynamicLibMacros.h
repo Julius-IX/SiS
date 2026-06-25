@@ -30,6 +30,7 @@
 SIS_VALUE_TYPES(DEFINE_REQUIRE)
 
 #define FN_SIGNATURE(name, arguments) static eval::Value name(std::vector<eval::Value>& args)
+#define NATIVE_METHOD(name, inst, args, content) method(name, [](std::shared_ptr<eval::Instance> (inst), std::vector<eval::Value>& (args)) -> eval::Value content)
 
 // Usage:
 //   SIS_MODULE_INIT(reg) {
