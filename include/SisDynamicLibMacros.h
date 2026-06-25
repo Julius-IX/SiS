@@ -50,7 +50,7 @@ SIS_VALUE_TYPES(DEFINE_REQUIRE)
 // SIS_NATIVE_CLASS_BEGIN(reg, "ClassName", CppType)
 //   Calls reg->defineClass("ClassName")
 //   Pre-declares the __native field (so you can never forget it).
-//   Opens a fluent chain — append .constructor(...).method(...) calls
+//   Opens a fluent chain append .constructor(...).method(...) calls
 //   directly after the macro.
 //
 // SIS_NATIVE_CLASS_END()
@@ -91,11 +91,11 @@ SIS_VALUE_TYPES(DEFINE_REQUIRE)
 
 // SIS_NATIVE_CTOR(CppType, inst, native_var, ...)
 //
-//   CppType    — the C++ class backing this SiS class
-//   inst       — the shared_ptr<eval::Instance> from the constructor lambda
-//   native_var — name to give the local shared_ptr<CppType> (usable after
+//   CppType    - the C++ class backing this SiS class
+//   inst       - the shared_ptr<eval::Instance> from the constructor lambda
+//   native_var - name to give the local shared_ptr<CppType> (usable after
 //                the macro for extra init work)
-//   ...        — forwarded verbatim to make_shared<CppType>(...) as
+//   ...        - forwarded verbatim to make_shared<CppType>(...) as
 //                constructor arguments, so it reads naturally:
 //                SIS_NATIVE_CTOR(NativeCounter, inst, ctr, initial);
 //
@@ -103,8 +103,8 @@ SIS_VALUE_TYPES(DEFINE_REQUIRE)
 //   - Heap-allocates shared_ptr<CppType> via a "box" so we can recover it
 //     from a raw address stored as a double.
 //   - Puts two elements in the __native Array:
-//       [0] double  — reinterpret_cast address of the box
-//       [1] NativeFunction — closure that keeps `native` alive and deletes
+//       [0] double  - reinterpret_cast address of the box
+//       [1] NativeFunction - closure that keeps `native` alive and deletes
 //           the box on destruction (the GC drops the Array → lambda fires).
 //
 
@@ -113,14 +113,14 @@ SIS_VALUE_TYPES(DEFINE_REQUIRE)
   auto native_var = std::make_shared<CppType>(__VA_ARGS__);                         \
   {                                                                                 \
     auto* _sis_box = new std::shared_ptr<CppType>(native_var);                      \
-    auto  _sis_handle = eval::Array();                                               \
+    auto  _sis_handle = eval::Array();                                              \
     /* Element 0: raw address of the box as a double */                             \
-    _sis_handle->emplaceBack(                                                      \
+    _sis_handle->emplaceBack(                                                       \
       static_cast<double>(reinterpret_cast<uintptr_t>(_sis_box)));                  \
-    /* Element 1: keepalive — captures the shared_ptr so the C++ object             \
+    /* Element 1: keepalive captures the shared_ptr so the C++ object               \
        stays alive exactly as long as this SiS Instance does.                       \
        Also responsible for delete-ing the box. */                                  \
-    _sis_handle->emplaceBack(eval::NativeFunction{                                 \
+    _sis_handle->emplaceBack(eval::NativeFunction{                                  \
       .name = "__sis_keepalive_" #CppType,                                          \
       .fn   = [native_var, _sis_box](std::vector<eval::Value>&) -> eval::Value {    \
         (void)native_var; /* keep ref-count alive */                                \
