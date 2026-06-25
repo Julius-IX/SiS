@@ -117,13 +117,13 @@ FN_SIGNATURE(split, args) {
   size_t start = 0;
   size_t pos = 0;
 
-  eval::Array out = std::make_shared<std::vector<eval::Value>>();
+  eval::Array out = eval::Array();
   while ((pos = str.find(delim, start)) != std::string::npos) {
-    out->emplace_back(str.substr(start, pos - start));
+    out->emplaceBack(str.substr(start, pos - start));
     start = pos + delim.size();
   }
 
-  out->emplace_back(str.substr(start));
+  out->emplaceBack(str.substr(start));
   return out;
 }
 
@@ -134,7 +134,7 @@ FN_SIGNATURE(join, args) {
   std::string out;
   bool first = true;
 
-  for (auto& v : *arr) {
+  for (auto& [k, v] : arr->elements) {
     if (!first) out += delim;
     first = false;
     out += requireStr(v, "join");

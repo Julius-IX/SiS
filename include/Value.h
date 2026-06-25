@@ -1,6 +1,5 @@
 #pragma once
 
-#include <Logging.h>
 #include <algorithm>
 #include <functional>
 #include <memory>
