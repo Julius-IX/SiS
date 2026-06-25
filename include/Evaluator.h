@@ -87,6 +87,7 @@ namespace eval {
     static void registerBuiltins(const std::shared_ptr<Environment>& env);
 
     Value cmpDouble(const par::Binary* node, const double* l, const double* r);
+    Value applyCompoundOp(const par::Node* node, lex::TokenType op, const Value& current, const Value& rhs);
 
     std::shared_ptr<Environment> loadFile(const Path& path, const par::Block& block, const std::vector<Path>& deps, Value* out_last);
     std::shared_ptr<Environment> loadDynamicLib(const Path& path, const std::vector<Path>& deps);

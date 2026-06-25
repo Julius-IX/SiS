@@ -394,7 +394,7 @@ namespace eval {
   // same arithmetic instead of three copies of the same switch.
   // PLUS is overloaded for string concatenation matching evalBinary's behaviour,
   // so `x += "hello"` works the same as `x = x + "hello"`.
-  static Value applyCompoundOp(lex::TokenType op, const Value& current, const Value& rhs) {
+  Value Evaluator::applyCompoundOp(const par::Node* node, lex::TokenType op, const Value& current, const Value& rhs) {
     const lex::TokenType binary_op = compoundToBinaryOp(op);
 
     if (binary_op == lex::TokenType::PLUS) {
@@ -406,19 +406,19 @@ namespace eval {
     const auto* l = std::get_if<double>(&current.data);
     const auto* r = std::get_if<double>(&rhs.data);
     if ((l == nullptr) || (r == nullptr)) {
-      throw std::runtime_error("Compound assignment requires two numbers");
+      throwKnownScopeErr(node, "Compound assignment requires two numbers, got " + current.typeName() + " and " + rhs.typeName());
     }
     switch (binary_op) {
       case lex::TokenType::PLUS: return {*l + *r};
       case lex::TokenType::MINUS: return {*l - *r};
       case lex::TokenType::STAR: return {*l * *r};
       case lex::TokenType::SLASH:
-        if (*r == 0.0) throw std::runtime_error("Division by zero");
+        if (*r == 0.0) throwKnownScopeErr(node, "Division by zero in compound assignment");
         return {*l / *r};
       case lex::TokenType::PERCENT:
-        if (*r == 0.0) throw std::runtime_error("Modulo by zero");
+        if (*r == 0.0) throwKnownScopeErr(node, "Modulo by zero in compound assignment");
         return {std::fmod(*l, *r)};
-      default: throw std::runtime_error("Unsupported compound assignment operator");
+      default: throwKnownScopeErr(node, "Unsupported compound assignment operator");
     }
   }
 
@@ -447,7 +447,7 @@ namespace eval {
           throwKnownScopeErr(node, "Undefined variable: " + target->name);
         }
         Value rhs = evaluate(node->right.get(), env);
-        new_value = applyCompoundOp(node->operation, *current, rhs);
+        new_value = applyCompoundOp(node, node->operation, *current, rhs);
       }
       if (!env->assign(target->name, new_value)) {
         throwKnownScopeErr(node, "Undefined variable: " + target->name);
@@ -485,7 +485,7 @@ namespace eval {
           throwKnownScopeErr(node, "Undefined field '" + member->field + "' on instance of " + inst_ptr->get()->klass->name);
         }
         Value rhs = evaluate(node->right.get(), env);
-        new_value = applyCompoundOp(node->operation, it->second, rhs);
+        new_value = applyCompoundOp(node, node->operation, it->second, rhs);
       }
       (*inst_ptr->get()->fields)[member->field] = new_value;
       return new_value;
@@ -512,7 +512,7 @@ namespace eval {
           throwKnownScopeErr(node, "Key " + key.toString() + " not found in array (compound assignment requires existing key)");
         }
         Value rhs = evaluate(node->right.get(), env);
-        new_value = applyCompoundOp(node->operation, *current, rhs);
+        new_value = applyCompoundOp(node, node->operation, *current, rhs);
       }
       (*arr)->set(key, new_value);
       return new_value;
