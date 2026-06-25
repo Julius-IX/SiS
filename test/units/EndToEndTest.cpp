@@ -285,6 +285,7 @@ namespace { // Arrays
     auto out = run("arrays/literal.sis");
     EXPECT_EQ(out[0], "1");
     EXPECT_EQ(out[1], "3");
+    EXPECT_EQ(out[2], "value");
   }
 
   TEST_F(E2E, ArrayPushAndPop) {
