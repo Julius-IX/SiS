@@ -114,7 +114,7 @@ SIS_VALUE_TYPES(DEFINE_REQUIRE)
   auto native_var = std::make_shared<CppType>(__VA_ARGS__);                         \
   {                                                                                 \
     auto* _sis_box = new std::shared_ptr<CppType>(native_var);                      \
-    auto  _sis_handle = eval::Array();                                              \
+    auto  _sis_handle = std::make_shared<eval::InternalArray>();                    \
     /* Element 0: raw address of the box as a double */                             \
     _sis_handle->emplaceBack(                                                       \
       static_cast<double>(reinterpret_cast<uintptr_t>(_sis_box)));                  \
