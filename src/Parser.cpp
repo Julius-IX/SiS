@@ -5,6 +5,9 @@
 #include <filesystem>
 #include <fstream>
 #include <print>
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#endif
 
 // WARN: May change at any time, temporary solution is the best permanent solution
 static void panic(const std::string_view msg) { throw std::runtime_error(msg.data()); }
@@ -51,27 +54,49 @@ namespace par { // Hooks
     }
 
     const char* sis_path_env = std::getenv("SIS_PATH");
-    if (sis_path_env == nullptr) return std::nullopt;
-    LOG_DEBUG_FLUSH("resolving with env var: {}", sis_path_env);
-
-    std::stringstream ss(sis_path_env);
-    std::string dir;
+    LOG_DEBUG_FLUSH("resolving with env var: {}", sis_path_env ? sis_path_env : "not set");
 
 #ifdef _WIN32
     const char sep = ';';
     const std::string dyn_subdir = "dynamic/windows";
     const std::string dyn_ext = ".dll";
+
+    auto getFallbackDir = []() -> std::string {
+      char exe_path[MAX_PATH];
+      GetModuleFileNameA(nullptr, exe_path, MAX_PATH);
+      return Path(exe_path).parent_path().string();
+    };
 #elif __APPLE__
     const char sep = ':';
     const std::string dyn_subdir = "dynamic/macos";
     const std::string dyn_ext = ".dylib";
+
+    auto getFallbackDir = []() -> std::string {
+      char exe_path[PATH_MAX];
+      uint32_t size = sizeof(exe_path);
+      if (_NSGetExecutablePath(exe_path, &size) != 0) return "";
+      return Path(exe_path).parent_path().string();
+    };
 #else
     const char sep = ':';
     const std::string dyn_subdir = "dynamic/linux";
     const std::string dyn_ext = ".so";
+
+    auto get_fallback_dir = []() -> std::string { return ""; }; // rely on SIS_PATH on linux
 #endif
 
-    while (std::getline(ss, dir, sep)) {
+    // Build the list of search dirs: env var entries first, then fallback
+    std::vector<std::string> search_dirs;
+    if (sis_path_env != nullptr) {
+      std::stringstream ss(sis_path_env);
+      std::string dir;
+      while (std::getline(ss, dir, sep)) {
+        search_dirs.push_back(dir);
+      }
+    }
+    if (auto fallback = get_fallback_dir(); !fallback.empty()) search_dirs.push_back(fallback);
+
+    for (const auto& dir : search_dirs) {
       Path b(dir);
       if (auto p = resolveFileOnDisk(b / "managed" / (relative.string() + ".sis"))) { // NOTE: ill deff change this and then forget to edit the build script but whatever
         LOG_DEBUG_FLUSH("checking native dir: {}", p->string());
