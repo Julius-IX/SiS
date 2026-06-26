@@ -44,6 +44,8 @@ namespace eval {
     // running a script for its side effects.
     Value run(const par::Program& program);
 
+    std::shared_ptr<Environment> globalEnv() const { return m_global; }
+
     private:
     const Path* m_current_eval_file;
     std::shared_ptr<Environment> m_global;
