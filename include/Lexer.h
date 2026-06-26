@@ -68,6 +68,11 @@ namespace lex {
       if (!this->m_input.empty()) this->m_state.current_char = this->m_input[0];
 
       m_state.current_char = m_input.size() > 0 ? m_input[0] : '\0';
+      if (m_input.size() >= 2 && m_input[0] == '#' && m_input[1] == '!') {
+        while (m_state.pos < m_input.size() && m_input[m_state.pos] != '\n') {
+          advanceState();
+        }
+      }
       for (size_t i = 0; i < TokenBuffer::CAPACITY; ++i) {
         fillBuffer();
       }
@@ -81,6 +86,13 @@ namespace lex {
 
     void newInput(std::string input) {
       reset();
+
+      if (m_input.size() >= 2 && m_input[0] == '#' && m_input[1] == '!') {
+        while (m_state.pos < m_input.size() && m_input[m_state.pos] != '\n') {
+          advanceState();
+        }
+      }
+
       this->m_input = std::move(input);
       if (!this->m_input.empty()) this->m_state.current_char = this->m_input[0];
 
