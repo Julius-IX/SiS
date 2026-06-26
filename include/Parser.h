@@ -46,6 +46,8 @@ namespace par {
       m_load_order.push_back(path);
     }
 
+    State& getStateMut(const Path& path) { return m_states.at(path); }
+
     private:
     std::vector<Path> m_load_order;
     std::deque<Path> m_include_stack;

@@ -5,6 +5,27 @@
 #include <string>
 
 constexpr std::string version = "SiS 0.2.1";
+class StringParser : public par::Parser {
+  public:
+  std::optional<par::Program> parseEvalString(const std::string& source) {
+    const Path synthetic{"<eval>"};
+    par::State state;
+    state.lexer = std::make_unique<lex::Lexer>(source, std::nullopt);
+    registerTestState(synthetic, std::move(state));
+    if (!parse(&getStateMut(synthetic))) return std::nullopt;
+    par::State& s = getStateMut(synthetic);
+    if (!s.block) return std::nullopt;
+    par::Program program;
+    program.files[synthetic] = par::ParsedFile{
+      .tokens = {},
+      .ast = std::move(s.block),
+      .includes = {},
+      .is_dynamic = false,
+    };
+    program.load_order.push_back(synthetic);
+    return program;
+  }
+};
 
 struct CliArgs {
   enum class Mode { SCRIPT, EVAL_STRING, REPL };
@@ -80,7 +101,14 @@ int main(const int argc, const char* argv[]) {
         }
         break;
       }
-      case CliArgs::Mode::EVAL_STRING: fmt::print("error: -e not yet implemented\n"); return 1;
+      case CliArgs::Mode::EVAL_STRING: {
+        StringParser parser;
+        auto program = parser.parseEvalString(args.source);
+        if (!program) return 1;
+        eval::Evaluator evaluator(argc, argv);
+        evaluator.run(*program);
+        break;
+      }
       case CliArgs::Mode::REPL: fmt::print("error: REPL not yet implemented\n"); return 1;
     }
   } catch (const std::runtime_error& e) {
