@@ -13,7 +13,8 @@ constexpr std::string VERSION = "SiS 0.2.1";
 class StringParser : public par::Parser {
   public:
   std::optional<par::Program> parseEvalString(const std::string& source) {
-    const Path synthetic{"<eval>"};
+    static int counter = 0;
+    const Path synthetic{fmt::format("<eval:{}>", counter++)};
     par::State state;
     state.lexer = std::make_unique<lex::Lexer>(source, std::nullopt);
     registerTestState(synthetic, std::move(state));
