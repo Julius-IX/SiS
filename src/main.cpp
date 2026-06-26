@@ -5,7 +5,7 @@
 #include <print>
 #include <string>
 
-#include <iostream>
+#include <linenoise.h>
 #include <spdlog/fmt/fmt.h>
 
 constexpr std::string VERSION = "SiS 0.2.1";
@@ -67,10 +67,12 @@ class Repl {
   static void loop(eval::Evaluator& eval) {
     std::string input;
     while (true) {
-      fmt::print("{}", input.empty() ? ">> " : ".. ");
-      std::fflush(stdout);
-      std::string line;
-      if (!std::getline(std::cin, line)) break;
+      const char* prompt = input.empty() ? ">> " : ".. ";
+      char* raw = linenoise(prompt);
+      if (!raw) break; // Ctrl+D
+      std::string line(raw);
+      linenoiseFree(raw);
+      if (!line.empty() && input.empty()) linenoiseHistoryAdd(line.c_str());
       if (!input.empty()) input += '\n';
       input += line;
       if (!isComplete(input)) continue;
@@ -79,7 +81,9 @@ class Repl {
         auto program = parser.parseEvalString(input);
         if (program) {
           eval::Value result = eval.run(*program);
-          fmt::print("{}\n", result.toString());
+          if (!std::holds_alternative<std::monostate>(result.data)) {
+            fmt::print("{}\n", result.toString());
+          }
         }
       } catch (const std::runtime_error& e) {
         fmt::print("Error: {}\n", e.what());
