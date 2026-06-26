@@ -226,19 +226,17 @@ namespace par { // Include resolving
     return true;
   }
 
-  bool Parser::parseRoot(const Path& path) {
+  std::optional<Program> Parser::parseRoot(const Path& path) {
     Path full_root_path = resolveRootDirectory(path);
     LOG_DEBUG_FLUSH("Full root path: {}", full_root_path.string());
 
     initRootState(full_root_path, path);
 
     m_include_stack.push_back(full_root_path);
-    while (!m_include_stack.empty()) { // NOLINT
+    while (!m_include_stack.empty()) {
       Path current_path = m_include_stack.back();
       m_include_stack.pop_back();
 
-      // Native modules have no source to parse sentinel block already set in
-      // loadIncludeSource, just record them in load order for the evaluator.
       auto ext = current_path.extension();
       if (ext == ".so" || ext == ".dll" || ext == ".dylib") {
         m_load_order.push_back(current_path);
@@ -265,7 +263,6 @@ namespace par { // Include resolving
       }
 
       if (m_states.contains(resolved)) {
-        // already loaded, dep recorded in checkForInclude, keep going
         m_include_stack.push_back(current_path);
         continue;
       }
@@ -275,10 +272,21 @@ namespace par { // Include resolving
       m_include_stack.push_back(resolved);
     }
 
-    for (auto& [p, state] : m_states) {
-      if (!state.block) return false;
+    Program program;
+    for (const Path& p : m_load_order) {
+      State& state = m_states[p];
+      auto ext = p.extension();
+      bool is_dynamic = (ext == ".so" || ext == ".dll" || ext == ".dylib");
+      if (!state.block && !is_dynamic) return std::nullopt;
+      program.files[p] = ParsedFile{
+        .tokens = {},
+        .ast = std::move(state.block),
+        .includes = std::move(state.includes),
+        .is_dynamic = is_dynamic,
+      };
+      program.load_order.push_back(p);
     }
-    return true;
+    return program;
   }
 
   std::expected<std::optional<Path>, std::string> Parser::checkForInclude(const Path& path) {

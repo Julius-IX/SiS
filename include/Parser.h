@@ -2,6 +2,7 @@
 
 #include <Lexer.h>
 #include <ParserNodeTypes.h>
+#include <Program.h>
 
 #include <deque>
 #include <expected>
@@ -30,7 +31,7 @@ namespace par {
     Parser();
     ~Parser() = default;
 
-    bool parseRoot(const Path& path);
+    std::optional<Program> parseRoot(const Path& path);
     bool parse(State* state);
 
     const Block& peekRoot() const { return *m_states.at(m_load_order.front()).block; }
