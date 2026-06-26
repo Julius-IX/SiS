@@ -77,6 +77,8 @@ namespace lex {
     [[nodiscard]] Token nextToken();
     [[nodiscard]] const Token& peekToken(const unsigned short index = 1) const noexcept { return m_buffer.peek(index); }
 
+    [[nodiscard]] TokenStream tokenize();
+
     void newInput(std::string input) {
       reset();
       this->m_input = std::move(input);

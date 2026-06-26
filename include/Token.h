@@ -6,6 +6,7 @@
 #include <string>
 #include <unordered_map>
 #include <variant>
+#include <vector>
 
 using Path = std::filesystem::path;
 
@@ -84,6 +85,12 @@ namespace lex {
         this->length == other.length;
     }
   } Token;
+
+  // A fully materialized token sequence produced by Lexer::tokenize().
+  // Owning, contiguous, and EOF-terminated (last element always has type SIS_EOF).
+  // This is the handoff type between the lexing and parsing stages.
+  using TokenStream = std::vector<Token>;
+
 
   inline TokenType lookupIdentifier(const std::string& identifier) {
     static std::unordered_map<std::string, TokenType> keywords = {

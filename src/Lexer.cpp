@@ -337,4 +337,14 @@ namespace lex {
     fillBuffer();
     return token;
   }
+
+  TokenStream Lexer::tokenize() {
+    TokenStream tokens;
+    Token tok;
+    do {
+      tok = nextToken();
+      tokens.push_back(tok);
+    } while (tok.type != TokenType::SIS_EOF);
+    return tokens;
+  }
 } // namespace lex
