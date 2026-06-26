@@ -1,19 +1,22 @@
 #include <Evaluator.h>
 #include <Parser.h>
 #include <Value.h>
-#include <gtest/gtest.h>
+#include <Program.h>
 
+#include <sstream>
+#include <string>
+#include <vector>
 #include <fcntl.h>
 #include <filesystem>
 #include <fstream>
+
 #ifdef _WIN32
 #include <io.h> // _open, _dup, _dup2 on Windows
 #else
 #include <unistd.h>
 #endif
-#include <sstream>
-#include <string>
-#include <vector>
+
+#include <gtest/gtest.h>
 
 // Locates sis_sources/ relative to the test binary via argv[0], so no path
 // needs to be hard-coded or passed on the command line.
@@ -39,33 +42,27 @@ namespace {
   // `output_lines`. Returns the last Value produced by the program.
   eval::Value runFile(const fs::path& path, std::vector<std::string>& output_lines) {
     par::Parser parser;
-    bool ok = parser.parseRoot(path);
-    LOG_DEBUG_FLUSH("parseRoot returned: {}", ok);
-    if (!ok) throw std::runtime_error("Parse failed: " + path.string());
+    auto program = parser.parseRoot(path);
+    if (!program) throw std::runtime_error("Parse failed: " + path.string());
 
-    // Redirect stdout to a temp file — avoids pipe buffer deadlock if the
-    // evaluator produces more output than the pipe can hold before we drain it.
     fs::path tmp = fs::temp_directory_path() / "sis_test_capture.txt";
     fflush(stdout);
     int saved_fd = dup(STDOUT_FILENO);
-
 #ifdef _WIN32
     int out_fd = open(tmp.string().c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_BINARY, 0600);
 #else
     int out_fd = open(tmp.string().c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0600);
 #endif
-
     dup2(out_fd, STDOUT_FILENO);
     close(out_fd);
 
     eval::Evaluator evaluator;
-    eval::Value result = evaluator.run(parser);
+    eval::Value result = evaluator.run(*program);
 
     fflush(stdout);
     dup2(saved_fd, STDOUT_FILENO);
     close(saved_fd);
 
-    // Read captured output back from the temp file
     std::ifstream captured(tmp);
     std::string line;
     while (std::getline(captured, line))
