@@ -1,10 +1,15 @@
 #include <Evaluator.h>
+#include <Lexer.h>
 #include <Parser.h>
+
 #include <print>
-#include <spdlog/fmt/fmt.h>
 #include <string>
 
-constexpr std::string version = "SiS 0.2.1";
+#include <iostream>
+#include <spdlog/fmt/fmt.h>
+
+constexpr std::string VERSION = "SiS 0.2.1";
+
 class StringParser : public par::Parser {
   public:
   std::optional<par::Program> parseEvalString(const std::string& source) {
@@ -24,6 +29,64 @@ class StringParser : public par::Parser {
     };
     program.load_order.push_back(synthetic);
     return program;
+  }
+};
+
+class Repl {
+  public:
+  Repl() = default;
+
+  void run() { loop(m_eval); }
+
+  void runWithPrelude(const par::Program& program) {
+    m_eval.run(program);
+    loop(m_eval);
+  }
+
+  private:
+  eval::Evaluator m_eval;
+
+  static bool isComplete(const std::string& input) {
+    lex::Lexer lexer(input, std::nullopt);
+    lex::TokenStream tokens = lexer.tokenize();
+    int depth = 0;
+    for (const lex::Token& tok : tokens) {
+      switch (tok.type) {
+        case lex::TokenType::L_BRACE:
+        case lex::TokenType::L_BRACK:
+        case lex::TokenType::L_PAREN: ++depth; break;
+        case lex::TokenType::R_BRACE:
+        case lex::TokenType::R_BRACK:
+        case lex::TokenType::R_PAREN: --depth; break;
+        default: break;
+      }
+    }
+    return depth <= 0;
+  }
+
+  static void loop(eval::Evaluator& eval) {
+    std::string input;
+    while (true) {
+      fmt::print("{}", input.empty() ? ">> " : ".. ");
+      std::fflush(stdout);
+      std::string line;
+      if (!std::getline(std::cin, line)) break;
+      if (!input.empty()) input += '\n';
+      input += line;
+      if (!isComplete(input)) continue;
+      StringParser parser;
+      try {
+        auto program = parser.parseEvalString(input);
+        if (program) {
+          eval::Value result = eval.run(*program);
+          fmt::print("{}\n", result.toString());
+        }
+      } catch (const std::runtime_error& e) {
+        fmt::print("Error: {}\n", e.what());
+      }
+      input.clear();
+    }
+    fmt::print("\n");
   }
 };
 
@@ -52,7 +115,7 @@ static CliArgs parseArgs(int argc, const char* argv[]) {
     }
 
     if (a == "--version" || a == "-v") {
-      fmt::print("{}\n", version);
+      fmt::print("{}\n", VERSION);
       std::exit(0);
     }
 
@@ -96,8 +159,8 @@ int main(const int argc, const char* argv[]) {
         eval::Evaluator evaluator(argc, argv);
         evaluator.run(*program);
         if (args.interactive_after) {
-          fmt::print("error: REPL not yet implemented\n");
-          return 1;
+          Repl repl;
+          repl.runWithPrelude(*program);
         }
         break;
       }
@@ -109,7 +172,11 @@ int main(const int argc, const char* argv[]) {
         evaluator.run(*program);
         break;
       }
-      case CliArgs::Mode::REPL: fmt::print("error: REPL not yet implemented\n"); return 1;
+      case CliArgs::Mode::REPL: {
+        Repl repl;
+        repl.run();
+        break;
+      }
     }
   } catch (const std::runtime_error& e) {
     fmt::print("Error: {}\n", e.what());
