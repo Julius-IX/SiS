@@ -50,6 +50,7 @@ endif()
 target_link_libraries(SiS PRIVATE
     SiSlib
     spdlog::spdlog $<$<BOOL:${MINGW}>:ws2_32>
+    linenoise_lib
 )
 
 # Test that shit

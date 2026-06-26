@@ -21,3 +21,14 @@ FetchContent_Declare(
         GIT_TAG v1.17.0
 )
 FetchContent_MakeAvailable(spdlog)
+
+# linenoise
+FetchContent_Declare(
+        linenoise
+        GIT_REPOSITORY https://github.com/antirez/linenoise.git
+        GIT_TAG 97d2850
+)
+FetchContent_MakeAvailable(linenoise)
+
+add_library(linenoise_lib STATIC ${linenoise_SOURCE_DIR}/linenoise.c)
+target_include_directories(linenoise_lib PUBLIC ${linenoise_SOURCE_DIR})
