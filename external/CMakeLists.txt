@@ -14,14 +14,6 @@ set(gtest_force_shared_crt OFF)
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE) 
 FetchContent_MakeAvailable(googletest)
 
-# cxxopts
-FetchContent_Declare(
-        cxxopts
-        GIT_REPOSITORY https://github.com/jarro2783/cxxopts.git
-        GIT_TAG 44380e5 # v3.3.1 
-)
-FetchContent_MakeAvailable(cxxopts)
-
 # spdlog
 FetchContent_Declare(
         spdlog
