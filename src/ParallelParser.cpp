@@ -66,7 +66,14 @@ namespace par {
         // This file has no more includes and is not yet parsed -- it was
         // loaded by initRootState or loadIncludeSource before parallel mode
         // took over, so parse it now on the main thread.
-        parseCurrentFile(current_path);
+        if (include_path.value() == std::nullopt) {
+          if (!m_states[current_path].block) {
+            parseCurrentFile(current_path);
+          } else {
+            m_load_order.push_back(current_path);
+          }
+          continue;
+        }
         continue;
       }
 
