@@ -120,7 +120,7 @@ static CliArgs parseArgs(int argc, const char* argv[]) {
                  "  --interactive / -i  enter REPL after script (or alone)\n"
                  "  --help    / -h      show this message\n"
                  "  --version / -v      show version\n"
-                 "  --parallel          use parallel lexing\n",
+                 "  --parallel / -a     use parallel lexing\n",
                  argv[0]);
       std::exit(0);
     }
@@ -151,13 +151,14 @@ static CliArgs parseArgs(int argc, const char* argv[]) {
       continue;
     }
 
-    fmt::print("error: unknown argument '{}'\n", a);
-    std::exit(1);
-
-    if (a == "--parallel") {
+    if (a == "--parallel" || a == "-p") {
       args.parallel = true;
       continue;
     }
+
+    fmt::print("error: unknown argument '{}'\n", a);
+    std::exit(1);
+
   }
 
   return args;
