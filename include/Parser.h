@@ -57,6 +57,12 @@ namespace par {
     std::unordered_map<Path, State> m_states;
     bool m_parallel = false;
 
+    struct ParseResult {
+      std::unique_ptr<Block> block;
+      std::unordered_map<size_t, std::string> line_cache;
+    };
+
+    static ParseResult lexAndParseFile(const std::string& source, const Path& path, ParserHooks hooks);
     std::optional<Program> parseRootParallel();
 
     void initRootState(const Path& full_root_path, const Path& original_path);
