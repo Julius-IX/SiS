@@ -13,7 +13,9 @@
 
 namespace par {
   typedef struct ParserState {
-    std::unique_ptr<lex::Lexer> lexer;
+    lex::TokenStream tokens;
+    size_t cursor = 0;
+    std::unordered_map<size_t, std::string> line_cache;
     std::unique_ptr<Block> block;
     std::vector<Path> includes;
     bool past_include_zone = false;
@@ -59,8 +61,8 @@ namespace par {
 
     static lex::Token advance(State* state);
     static bool match(State* state, lex::TokenType type);
-    static bool check(lex::Lexer* lexer, lex::TokenType type);
-    static bool isAtEnd(lex::Lexer* lexer);
+    static bool check(const State* state, lex::TokenType type);
+    static bool isAtEnd(const State* state);
     bool expect(State* state, lex::TokenType type, std::string_view err_msg) const;
 
     std::expected<std::optional<Path>, std::string> checkForInclude(const Path& path);

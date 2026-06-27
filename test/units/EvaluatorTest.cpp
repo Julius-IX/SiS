@@ -16,10 +16,12 @@ class TestEval : public par::Parser {
     m_hooks.format_error = [](par::State*, const lex::Token& token, std::string_view msg) -> std::string { return fmt::format("{}:{}: {}", token.line, token.column, msg); };
     m_hooks.resolve_file = [](const Path&, const Path&) -> std::optional<Path> { return std::nullopt; };
 
-    par::State state{
-      .lexer = std::make_unique<lex::Lexer>(source),
-      .last_token = {},
-    };
+    lex::Lexer lexer(source);
+    lex::TokenStream tokens = lexer.tokenize();
+    auto line_cache = lexer.takeLineCache();
+    par::State state;
+    state.tokens = std::move(tokens);
+    state.line_cache = std::move(line_cache);
     bool ok = parse(&state);
     if (ok) m_block = std::move(state.block);
     return ok;

@@ -15,8 +15,12 @@ class StringParser : public par::Parser {
   std::optional<par::Program> parseEvalString(const std::string& source) {
     static int counter = 0;
     const Path synthetic{fmt::format("<eval:{}>", counter++)};
+    lex::Lexer lexer(source, std::nullopt);
+    lex::TokenStream tokens = lexer.tokenize();
+    auto line_cache = lexer.takeLineCache();
     par::State state;
-    state.lexer = std::make_unique<lex::Lexer>(source, std::nullopt);
+    state.tokens = std::move(tokens);
+    state.line_cache = std::move(line_cache);
     registerTestState(synthetic, std::move(state));
     if (!parse(&getStateMut(synthetic))) return std::nullopt;
     par::State& s = getStateMut(synthetic);
