@@ -16,7 +16,7 @@
 #endif
 
 // WARN: May change at any time, temporary solution is the best permanent solution
-static void panic(const std::string_view msg) { throw std::runtime_error(msg.data()); }
+void panic(const std::string_view msg) { throw std::runtime_error(msg.data()); }
 
 namespace par { // Hooks
   static std::optional<std::string> readFileToString(const Path& path) {
@@ -253,6 +253,7 @@ namespace par { // Include resolving
   }
 
   std::optional<Program> Parser::parseRoot(const Path& path) {
+    if (m_parallel) return parseRootParallel();
     Path full_root_path = resolveRootDirectory(path);
     LOG_DEBUG_FLUSH("Full root path: {}", full_root_path.string());
 

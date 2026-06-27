@@ -33,6 +33,7 @@ namespace par {
     Parser();
     ~Parser() = default;
 
+    void setParallel(bool parallel) { m_parallel = parallel; }
     std::optional<Program> parseRoot(const Path& path);
     bool parse(State* state);
 
@@ -54,6 +55,9 @@ namespace par {
     std::vector<Path> m_load_order;
     std::deque<Path> m_include_stack;
     std::unordered_map<Path, State> m_states;
+    bool m_parallel = false;
+
+    std::optional<Program> parseRootParallel();
 
     void initRootState(const Path& full_root_path, const Path& original_path);
     void parseCurrentFile(const Path& current_path);

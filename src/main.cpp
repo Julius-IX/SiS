@@ -104,6 +104,7 @@ struct CliArgs {
   Mode mode = Mode::REPL;
   std::string source;
   bool interactive_after = false;
+  bool parallel = false;
 };
 
 static CliArgs parseArgs(int argc, const char* argv[]) {
@@ -118,7 +119,8 @@ static CliArgs parseArgs(int argc, const char* argv[]) {
                  "  -e <code>           evaluate string\n"
                  "  --interactive / -i  enter REPL after script (or alone)\n"
                  "  --help    / -h      show this message\n"
-                 "  --version / -v      show version\n",
+                 "  --version / -v      show version\n"
+                 "  --parallel          use parallel lexing\n",
                  argv[0]);
       std::exit(0);
     }
@@ -151,6 +153,11 @@ static CliArgs parseArgs(int argc, const char* argv[]) {
 
     fmt::print("error: unknown argument '{}'\n", a);
     std::exit(1);
+
+    if (a == "--parallel") {
+      args.parallel = true;
+      continue;
+    }
   }
 
   return args;
@@ -163,6 +170,7 @@ int main(const int argc, const char* argv[]) {
     switch (args.mode) {
       case CliArgs::Mode::SCRIPT: {
         par::Parser parser;
+        parser.setParallel(args.parallel);
         auto program = parser.parseRoot(args.source);
         if (!program) return 1;
         eval::Evaluator evaluator(argc, argv);
