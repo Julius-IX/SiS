@@ -8,8 +8,10 @@
 #include <expected>
 #include <filesystem>
 #include <functional>
+#include <future>
 #include <optional>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace par {
   typedef struct ParserState {
@@ -63,8 +65,20 @@ namespace par {
       std::vector<std::string> raw_includes; // unresolved, in source order
     };
 
+    struct ParallelContext {
+      std::unordered_map<Path, std::future<ParseResult>> futures;
+      std::unordered_set<Path> scheduled;
+      std::unordered_set<Path> ordered;
+    };
+
     static ParseResult lexAndParseFile(const std::string& source, const Path& path);
     std::optional<Program> parseRootParallel();
+
+    // parseRootParallel helpers -- each owns one responsibility
+    void pScheduleFile(ParallelContext& ctx, const Path& path, std::string source);
+    void pCommitNative(ParallelContext& ctx, const Path& dep);
+    bool pProcessFuture(ParallelContext& ctx, const Path& current_path);
+    bool pTryCommit(ParallelContext& ctx, const Path& current_path);
 
     void initRootState(const Path& full_root_path, const Path& original_path);
     void parseCurrentFile(const Path& current_path);
