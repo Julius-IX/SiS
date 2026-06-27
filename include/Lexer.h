@@ -84,6 +84,8 @@ namespace lex {
 
     [[nodiscard]] TokenStream tokenize();
 
+    [[nodiscard]] std::unordered_map<size_t, std::string> takeLineCache() { return std::move(m_line_cache); }
+
     void newInput(std::string input) {
       reset();
 
