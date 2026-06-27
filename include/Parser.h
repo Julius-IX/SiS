@@ -60,9 +60,10 @@ namespace par {
     struct ParseResult {
       std::unique_ptr<Block> block;
       std::unordered_map<size_t, std::string> line_cache;
+      std::vector<std::string> raw_includes; // unresolved, in source order
     };
 
-    static ParseResult lexAndParseFile(const std::string& source, const Path& path, ParserHooks hooks);
+    static ParseResult lexAndParseFile(const std::string& source, const Path& path);
     std::optional<Program> parseRootParallel();
 
     void initRootState(const Path& full_root_path, const Path& original_path);
