@@ -144,9 +144,7 @@ namespace par { // Helpers
     return node;
   }
 
-  static lex::Token makeSyntheticEof() {
-    return lex::Token{.type = lex::TokenType::SIS_EOF, .value = {}, .line = 0, .column = 0};
-  }
+  static lex::Token makeSyntheticEof() { return lex::Token{.type = lex::TokenType::SIS_EOF, .value = {}, .line = 0, .column = 0}; }
 
   static const lex::Token& peekAt(const State* state) {
     if (state->cursor >= state->tokens.size()) {
@@ -253,13 +251,15 @@ namespace par { // Include resolving
   }
 
   std::optional<Program> Parser::parseRoot(const Path& path) {
-    if (m_parallel) return parseRootParallel();
     Path full_root_path = resolveRootDirectory(path);
     LOG_DEBUG_FLUSH("Full root path: {}", full_root_path.string());
 
     initRootState(full_root_path, path);
 
     m_include_stack.push_back(full_root_path);
+
+    if (m_parallel) return parseRootParallel();
+
     while (!m_include_stack.empty()) {
       Path current_path = m_include_stack.back();
       m_include_stack.pop_back();
