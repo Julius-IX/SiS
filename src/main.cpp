@@ -120,7 +120,7 @@ static CliArgs parseArgs(int argc, const char* argv[]) {
                  "  --interactive / -i  enter REPL after script (or alone)\n"
                  "  --help    / -h      show this message\n"
                  "  --version / -v      show version\n"
-                 "  --parallel / -a     use parallel lexing\n",
+                 "  --parallel / -p     use parallel lexing\n",
                  argv[0]);
       std::exit(0);
     }
