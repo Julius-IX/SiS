@@ -427,6 +427,28 @@ namespace { // Include resolution
 
 } // namespace
 
+namespace { // Namespacing
+
+  TEST_P(E2E, NamespacedVariableAccess) {
+    auto out = run("includes/namespace_access.sis");
+    EXPECT_EQ(out[0], "0.1");
+    EXPECT_EQ(out[1], "15");
+  }
+
+  TEST_P(E2E, BareVariableFromIncludeIsUndefined) {
+    EXPECT_THROW(run("includes/bare_name_fails.sis"), std::runtime_error);
+  }
+
+  TEST_P(E2E, BareFunctionFromIncludeIsUndefined) {
+    EXPECT_THROW(run("includes/bare_fn_fails.sis"), std::runtime_error);
+  }
+
+  TEST_P(E2E, BareClassFromIncludeIsUndefined) {
+    EXPECT_THROW(run("includes/bare_new_fails.sis"), std::runtime_error);
+  }
+
+} // namespace
+
 namespace { // Error and edge cases
 
   TEST_P(E2E, ParseErrorOnMissingSemicolonThrows) { EXPECT_THROW(eval("errors/missing_semicolon.sis"), std::runtime_error); }
