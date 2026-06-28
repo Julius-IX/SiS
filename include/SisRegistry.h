@@ -23,17 +23,23 @@ namespace eval {
   // and your actual args from args[1] onward.
   struct NativeClassBuilder {
     std::shared_ptr<Class> klass;
-
+    std::string m_pending_docs;
+  
+    // Buffer a doc string to be consumed by the next constructor() or method() call.
+    NativeClassBuilder& docs(std::string text) {
+      m_pending_docs = std::move(text);
+      return *this;
+    }
+  
     // Register the constructor. `ctor` receives the partially-constructed
     // instance (fields already set to defaults by evalNewExpr) and the
     // user-supplied constructor arguments. Mutate inst->fields directly
     // to initialize the instance.
-    NativeClassBuilder& constructor(std::function<void(std::shared_ptr<Instance>, std::vector<Value>&)> ctor, std::string docs_string = "") {
+    NativeClassBuilder& constructor(std::function<void(std::shared_ptr<Instance>, std::vector<Value>&)> ctor) {
       klass->native_methods["constructor"] = NativeFunction{
         .name = "constructor",
-        .docs = std::move(docs_string),
+        .docs = std::move(m_pending_docs),
         .fn   = [ctor](std::vector<Value>& args) -> Value {
-          // args[0] is the instance injected by evalNewExpr
           auto inst = std::get<std::shared_ptr<Instance>>(args[0].data);
           std::vector<Value> ctor_args(args.begin() + 1, args.end());
           ctor(inst, ctor_args);
@@ -42,13 +48,13 @@ namespace eval {
       };
       return *this;
     }
-
+  
     // Register a named method. `fn` receives the instance as first arg
     // (already unwrapped to shared_ptr<Instance>) and user args as the rest.
-    NativeClassBuilder& method(const char* name, std::function<Value(std::shared_ptr<Instance>, std::vector<Value>&)> fn, std::string docs_string = "") {
+    NativeClassBuilder& method(const char* name, std::function<Value(std::shared_ptr<Instance>, std::vector<Value>&)> fn) {
       klass->native_methods[name] = NativeFunction{
         .name = name,
-        .docs = std::move(docs_string),
+        .docs = std::move(m_pending_docs),
         .fn   = [fn](std::vector<Value>& args) -> Value {
           auto inst = std::get<std::shared_ptr<Instance>>(args[0].data);
           std::vector<Value> method_args(args.begin() + 1, args.end());
@@ -57,11 +63,14 @@ namespace eval {
       };
       return *this;
     }
-
+  
     // Register a default field value. evalNewExpr will populate this on
     // every new instance before the constructor runs, just like AST-declared
     // fields. Use Value{} (null) if there is no meaningful default.
+    // Note: clears pending docs since fields don't carry them, preventing
+    // a stray .docs() from bleeding into the next method.
     NativeClassBuilder& field(const char* name, Value default_value) {
+      m_pending_docs = {};
       klass->default_fields[name] = std::move(default_value);
       return *this;
     }
