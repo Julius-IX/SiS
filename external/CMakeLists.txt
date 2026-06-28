@@ -14,14 +14,6 @@ set(gtest_force_shared_crt OFF)
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE) 
 FetchContent_MakeAvailable(googletest)
 
-# spdlog
-FetchContent_Declare(
-        spdlog
-        GIT_REPOSITORY git@github.com:gabime/spdlog.git
-        GIT_TAG v1.17.0
-)
-FetchContent_MakeAvailable(spdlog)
-
 # linenoise
 FetchContent_Declare(
         linenoise

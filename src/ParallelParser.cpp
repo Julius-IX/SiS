@@ -1,4 +1,3 @@
-#include <Logging.h>
 #include <Parser.h>
 
 #include <algorithm>

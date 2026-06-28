@@ -1,4 +1,3 @@
-#include <Logging.h>
 #include <Parser.h>
 
 #include <algorithm>
@@ -20,7 +19,6 @@ void panic(const std::string_view msg) { throw std::runtime_error(msg.data()); }
 
 namespace par { // Hooks
   static std::optional<std::string> readFileToString(const Path& path) {
-    LOG_DEBUG_FLUSH("Reading file {}", path.string());
     std::ifstream file(path, std::ios::in | std::ios::binary);
     if (!file) return std::nullopt;
 
@@ -52,18 +50,15 @@ namespace par { // Hooks
     std::error_code ec;
     auto canonical = std::filesystem::weakly_canonical(full, ec);
     if (ec || !std::filesystem::is_regular_file(canonical)) return std::nullopt;
-    LOG_DEBUG_FLUSH("resolved file path: {}", canonical.string());
     return canonical;
   }
 
   std::optional<Path> resolveFile(const Path& root, const Path& relative) {
-    LOG_DEBUG_FLUSH("resolving file path: {}", relative.string());
     if (relative.has_extension()) {
       return resolveFileOnDisk(root / relative);
     }
 
     const char* sis_path_env = std::getenv("SIS_PATH");
-    LOG_DEBUG_FLUSH("resolving with env var: {}", sis_path_env ? sis_path_env : "not set");
 #ifdef _WIN32
     const char sep = ';';
     const std::string dyn_subdir = "dynamic/";
@@ -105,15 +100,12 @@ namespace par { // Hooks
     for (const auto& dir : search_dirs) {
       Path b(dir);
       if (auto p = resolveFileOnDisk(b / "lib" / "managed" / (relative.string() + ".sis"))) { // NOTE: ill deff change this and then forget to edit the build script but whatever
-        LOG_DEBUG_FLUSH("checking native dir: {}", p->string());
         return p;
       }
       if (auto p = resolveFileOnDisk(b / dyn_subdir / (relative.string() + dyn_ext))) {
-        LOG_DEBUG_FLUSH("checking dynamic dir");
         return p;
       }
     }
-    LOG_DEBUG_FLUSH("failed to resolve file path: {}", relative.string());
     return std::nullopt;
   }
 
@@ -216,7 +208,6 @@ namespace par { // Include resolving
   }
 
   void Parser::parseCurrentFile(const Path& current_path) {
-    LOG_DEBUG_FLUSH("Parsing full file {}", current_path.string());
     try {
       if (!parse(&m_states[current_path])) {
         panic(fmt::format("Failed to parse '{}'", current_path.string()));
@@ -228,8 +219,6 @@ namespace par { // Include resolving
   }
 
   bool Parser::loadIncludeSource(const Path& include_path) {
-    LOG_DEBUG_FLUSH("Resolving include path: {}", include_path.string());
-
     // Native modules (.so/.dll/.dylib) have no source to lex give them a
     // sentinel empty block so the final validity check in parseRoot passes,
     // and let the evaluator handle them via loadDynamicLib.
@@ -255,7 +244,6 @@ namespace par { // Include resolving
 
   std::optional<Program> Parser::parseRoot(const Path& path) {
     Path full_root_path = resolveRootDirectory(path);
-    LOG_DEBUG_FLUSH("Full root path: {}", full_root_path.string());
 
     initRootState(full_root_path, path);
 

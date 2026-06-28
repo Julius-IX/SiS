@@ -1,5 +1,4 @@
 #include <Evaluator.h>
-#include <Logging.h>
 #include <NativeFunctions.h>
 #include <Token.h>
 
@@ -113,7 +112,6 @@ namespace eval {
   }
 
   std::shared_ptr<Environment> Evaluator::loadFile(const Path& path, const par::Block& block, Value* out_last) {
-    LOG_DEBUG_FLUSH("loading .sis file");
     if (auto it = m_file_cache.find(path); it != m_file_cache.end()) {
       return it->second;
     }
@@ -131,7 +129,6 @@ namespace eval {
   }
 
   std::shared_ptr<Environment> Evaluator::loadDynamicLib(const Path& path) {
-    LOG_DEBUG_FLUSH("loading dynamic lib");
     if (auto it = m_file_cache.find(path); it != m_file_cache.end()) return it->second;
 
     auto lib_env = std::make_shared<Environment>(m_global);
