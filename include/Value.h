@@ -34,6 +34,7 @@ namespace eval {
   // they're distinguished only by which variant alternative they live in.
   struct NativeFunction {
     std::string name; // for error messages ("X expects 1 argument", etc)
+    std::string docs;
     std::function<Value(std::vector<Value>&)> fn;
   };
 
@@ -52,6 +53,7 @@ namespace eval {
   struct Class : std::enable_shared_from_this<Class> {
     std::string name;
     std::shared_ptr<Class> parent;
+    std::string docs; // duplicated due to native functions not having a declaration
     const par::ClassDecl* declaration; // nullptr for native classes
     std::unordered_map<std::string, Function> methods;
     std::unordered_map<std::string, NativeFunction> native_methods; // methods implemented in C++
@@ -79,7 +81,7 @@ namespace eval {
     [[nodiscard]] const NativeFunction* findNativeMethod(const std::string& method_name, std::shared_ptr<Class>* owner_out = nullptr) {
       auto it = native_methods.find(method_name);
       if (it != native_methods.end()) {
-        if (owner_out) *owner_out = shared_from_this();
+        if (owner_out != nullptr) *owner_out = shared_from_this();
         return &it->second;
       }
       if (parent) return parent->findNativeMethod(method_name, owner_out);

@@ -83,8 +83,8 @@ SIS_VALUE_TYPES(DEFINE_REQUIRE)
 //   SIS_NATIVE_CLASS_END();
 
 // clang-format off
-#define SIS_NATIVE_CLASS_BEGIN(reg, class_name, CppType)                               \
-  (reg)->defineClass(class_name)                                                       \
+#define SIS_NATIVE_CLASS_BEGIN(reg, class_name, CppType, ...)                          \
+  (reg)->defineClass(class_name, ##__VA_ARGS__)                                        \
     .field("__native", eval::Value{})   /* placeholder; SIS_NATIVE_CTOR fills this */  \
 
 #define SIS_NATIVE_CLASS_END() /* just a semicolon guard */ ;

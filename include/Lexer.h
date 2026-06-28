@@ -149,6 +149,12 @@ namespace lex {
 
     void fillBuffer();
     void advanceState();
+    void advanceState(uint32_t multiplier) {
+      assert(multiplier > 0 && "multiplier must be greater than 0");
+      for (uint32_t i = 0; i < multiplier; ++i) {
+        advanceState();
+      }
+    }
     void consumeSpace();
     void skipComment(const char& current_char, const char& next_char);
 
@@ -166,6 +172,11 @@ namespace lex {
 
     [[nodiscard]] TypeValuePair parseComment(const char* next_char);
     [[nodiscard]] TypeValuePair parseString();
+    [[nodiscard]] TypeValuePair parseDocComment();
+
+    [[nodiscard]] bool isThisLineDocComment() {
+      return m_state.current_char == '/' && peekChar() == '/' && peekChar(1) == '/';
+    }
   };
 
   [[nodiscard]] static bool isNum(const char& c /* NOLINT */) noexcept { return (c >= '0' && c <= '9'); }

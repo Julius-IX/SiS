@@ -146,12 +146,15 @@ namespace par { // Helpers
 
   static lex::Token makeSyntheticEof() { return lex::Token{.type = lex::TokenType::SIS_EOF, .value = {}, .line = 0, .column = 0}; }
 
-  static const lex::Token& peekAt(const State* state) {
-    if (state->cursor >= state->tokens.size()) {
+  static const lex::Token& peekAt(const State* state, std::size_t offset = 0) {
+    const std::size_t index = state->cursor + offset;
+
+    if (index >= state->tokens.size()) {
       static const lex::Token eof = makeSyntheticEof();
       return eof;
     }
-    return state->tokens[state->cursor];
+
+    return state->tokens[index];
   }
 
   bool Parser::isAtEnd(const State* state) { return check(state, lex::TokenType::SIS_EOF); }
@@ -458,6 +461,8 @@ namespace par { // Base parsing loop functions
       case lex::TokenType::COLON:
       case lex::TokenType::SEMICOLON:
       case lex::TokenType::ARROW:
+      case lex::TokenType::AS:
+      case lex::TokenType::DOC_COMMENT:
       case lex::TokenType::COMMENT: return 0;
     }
     assert(false && "bindingPower: unnamed TokenType value");
@@ -558,6 +563,7 @@ namespace par { // Base parsing loop functions
         return makeNode<ArrayLiteral>(tok.line, tok.column, std::move(elements));
       }
 
+      case lex::TokenType::DOC_COMMENT: return parseDocComment(state);
       case lex::TokenType::FN: return parseFnLiteral(state);
       case lex::TokenType::NEW: return parseNewExpr(state);
       case lex::TokenType::THIS: return parseThisOrSuper(state, false);
@@ -607,6 +613,7 @@ namespace par { // Base parsing loop functions
       case lex::TokenType::COLON:
       case lex::TokenType::SEMICOLON:
       case lex::TokenType::ARROW:
+      case lex::TokenType::AS:
       case lex::TokenType::COMMENT: panic(m_hooks.format_error(state, tok, "Unexpected token in expression")); return nullptr;
     }
     assert(false && "parseAtom: unnamed TokenType value");
@@ -752,6 +759,7 @@ namespace par { // Complex parsing structures
     lex::TokenType next = peekAt(state).type;
 
     switch (next) {
+      case lex::TokenType::DOC_COMMENT: return parseDocComment(state);
       case lex::TokenType::L_BRACE: return parseBlock(state);
       case lex::TokenType::IF: return parseIf(state);
       case lex::TokenType::WHILE: return parseWhile(state);
@@ -781,6 +789,44 @@ namespace par { // Complex parsing structures
         return makeNode<ExprStmt>(expr_line, expr_column, std::move(expr));
       }
     }
+  }
+
+  std::unique_ptr<Node> Parser::parseDocComment(State* state) {
+    lex::Token doc_tok = advance(state); // consume`doc comment`
+
+    if (!check(state, lex::TokenType::FN) && !check(state, lex::TokenType::CLASS)) {
+      panic(formatIllegalTokenMessage(state, doc_tok, "Unexpected documentation comment, placed without function or class declaration"));
+      return nullptr;
+    }
+    if (peekAt(state, 1).type != lex::TokenType::IDENT) {
+      panic(formatIllegalTokenMessage(state, doc_tok, "Unexpected documentation comment, placed without named function or class declaration"));
+    }
+
+    if (check(state, lex::TokenType::FN)) {
+      std::unique_ptr<Node> decl = parseTopLevelFn(state);
+      if (decl == nullptr) return nullptr;
+
+      // parseTopLevelFn returns VarDecl { initializer: FnLiteral }
+      auto* var_decl = static_cast<par::VarDecl*>(decl.get());
+      auto* fn = static_cast<par::FnLiteral*>(var_decl->initializer.get());
+
+      if (auto value = getFromVariant<std::string>(doc_tok)) {
+        fn->docs = value.value();
+      }
+      return decl;
+    }
+
+    if (check(state, lex::TokenType::CLASS)) {
+      std::unique_ptr<Node> klass_decl = parseClassDecl(state);
+      auto* klass = static_cast<ClassDecl*>(klass_decl.get());
+      if (klass_decl == nullptr || klass == nullptr) return nullptr;
+      if (auto value = getFromVariant<std::string>(doc_tok)) {
+        klass->docs = value.value();
+      }
+      return std::move(klass_decl);
+    }
+
+    return nullptr;
   }
 
   std::unique_ptr<Node> Parser::parseBlock(State* state) {
@@ -1223,6 +1269,27 @@ namespace par { // Complex parsing structures
         if (method_node == nullptr) return false;
         out_method_names->push_back(std::move(method_name));
         out_methods->push_back(std::move(method_node));
+      } else if (check(state, lex::TokenType::DOC_COMMENT)) {
+        lex::Token doc_tok = advance(state);
+        std::string docs;
+        if (auto value = getFromVariant<std::string>(doc_tok)) {
+          docs = value.value();
+        }
+
+        if (!check(state, lex::TokenType::FN)) {
+          panic(m_hooks.format_error(state, peekAt(state), "Expected 'fn' in class body after doc comment"));
+        }
+
+        std::string method_name;
+        auto method_node = parseClassMethod(state, &method_name);
+        if (method_node == nullptr) return false;
+        auto* method = static_cast<FnLiteral*>(method_node.get());
+
+        method->docs = docs;
+
+        out_method_names->push_back(std::move(method_name));
+        out_methods->push_back(std::move(method_node));
+
       } else {
         panic(m_hooks.format_error(state, peekAt(state), "Expected 'pin' or 'fn' in class body"));
         return false;

@@ -102,6 +102,15 @@ namespace {
 
 } // namespace
 
+namespace { // Documentation
+  TEST_P(E2E, BasicDocumentationWorks) {
+    auto out = run("documentation/docs_works.sis");
+    EXPECT_EQ(out[0], " This Class does this");
+    EXPECT_EQ(out[1], " This method says hello");
+    EXPECT_EQ(out[2], " This free function does nothing"); 
+  }
+}
+
 namespace { // Arithmetic and operators
 
   TEST_P(E2E, BasicArithmetic) {
