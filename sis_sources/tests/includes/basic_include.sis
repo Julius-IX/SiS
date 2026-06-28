@@ -1,5 +1,5 @@
 include "library.sis";
-print(LIB_VERSION);
-print(str(libraryAdd(2, 3)));
-pin obj = new LibraryClass();
+print(library.LIB_VERSION);
+print(str(library.libraryAdd(2, 3)));
+pin obj = new library.LibraryClass();
 print(obj.getName());
