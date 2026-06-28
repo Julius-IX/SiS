@@ -48,7 +48,7 @@ class Repl {
     while (true) {
       const char* prompt = input.empty() ? ">> " : ".. ";
       char* raw = linenoise(prompt);
-      if (!raw) break; // Ctrl+D
+      if (!raw) break; // Ctrl+D || Ctlr+C
       std::string line(raw);
       linenoiseFree(raw);
       if (!line.empty() && input.empty()) linenoiseHistoryAdd(line.c_str());

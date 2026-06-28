@@ -115,7 +115,7 @@ namespace par {
     return resolved;
   }
 
-  // lexAndParseFile: lex a source file, strip its include directives into
+  // lex a source file, strip its include directives into
   // raw_includes (unresolved string paths, in source order), then parse the
   // remaining statements into a Block AST. Runs entirely on a worker thread
   // with no access to the main parser's state.
@@ -149,7 +149,7 @@ namespace par {
 
   // Registers a native module: writes a sentinel state, commits it to
   // load_order, and marks it ordered. Native modules are always immediately
-  // ready -- they have no source to parse and no deps of their own.
+  // ready -- they have no source to parse and no `.sis` deps of their own.
   void Parser::pCommitNative(ParallelContext& ctx, const Path& dep) {
     lex::TokenStream sentinel;
     sentinel.push_back(
@@ -226,7 +226,7 @@ namespace par {
     return true;
   }
 
-  // parseRootParallel: drives the include graph walk using async workers.
+  // drives the include graph walk using async workers.
   //
   // Include discovery and ordering stay serial on the main thread. Workers
   // only lex+parse their assigned file and return a ParseResult.

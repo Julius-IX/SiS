@@ -33,7 +33,7 @@ namespace eval {
   // When m_call_stack is non-empty, appends a call trace so the error shows
   // not just WHERE something blew up but also the chain of calls that got
   // there. Frames are printed innermost-first (most recent call at the top),
-  // which matches every mainstream language's stack trace convention.
+  // this is to match every mainstream language's stack trace convention.
   void Evaluator::throwKnownScopeErr(const par::Node* node, std::string msg) {
     std::string full;
     if (node == nullptr) {
@@ -112,18 +112,13 @@ namespace eval {
     }
   }
 
-  std::shared_ptr<Environment> Evaluator::loadFile(const Path& path, const par::Block& block, const std::vector<Path>& deps, Value* out_last) {
+  std::shared_ptr<Environment> Evaluator::loadFile(const Path& path, const par::Block& block, Value* out_last) {
     LOG_DEBUG_FLUSH("loading .sis file");
     if (auto it = m_file_cache.find(path); it != m_file_cache.end()) {
       return it->second;
     }
 
     auto file_env = std::make_shared<Environment>(m_global);
-
-    // TODO: make permanent
-    // for (const Path& dep : deps) {
-    //   if (auto it = m_file_cache.find(dep); it != m_file_cache.end()) mergeIntoEnv(it->second, file_env);
-    // }
 
     Value last{};
     for (const auto& stmt : block.statements) {
@@ -135,16 +130,11 @@ namespace eval {
     return file_env;
   }
 
-  std::shared_ptr<Environment> Evaluator::loadDynamicLib(const Path& path, const std::vector<Path>& deps) {
+  std::shared_ptr<Environment> Evaluator::loadDynamicLib(const Path& path) {
     LOG_DEBUG_FLUSH("loading dynamic lib");
     if (auto it = m_file_cache.find(path); it != m_file_cache.end()) return it->second;
 
     auto lib_env = std::make_shared<Environment>(m_global);
-
-    // TODO: make permanent
-    // for (const Path& dep : deps) {
-    //   if (auto it = m_file_cache.find(dep); it != m_file_cache.end()) mergeIntoEnv(it->second, lib_env);
-    // }
 
 #ifdef __unix__
     void* handle = dlopen(path.c_str(), RTLD_LAZY | RTLD_GLOBAL);
@@ -199,10 +189,9 @@ namespace eval {
       const par::ParsedFile& file = program.files.at(path);
       m_current_eval_file = &path;
 
-      std::shared_ptr<Environment> file_env = file.is_dynamic ? loadDynamicLib(path, file.includes) : loadFile(path, *file.ast, file.includes, &last);
+      std::shared_ptr<Environment> file_env = file.is_dynamic ? loadDynamicLib(path) : loadFile(path, *file.ast, &last);
 
       if (path == program.root_path) {
-        // Entry point: flat-merge into global, same as before.
         mergeIntoEnv(file_env, m_global);
       } else {
         // Non-entry file: wrap its environment snapshot as a namespace Instance
@@ -437,18 +426,7 @@ namespace eval {
     }
   }
 
-  // Handles =, +=, -=, *=, /=, %=. Two kinds of targets:
-  //   - Identifier:   plain variable, resolved/updated through `env`.
-  //   - MemberAccess: instance.field = ... via '.' syntax, OR this->field =
-  //                   ... (super->field = ... is rejected, same as in most
-  //                   languages, you can write to your own fields but
-  //                   "assigning into the parent" doesn't mean anything
-  //                   since fields aren't per-class, they're per-instance,
-  //                   this->field and super->field refer to the SAME
-  //                   storage slot, only method lookup differs). Both forms
-  //                   mutate the instance's own field map directly, they're
-  //                   told apart by whether the MemberAccess's object child
-  //                   is a Self node.
+  // Handles =, +=, -=, *=, /=, %=
   Value Evaluator::evalAssignment(const par::Binary* node, const std::shared_ptr<Environment>& env) {
     // Plain identifier target, e.g. x = 5; x += 1;
     if (node->left->type == par::NodeType::IDENTIFIER) {
@@ -593,7 +571,7 @@ namespace eval {
     return result;
   }
 
-  // Fall-through switch: once a matching case is found (or the default case
+  // Fall-through switch C-style: once a matching case is found (or the default case
   // is reached with no earlier match), every statement from there to the end
   // of the switch runs, across case boundaries, until a BreakSignal escapes
   // (an explicit `break;`) or the cases run out. valuesEqual is the same
@@ -674,7 +652,7 @@ namespace eval {
 
   // Records which source file each FnLiteral node was declared in. This is
   // the other half of the file-tracking
-  // FIX: when callFunction later executes
+  // when callFunction later executes
   // the body, it looks up the declaration here to switch m_current_eval_file
   // to the right file, so errors inside the function report the correct source
   // even if the call site is in a different file.
@@ -786,7 +764,7 @@ namespace eval {
   // instance's own runtime class.
   //
   // Resolution order: fields → AST methods → native methods.
-  // Fields always win over methods, same as before. AST methods are checked
+  // Fields always win over methods. AST methods are checked
   // before native methods so that a .sis subclass can override a native
   // method simply by declaring a method with the same name.
   //

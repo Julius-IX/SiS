@@ -18,11 +18,6 @@ namespace eval {
   class Environment;
   struct Value;
 
-  // A function value at runtime: the AST node describing params/body, plus the
-  // environment that was active when the function was created. That pairing
-  // (code + captured environment) is what makes this a closure, the function
-  // can still see variables from its defining scope even when called later
-  // from somewhere else.
   struct Function {
     const par::FnLiteral* declaration; // non-owning, the AST outlives evaluation
     std::shared_ptr<Environment> closure;
@@ -53,19 +48,12 @@ namespace eval {
   struct Class : std::enable_shared_from_this<Class> {
     std::string name;
     std::shared_ptr<Class> parent;
-    std::string docs; // duplicated due to native functions not having a declaration
+    std::string docs;                  // duplicated due to native functions not having an AST node
     const par::ClassDecl* declaration; // nullptr for native classes
     std::unordered_map<std::string, Function> methods;
     std::unordered_map<std::string, NativeFunction> native_methods; // methods implemented in C++
     std::unordered_map<std::string, Value> default_fields;          // field defaults for native classes
-                                                                    // (AST classes use declaration->fields)
-    // Walks up the parent chain looking for a method named `name`, declared
-    // directly on this class or inherited. Returns nullptr if nobody in the
-    // chain defines it. If `owner_out` is non-null, it's set to the class
-    // that actually DECLARES the matched method (which may be an ancestor,
-    // not `this`), callers need that to correctly bind "__class__" so a
-    // super-> call inside the method resolves starting from the right
-    // generation rather than looping back on itself.
+
     [[nodiscard]] const Function* findMethod(const std::string& method_name, std::shared_ptr<Class>* owner_out = nullptr) {
       auto it = methods.find(method_name);
       if (it != methods.end()) {
@@ -96,7 +84,7 @@ namespace eval {
   // Held by shared_ptr (same as Array) so instances have reference semantics:
   // `pin b = a;` aliases the same object, mutating through `b` is visible
   // through `a`. This also avoids copying the struct on every evaluate()
-  // return — only the shared_ptr is copied, not the fields map or klass ptr.
+  // return only the shared_ptr is copied, not the fields map or klass ptr.
   struct Instance {
     std::shared_ptr<Class> klass;
     std::shared_ptr<std::unordered_map<std::string, Value>> fields;
@@ -140,24 +128,25 @@ namespace eval {
       return std::visit(
         [](const auto& v) -> std::string {
           using T = std::decay_t<decltype(v)>;
-          if constexpr (std::is_same_v<T, std::monostate>)
+          if constexpr (std::is_same_v<T, std::monostate>) {
             return "null";
-          else if constexpr (std::is_same_v<T, bool>)
+          } else if constexpr (std::is_same_v<T, bool>) {
             return "bool";
-          else if constexpr (std::is_same_v<T, double>)
+          } else if constexpr (std::is_same_v<T, double>) {
             return "num";
-          else if constexpr (std::is_same_v<T, std::string>)
+          } else if constexpr (std::is_same_v<T, std::string>) {
             return "string";
-          else if constexpr (std::is_same_v<T, Array>)
+          } else if constexpr (std::is_same_v<T, Array>) {
             return "array";
-          else if constexpr (std::is_same_v<T, Function>)
+          } else if constexpr (std::is_same_v<T, Function>) {
             return "function";
-          else if constexpr (std::is_same_v<T, NativeFunction>)
+          } else if constexpr (std::is_same_v<T, NativeFunction>) {
             return "function";
-          else if constexpr (std::is_same_v<T, std::shared_ptr<Class>>)
+          } else if constexpr (std::is_same_v<T, std::shared_ptr<Class>>) {
             return "class";
-          else
+          } else {
             return "instance"; // shared_ptr<Instance>
+          }
         },
         data);
     }
@@ -219,7 +208,7 @@ namespace eval {
   };
 
   // Ordered key-value store backing the Array type. Using a vector of pairs
-  // rather than a hash map so insertion order is preserved — arr[0], arr[1]
+  // rather than a hash map so insertion order is preserved arr[0], arr[1]
   // etc. iterate in the order they were inserted, which is what users expect.
   // Lookup is O(n) linear scan, which is fine for typical scripting array
   // sizes. Keys can be any Value (number, string, bool, etc), so [1, 2, 3]

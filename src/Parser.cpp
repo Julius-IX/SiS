@@ -161,7 +161,7 @@ namespace par { // Helpers
 
   bool Parser::check(const State* state, lex::TokenType type) { return peekAt(state).type == type; }
 
-  // advance: unconditionally consume and return the next token. For when you
+  // unconditionally consume and return the next token. For when you
   // already know what it is and just need to move past it.
   lex::Token Parser::advance(State* state) {
     lex::Token token = peekAt(state);
@@ -170,7 +170,7 @@ namespace par { // Helpers
     return token;
   }
 
-  // match: if the next token is `type`, consume it and return true.
+  // if the next token is `type`, consume it and return true.
   // Otherwise leave it alone and return false.
   bool Parser::match(State* state, lex::TokenType type) {
     if (!check(state, type)) return false;
@@ -179,7 +179,7 @@ namespace par { // Helpers
     return true;
   }
 
-  // expect: consumes the next token if it matches `type`, panics + returns false otherwise.
+  // consumes the next token if it matches `type`, panics + returns false otherwise.
   bool Parser::expect(State* state, lex::TokenType type, std::string_view err_msg) const {
     if (peekAt(state).type != type) {
       panic(m_hooks.format_error(state, peekAt(state), err_msg));
@@ -538,8 +538,7 @@ namespace par { // Base parsing loop functions
           }
 
           // Parse the first expression. It's either a standalone value, or the
-          // key in a `key: value` pair we don't know which until we peek at
-          // what follows it.
+          // key in a `key: value` pair we don't know which so we peek
           std::unique_ptr<Node> first = parseExpression(state, 1);
           if (first == nullptr) return nullptr;
 
@@ -1152,7 +1151,6 @@ namespace par { // Complex parsing structures
   }
 
   std::unique_ptr<VarDecl> Parser::parseClassField(State* state) {
-    // field declaration
     lex::Token field_pin_tok = advance(state); // consume 'pin'
     lex::Token field_tok = advance(state);
     if (field_tok.type != lex::TokenType::IDENT) {
@@ -1198,7 +1196,6 @@ namespace par { // Complex parsing structures
   }
 
   std::unique_ptr<FnLiteral> Parser::parseClassMethod(State* state, std::string* out_name) {
-    // method declaration
     lex::Token method_fn_tok = advance(state); // consume 'fn'
     lex::Token method_tok = advance(state);
     if (method_tok.type != lex::TokenType::IDENT) {

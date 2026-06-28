@@ -1,5 +1,8 @@
 #pragma once
 
+// NOTE: stolen code from another project this is purely for debugging purposes
+// TODO: prob remove this due to it mostly being useless
+
 #include <string>
 #include <unordered_map>
 

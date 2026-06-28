@@ -5,10 +5,9 @@
 namespace lex {
   DoubleSymbolTable Lexer::s_symbol_table = initSymbolTable();
 
-  /* the keys in 'table' can either consist of one or two chars
-   * '\0' will represent the key to the default TokenType of the first char
-   * if said char is not followed by a second character that could be part of the token
-   */
+  // the keys in 'table' can either consist of one or two chars
+  // '\0' will represent the key to the default TokenType of the first char
+  // if said char is not followed by a second character that could be part of the token
   DoubleSymbolTable Lexer::initSymbolTable() {
     DoubleSymbolTable table;
 
@@ -139,17 +138,15 @@ namespace lex {
         current_next_pair[1] = peekChar();
       }
 
-      /* Two more times to get rid of block comment terminator
-       * no need to wrap in if block
-       * advanceState() prevents going past m_input.size();
-       */
+      // Two more times to get rid of block comment terminator
+      // no need to wrap in if block
+      // advanceState() prevents going past m_input.size();
       advanceState(2);
     }
   }
 
-  /* default offset is 0 and grabs the char after the current one
-   * offset of 1 will grab the char after that etc etc
-   */
+  // default offset is 0 and grabs the char after the current one
+  // offset of 1 will grab the char after that etc etc
   char Lexer::peekChar(uint32_t offset) const noexcept {
     if ((this->m_state.next_pos + offset) >= this->m_input.length()) {
       return '\0';
@@ -157,7 +154,6 @@ namespace lex {
     return this->m_input[this->m_state.next_pos + offset];
   }
 
-  /* incoming segfault */
   TypeValuePair Lexer::parseNum() {
     const size_t start_index = this->m_state.pos;
     TypeValuePair tvp{ILLEGAL, {}};
@@ -203,7 +199,6 @@ namespace lex {
     return tvp;
   }
 
-  /* incoming segfault */
   TypeValuePair Lexer::parseIdent() {
     const size_t start_index = this->m_state.pos;
     TypeValuePair tvp{ILLEGAL, "FAILED TO PARSE IDENTIFIER"};

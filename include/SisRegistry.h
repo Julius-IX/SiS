@@ -49,8 +49,6 @@ namespace eval {
       return *this;
     }
   
-    // Register a named method. `fn` receives the instance as first arg
-    // (already unwrapped to shared_ptr<Instance>) and user args as the rest.
     NativeClassBuilder& method(const char* name, std::function<Value(std::shared_ptr<Instance>, std::vector<Value>&)> fn) {
       klass->native_methods[name] = NativeFunction{
         .name = name,
@@ -67,7 +65,7 @@ namespace eval {
     // Register a default field value. evalNewExpr will populate this on
     // every new instance before the constructor runs, just like AST-declared
     // fields. Use Value{} (null) if there is no meaningful default.
-    // Note: clears pending docs since fields don't carry them, preventing
+    // NOTE: clears pending docs since fields don't carry them, preventing
     // a stray .docs() from bleeding into the next method.
     NativeClassBuilder& field(const char* name, Value default_value) {
       m_pending_docs = {};
@@ -83,13 +81,10 @@ namespace eval {
     std::shared_ptr<Environment> env;
     std::unordered_map<std::string, std::shared_ptr<Class>>& classes;
 
-    // Used to define variables in scope
     void defineVariable(const std::string& name, Value value) {
       env->define(name, std::move(value));
     }
 
-    // Register a free function directly into scope callable by name
-    // like any built-in (print, len, etc.)
     void defineFn(const char* name, std::function<Value(std::vector<Value>&)> fn, std::string docs_string = "") {
       env->define(name, Value(NativeFunction{
         .name = std::string(name),

@@ -4,7 +4,7 @@
 #include <string>
 #include <spdlog/fmt/fmt.h>
 
-namespace par { // Tree-drawing (debugging only don't expect direct access to this)
+namespace par { // Tree-drawing (debugging only don't expect direct access to this or it to be maintained correctly)
   namespace {
     constexpr std::string_view BRANCH = "├── ";
     constexpr std::string_view LAST_BRANCH = "└── ";

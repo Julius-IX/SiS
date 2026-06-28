@@ -35,7 +35,7 @@ namespace eval {
         } else if constexpr (std::is_same_v<T, double>) {
           // Use the shortest round-trip representation, then strip trailing
           // zeros after the decimal point. If nothing remains after the dot,
-          // strip that too — so 123.0 becomes "123", 1.50 becomes "1.5".
+          // strip that too so 123.0 becomes "123", 1.50 becomes "1.5".
           std::string s = fmt::format("{}", v);
           if (s.find('.') != std::string::npos) {
             s.erase(s.find_last_not_of('0') + 1);
