@@ -810,11 +810,28 @@ namespace eval {
       throwKnownScopeErr(node, "String has no member '" + field + "'");
     }
 
+    if (const auto* named_fn = std::get_if<Function>(&object.data)) {
+      if (field == "__docs__") {
+        return {named_fn->declaration->docs};
+      }
+      throwKnownScopeErr(node, "Function has no member '" + field + "'");
+    }
+    
+    if (const auto* native_fn = std::get_if<NativeFunction>(&object.data)) {
+      if (field == "__docs__") {
+        return {native_fn->docs};
+      }
+      throwKnownScopeErr(node, "Native function has no member '" + field + "'");
+    }
+
     if (const auto* instance = std::get_if<std::shared_ptr<Instance>>(&object.data)) {
       // Fields take priority over methods.
       auto field_it = instance->get()->fields->find(field);
       if (field_it != instance->get()->fields->end()) {
         return field_it->second;
+      }
+      if (field == "__docs__") {
+        return {instance->get()->klass->docs};
       }
 
       // Namespace instances (klass == nullptr) are pure field bags.
@@ -910,6 +927,7 @@ namespace eval {
     auto klass = std::make_shared<Class>();
     klass->name = node->name;
     klass->declaration = node;
+    klass->docs = node->docs;
 
     if (!node->parent_name.empty()) {
       auto parent_it = m_classes.find(node->parent_name);
