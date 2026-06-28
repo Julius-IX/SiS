@@ -8,7 +8,7 @@
 
 #include <spdlog/fmt/fmt.h>
 
-constexpr std::string VERSION = "SiS 0.2.1";
+constexpr std::string VERSION = "SiS 1.0.0";
 
 struct CliArgs {
   enum class Mode : uint8_t { SCRIPT, EVAL_STRING, REPL };
