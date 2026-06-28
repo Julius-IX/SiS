@@ -943,6 +943,24 @@ namespace par { // Complex parsing structures
       panic(m_hooks.format_error(state, name_tok, "Empty class name"));
       return nullptr;
     }
+
+    // Support qualified names: new ns.ClassName()
+    while (check(state, lex::TokenType::DOT)) {
+      advance(state); // consume '.'
+      lex::Token part_tok = advance(state);
+      if (part_tok.type != lex::TokenType::IDENT) {
+        panic(m_hooks.format_error(state, part_tok, "Expected class name after '.' in 'new'"));
+        return nullptr;
+      }
+      auto part = getFromVariant<std::string>(state->last_token);
+      if (!part) {
+        panic(m_hooks.format_error(state, part_tok, "Empty class name after '.'"));
+        return nullptr;
+      }
+      *class_name += '.';
+      *class_name += *part;
+    }
+
     if (!expect(state, lex::TokenType::L_PAREN, "Expected '(' after class name in 'new'")) return nullptr;
     std::optional<std::vector<std::unique_ptr<Node>>> args = parseExpressionList(state, lex::TokenType::R_PAREN);
     if (args == std::nullopt) return nullptr;
