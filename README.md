@@ -5,7 +5,7 @@ Shit Script (SiS)
 - [ ] Add proper README
 - [X] Stop being lazy and add proper Tests
 - [X] Add base standard libraries
-- [ ] Add more passable flags
+- [X] Add more passable flags
 - [ ] Make lsp server
 - [ ] Add example project
 

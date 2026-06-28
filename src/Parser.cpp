@@ -300,6 +300,7 @@ namespace par { // Include resolving
     }
 
     Program program;
+    program.root_path = full_root_path;
     for (const Path& p : m_load_order) {
       State& state = m_states[p];
       auto ext = p.extension();
@@ -310,9 +311,11 @@ namespace par { // Include resolving
         .ast = std::move(state.block),
         .includes = std::move(state.includes),
         .is_dynamic = is_dynamic,
+        .alias = m_aliases.contains(p) ? m_aliases.at(p) : "",
       };
       program.load_order.push_back(p);
     }
+
     return program;
   }
 
@@ -339,6 +342,20 @@ namespace par { // Include resolving
       return std::unexpected(m_hooks.format_error(&state, state.last_token, "Failed to get path from 'include'"));
     }
 
+    // Optional: as <name>
+    std::string alias;
+    if (match(&state, lex::TokenType::AS)) {
+      lex::Token alias_tok = advance(&state);
+      if (alias_tok.type != lex::TokenType::IDENT) {
+        return std::unexpected(m_hooks.format_error(&state, alias_tok, "Expected identifier after 'as'"));
+      }
+      auto alias_name = getFromVariant<std::string>(state.last_token);
+      if (!alias_name) {
+        return std::unexpected(m_hooks.format_error(&state, alias_tok, "Empty alias name after 'as'"));
+      }
+      alias = std::move(*alias_name);
+    }
+
     if (!match(&state, lex::TokenType::SEMICOLON)) {
       return std::unexpected(m_hooks.format_error(&state, state.last_token, "Expected ';' after 'include' expression"));
     }
@@ -348,6 +365,7 @@ namespace par { // Include resolving
       return std::unexpected(m_hooks.format_error(&state, state.last_token, "Failed to resolve include path"));
     }
 
+    if (!alias.empty()) m_aliases[include_path.value()] = std::move(alias);
     state.includes.push_back(include_path.value());
     return include_path;
   }
@@ -941,6 +959,24 @@ namespace par { // Complex parsing structures
       panic(m_hooks.format_error(state, name_tok, "Empty class name"));
       return nullptr;
     }
+
+    // Support qualified names: new ns.ClassName()
+    while (check(state, lex::TokenType::DOT)) {
+      advance(state); // consume '.'
+      lex::Token part_tok = advance(state);
+      if (part_tok.type != lex::TokenType::IDENT) {
+        panic(m_hooks.format_error(state, part_tok, "Expected class name after '.' in 'new'"));
+        return nullptr;
+      }
+      auto part = getFromVariant<std::string>(state->last_token);
+      if (!part) {
+        panic(m_hooks.format_error(state, part_tok, "Empty class name after '.'"));
+        return nullptr;
+      }
+      *class_name += '.';
+      *class_name += *part;
+    }
+
     if (!expect(state, lex::TokenType::L_PAREN, "Expected '(' after class name in 'new'")) return nullptr;
     std::optional<std::vector<std::unique_ptr<Node>>> args = parseExpressionList(state, lex::TokenType::R_PAREN);
     if (args == std::nullopt) return nullptr;

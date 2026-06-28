@@ -1,0 +1,2 @@
+include "library.sis";
+pin obj = new LibraryClass();

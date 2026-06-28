@@ -13,9 +13,9 @@ namespace par {
 
   // Consumes include directives from the front of the token stream and returns
   // their raw string paths in source order. Advances state.cursor past each
-  // consumed INCLUDE STRING SEMICOLON triple. Throws on malformed syntax or
-  // an include appearing after non-include statements.
-  static std::vector<std::string> drainIncludes(State& state) {
+  // consumed INCLUDE STRING [AS IDENT] SEMICOLON sequence. Throws on malformed
+  // syntax or an include appearing after non-include statements.
+  static std::vector<std::string> drainIncludes(State& state, std::unordered_map<std::string, std::string>& aliases_out) {
     std::vector<std::string> raw_includes;
     bool past_include_zone = false;
 
@@ -50,8 +50,26 @@ namespace par {
         throw std::runtime_error(
           fmt::format("{}:{}: failed to read include path", path_tok.line, path_tok.column));
       }
-      raw_includes.push_back(*raw_path);
+      std::string raw = *raw_path;
       ++state.cursor; // consume STRING
+
+      // Optional: as <name>
+      if (state.cursor < state.tokens.size() &&
+          state.tokens[state.cursor].type == lex::TokenType::AS) {
+        ++state.cursor; // consume AS
+        if (state.cursor >= state.tokens.size() ||
+            state.tokens[state.cursor].type != lex::TokenType::IDENT) {
+          const lex::Token& bad =
+            state.cursor < state.tokens.size() ? state.tokens[state.cursor] : state.tokens.back();
+          throw std::runtime_error(
+            fmt::format("{}:{}: expected identifier after 'as'", bad.line, bad.column));
+        }
+        const std::string* alias = std::get_if<std::string>(&state.tokens[state.cursor].value);
+        if (alias != nullptr) {
+          aliases_out[raw] = *alias;
+        }
+        ++state.cursor; // consume IDENT
+      }
 
       if (state.cursor >= state.tokens.size() ||
           state.tokens[state.cursor].type != lex::TokenType::SEMICOLON) {
@@ -61,6 +79,8 @@ namespace par {
           fmt::format("{}:{}: expected ';' after include path", bad.line, bad.column));
       }
       ++state.cursor; // consume SEMICOLON
+
+      raw_includes.push_back(std::move(raw));
     }
 
     return raw_includes;
@@ -110,7 +130,7 @@ namespace par {
 
     ParseResult result;
     result.line_cache   = state.line_cache;
-    result.raw_includes = drainIncludes(state);
+    result.raw_includes = drainIncludes(state, result.raw_aliases);
 
     Parser worker;
     if (!worker.parse(&state)) {
@@ -155,6 +175,15 @@ namespace par {
 
     auto resolved = resolveRawIncludes(result.raw_includes, current_path, m_hooks, m_include_stack);
     if (!resolved) return false;
+
+    // Translate raw string aliases to resolved Path keys now that we have
+    // the resolved paths parallel to the raw include list.
+    for (size_t i = 0; i < result.raw_includes.size(); ++i) {
+      auto alias_it = result.raw_aliases.find(result.raw_includes[i]);
+      if (alias_it != result.raw_aliases.end()) {
+        m_aliases[(*resolved)[i]] = alias_it->second;
+      }
+    }
 
     // Iterate in reverse source order so deps pop off the stack in forward
     // source declaration order (stack is LIFO).
@@ -233,6 +262,7 @@ namespace par {
     }
 
     Program program;
+    program.root_path = root;
     for (const Path& p : m_load_order) {
       State& state    = m_states[p];
       auto   p_ext    = p.extension();
@@ -243,6 +273,7 @@ namespace par {
         .ast        = std::move(state.block),
         .includes   = std::move(state.includes),
         .is_dynamic = is_dynamic,
+        .alias      = m_aliases.count(p) ? m_aliases.at(p) : "",
       };
       program.load_order.push_back(p);
     }

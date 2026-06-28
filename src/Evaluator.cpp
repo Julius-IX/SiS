@@ -1,7 +1,7 @@
 #include <Evaluator.h>
+#include <Logging.h>
 #include <NativeFunctions.h>
 #include <Token.h>
-#include <Logging.h>
 
 #include <algorithm>
 #include <cmath>
@@ -95,17 +95,6 @@ namespace eval {
       a.data);
   }
 
-  // ---------------------------------------------------------------------
-  // Built-in functions
-  //
-  // This is the single place to register a native function: build a
-  // NativeFunction and env->define() it into the global scope. Every
-  // built-in receives already-evaluated arguments as a vector<Value>& and
-  // returns a Value, exactly the same calling convention evalCall uses for
-  // user-defined functions, so from the language's point of view there's no
-  // visible difference between print(...) and a function someone wrote
-  // themselves.
-  // ---------------------------------------------------------------------
   void Evaluator::registerBuiltins(const std::shared_ptr<Environment>& env) {
     for (const auto& [name, fn] : native_functions) {
       env->define(name, Value(fn));
@@ -131,9 +120,10 @@ namespace eval {
 
     auto file_env = std::make_shared<Environment>(m_global);
 
-    for (const Path& dep : deps) {
-      if (auto it = m_file_cache.find(dep); it != m_file_cache.end()) mergeIntoEnv(it->second, file_env);
-    }
+    // TODO: make permanent
+    // for (const Path& dep : deps) {
+    //   if (auto it = m_file_cache.find(dep); it != m_file_cache.end()) mergeIntoEnv(it->second, file_env);
+    // }
 
     Value last{};
     for (const auto& stmt : block.statements) {
@@ -151,9 +141,10 @@ namespace eval {
 
     auto lib_env = std::make_shared<Environment>(m_global);
 
-    for (const Path& dep : deps) {
-      if (auto it = m_file_cache.find(dep); it != m_file_cache.end()) mergeIntoEnv(it->second, lib_env);
-    }
+    // TODO: make permanent
+    // for (const Path& dep : deps) {
+    //   if (auto it = m_file_cache.find(dep); it != m_file_cache.end()) mergeIntoEnv(it->second, lib_env);
+    // }
 
 #ifdef __unix__
     void* handle = dlopen(path.c_str(), RTLD_LAZY | RTLD_GLOBAL);
@@ -210,7 +201,30 @@ namespace eval {
 
       std::shared_ptr<Environment> file_env = file.is_dynamic ? loadDynamicLib(path, file.includes) : loadFile(path, *file.ast, file.includes, &last);
 
-      mergeIntoEnv(file_env, m_global);
+      if (path == program.root_path) {
+        // Entry point: flat-merge into global, same as before.
+        mergeIntoEnv(file_env, m_global);
+      } else {
+        // Non-entry file: wrap its environment snapshot as a namespace Instance
+        // (klass == nullptr, pure field bag) and define it in global under the
+        // file's stem. Both scripted and dynamic files already return an
+        // Environment so no branching needed here.
+        auto fields = std::make_shared<std::unordered_map<std::string, Value>>();
+        for (auto& [name, val] : file_env->snapshot()) {
+          (*fields)[name] = val;
+        }
+        auto ns = std::make_shared<Instance>(Instance{.klass = nullptr, .fields = fields});
+        const std::string ns_name = file.alias.empty() ? path.stem().string() : file.alias;
+        m_global->define(ns_name, Value(ns));
+
+        // Remove this file's classes from the global registry so they're only
+        // reachable via the namespace, not as bare names.
+        for (auto& [name, val] : *fields) {
+          if (std::holds_alternative<std::shared_ptr<Class>>(val.data)) {
+            m_classes.erase(name);
+          }
+        }
+      }
     }
     return last;
   }
@@ -483,7 +497,8 @@ namespace eval {
       } else {
         auto it = inst_ptr->get()->fields->find(member->field);
         if (it == inst_ptr->get()->fields->end()) {
-          throwKnownScopeErr(node, "Undefined field '" + member->field + "' on instance of " + inst_ptr->get()->klass->name);
+          const std::string type_name = inst_ptr->get()->klass ? inst_ptr->get()->klass->name : "<namespace>";
+          throwKnownScopeErr(node, "Undefined field '" + member->field + "' on instance of " + type_name);
         }
         Value rhs = evaluate(node->right.get(), env);
         new_value = applyCompoundOp(node, node->operation, it->second, rhs);
@@ -802,6 +817,12 @@ namespace eval {
         return field_it->second;
       }
 
+      // Namespace instances (klass == nullptr) are pure field bags.
+      // If the field wasn't found above, there's nothing more to search.
+      if (instance->get()->klass == nullptr) {
+        throwKnownScopeErr(node, "Namespace has no member '" + field + "'");
+      }
+
       std::shared_ptr<Class> lookup_class = search_class ? search_class : instance->get()->klass;
 
       // AST method path same as before, creates a bound closure scope so
@@ -930,11 +951,40 @@ namespace eval {
   // constructor exists anywhere in the chain, construction succeeds with
   // only field defaults applied.
   Value Evaluator::evalNewExpr(const par::NewExpr* node, const std::shared_ptr<Environment>& env) {
-    auto class_it = m_classes.find(node->class_name);
-    if (class_it == m_classes.end()) {
-      throwKnownScopeErr(node, "Unknown class '" + node->class_name + "'");
+    std::shared_ptr<Class> klass;
+
+    const std::string& raw = node->class_name;
+    auto dot = raw.find('.');
+    if (dot == std::string::npos) {
+      // Bare name: existing path.
+      auto it = m_classes.find(raw);
+      if (it == m_classes.end()) {
+        throwKnownScopeErr(node, "Unknown class '" + raw + "'");
+      }
+      klass = it->second;
+    } else {
+      // Qualified name: resolve namespace Instance, then read the Class value from its fields.
+      std::string ns_name = raw.substr(0, dot);
+      std::string class_name = raw.substr(dot + 1);
+
+      auto ns_val = m_global->get(ns_name);
+      if (!ns_val) {
+        throwKnownScopeErr(node, "Unknown namespace '" + ns_name + "' in 'new " + raw + "'");
+      }
+      const auto* ns_inst = std::get_if<std::shared_ptr<Instance>>(&ns_val->data);
+      if (ns_inst == nullptr) {
+        throwKnownScopeErr(node, "'" + ns_name + "' is not a namespace");
+      }
+      auto field_it = (*ns_inst)->fields->find(class_name);
+      if (field_it == (*ns_inst)->fields->end()) {
+        throwKnownScopeErr(node, "Namespace '" + ns_name + "' has no member '" + class_name + "'");
+      }
+      const auto* class_val = std::get_if<std::shared_ptr<Class>>(&field_it->second.data);
+      if (class_val == nullptr) {
+        throwKnownScopeErr(node, "'" + raw + "' is not a class");
+      }
+      klass = *class_val;
     }
-    std::shared_ptr<Class> klass = class_it->second;
 
     auto fields = std::make_shared<std::unordered_map<std::string, Value>>();
     auto instance = std::make_shared<Instance>(Instance{.klass = klass, .fields = fields});

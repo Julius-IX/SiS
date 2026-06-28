@@ -1,0 +1,5 @@
+include "library.sis" as lib;
+
+pin instance = new lib.lib.LibraryClass();
+print(lib.lib.libraryAdd(1, 2));
+print(instance.name);

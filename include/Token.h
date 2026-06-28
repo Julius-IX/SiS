@@ -55,6 +55,7 @@ namespace lex {
     SEMICOLON,
     ARROW,
 
+    AS,
     COMMENT,
   } TokenType;
   // clang-format on
@@ -100,7 +101,7 @@ namespace lex {
       {"case", CASE}, {"return", RETURN}, {"break", BREAK},     {"continue", CONTINUE}, {"default", DEFAULT},
 
       {"fn", FN},     {"pin", PIN},       {"class", CLASS},     {"extends", EXTENDS},   {"new", NEW},
-      {"this", THIS}, {"super", SUPER},   {"include", INCLUDE},
+      {"this", THIS}, {"super", SUPER},   {"include", INCLUDE}, {"as", AS}
     };
 
     auto keyword_it = keywords.find(identifier);
@@ -179,6 +180,7 @@ namespace lex {
       case SEMICOLON: return "SEMICOLON";
       case ARROW: return "ARROW";
 
+      case AS: return "AS";
       case COMMENT: return "COMMENT";
 
       default: return fmt::format("Invalid Token Type received: {}", static_cast<int>(token.type));
