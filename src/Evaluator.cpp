@@ -1,7 +1,7 @@
 #include <Evaluator.h>
+#include <Logging.h>
 #include <NativeFunctions.h>
 #include <Token.h>
-#include <Logging.h>
 
 #include <algorithm>
 #include <cmath>
@@ -474,7 +474,8 @@ namespace eval {
       } else {
         auto it = inst_ptr->get()->fields->find(member->field);
         if (it == inst_ptr->get()->fields->end()) {
-          throwKnownScopeErr(node, "Undefined field '" + member->field + "' on instance of " + inst_ptr->get()->klass->name);
+          const std::string type_name = inst_ptr->get()->klass ? inst_ptr->get()->klass->name : "<namespace>";
+          throwKnownScopeErr(node, "Undefined field '" + member->field + "' on instance of " + type_name);
         }
         Value rhs = evaluate(node->right.get(), env);
         new_value = applyCompoundOp(node, node->operation, it->second, rhs);
@@ -791,6 +792,12 @@ namespace eval {
       auto field_it = instance->get()->fields->find(field);
       if (field_it != instance->get()->fields->end()) {
         return field_it->second;
+      }
+
+      // Namespace instances (klass == nullptr) are pure field bags.
+      // If the field wasn't found above, there's nothing more to search.
+      if (instance->get()->klass == nullptr) {
+        throwKnownScopeErr(node, "Namespace has no member '" + field + "'");
       }
 
       std::shared_ptr<Class> lookup_class = search_class ? search_class : instance->get()->klass;
