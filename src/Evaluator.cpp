@@ -95,17 +95,6 @@ namespace eval {
       a.data);
   }
 
-  // ---------------------------------------------------------------------
-  // Built-in functions
-  //
-  // This is the single place to register a native function: build a
-  // NativeFunction and env->define() it into the global scope. Every
-  // built-in receives already-evaluated arguments as a vector<Value>& and
-  // returns a Value, exactly the same calling convention evalCall uses for
-  // user-defined functions, so from the language's point of view there's no
-  // visible difference between print(...) and a function someone wrote
-  // themselves.
-  // ---------------------------------------------------------------------
   void Evaluator::registerBuiltins(const std::shared_ptr<Environment>& env) {
     for (const auto& [name, fn] : native_functions) {
       env->define(name, Value(fn));
@@ -131,9 +120,10 @@ namespace eval {
 
     auto file_env = std::make_shared<Environment>(m_global);
 
-    for (const Path& dep : deps) {
-      if (auto it = m_file_cache.find(dep); it != m_file_cache.end()) mergeIntoEnv(it->second, file_env);
-    }
+    // TODO: make permanent
+    // for (const Path& dep : deps) {
+    //   if (auto it = m_file_cache.find(dep); it != m_file_cache.end()) mergeIntoEnv(it->second, file_env);
+    // }
 
     Value last{};
     for (const auto& stmt : block.statements) {
@@ -151,9 +141,10 @@ namespace eval {
 
     auto lib_env = std::make_shared<Environment>(m_global);
 
-    for (const Path& dep : deps) {
-      if (auto it = m_file_cache.find(dep); it != m_file_cache.end()) mergeIntoEnv(it->second, lib_env);
-    }
+    // TODO: make permanent
+    // for (const Path& dep : deps) {
+    //   if (auto it = m_file_cache.find(dep); it != m_file_cache.end()) mergeIntoEnv(it->second, lib_env);
+    // }
 
 #ifdef __unix__
     void* handle = dlopen(path.c_str(), RTLD_LAZY | RTLD_GLOBAL);
