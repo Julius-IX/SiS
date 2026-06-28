@@ -195,8 +195,7 @@ namespace eval {
 
   Value Evaluator::run(const par::Program& program) {
     Value last{};
-    for (size_t i = 0; i < program.load_order.size(); ++i) {
-      const Path& path = program.load_order[i];
+    for (const Path& path : program.load_order) {
       const par::ParsedFile& file = program.files.at(path);
       m_current_eval_file = &path;
 
@@ -216,6 +215,14 @@ namespace eval {
         }
         auto ns = std::make_shared<Instance>(Instance{.klass = nullptr, .fields = fields});
         m_global->define(path.stem().string(), Value(ns));
+
+        // Remove this file's classes from the global registry so they're only
+        // reachable via the namespace, not as bare names.
+        for (auto& [name, val] : *fields) {
+          if (std::holds_alternative<std::shared_ptr<Class>>(val.data)) {
+            m_classes.erase(name);
+          }
+        }
       }
     }
     return last;
