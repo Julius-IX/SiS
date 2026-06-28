@@ -53,28 +53,34 @@ FN_SIGNATURE(fnCounterSum, args) {
 }
 
 SIS_MODULE_INIT(reg) {
-  reg->defineFn("add", fnAdd);
-  reg->defineFn("clamp", fnClamp);
-  reg->defineFn("counter_sum", fnCounterSum);
+  reg->defineFn("add", fnAdd, "add(a, b) -> a + b");
+  reg->defineFn("clamp", fnClamp, "clamp(v, lo, hi) -> min(max(v, lo), hi)");
+  reg->defineFn("counter_sum", fnCounterSum, "counter_sum(arr) -> sum(arr)");
+
 
   // clang-format off
-  SIS_NATIVE_CLASS_BEGIN(reg, "Counter", NativeCounter)
+  SIS_NATIVE_CLASS_BEGIN(reg, "Counter", NativeCounter,  "A class that counts things")
+    .docs("The constructor takes an optional number, defaults to 0.")
     .constructor([](std::shared_ptr<eval::Instance> inst, std::vector<eval::Value>& args) {
       double initial = args.empty() ? 0.0 : requireNum(args[0], "Counter()");
       SIS_NATIVE_CTOR(NativeCounter, inst, native_var, initial);
     })
+    .docs("Increment the counter by 1.")
     .NATIVE_METHOD("increment", inst, args, {
       SIS_GET_NATIVE(NativeCounter, inst)->increment();
       return eval::Value{};
     })
+    .docs("Add a number to the counter.")
     .NATIVE_METHOD("add", inst, args, {
       if (args.size() != 1) throw std::runtime_error("Counter.add() expects 1 argument");
       SIS_GET_NATIVE(NativeCounter, inst)->add(requireNum(args[0], "Counter.add"));
       return eval::Value{};
     })
+    .docs("Get the current value of the counter.")
     .NATIVE_METHOD("value", inst, args, {
       return {SIS_GET_NATIVE(NativeCounter, inst)->value()};
     })
+    .docs("Reset the counter to 0.")
     .NATIVE_METHOD("reset", inst, args, {
       return {SIS_GET_NATIVE(NativeCounter, inst)->reset()};
     })

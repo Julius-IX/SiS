@@ -78,13 +78,13 @@ static std::shared_ptr<NativeCounter> getCounter(const std::shared_ptr<eval::Ins
   }
 
   const auto* arr = std::get_if<eval::Array>(&it->second.data);
-  if ((arr == nullptr) || !*arr || (*arr)->empty()) {
+  if ((arr == nullptr) || !*arr || (*arr)->elements.empty()) {
     throw std::runtime_error("Counter: __native field is not a valid handle");
   }
 
   // The NativeCounter* was stashed as a double (its raw address).
   // See the constructor below for where this is written.
-  const auto* addr = std::get_if<double>(&(**arr)[0].data);
+  const auto* addr = std::get_if<double>(&(**arr).elements[0].second.data);
   if (addr == nullptr) throw std::runtime_error("Counter: __native handle is corrupt");
 
   // Reinterpret the stored address back to a shared_ptr via a raw pointer.
@@ -118,7 +118,7 @@ static eval::Value fnCounterSum(std::vector<eval::Value>& args) {
   if (!arr || !*arr) throw std::runtime_error("counter_sum() expects an array");
 
   NativeCounter acc(0.0);
-  for (const eval::Value& elem : **arr) {
+  for (auto& [key, elem] : (**arr).elements) {
     acc.add(requireNum(elem, "counter_sum"));
   }
   return {acc.value()};
@@ -138,8 +138,9 @@ static eval::Value fnCounterSum(std::vector<eval::Value>& args) {
 // works and is self-contained.
 
 static void registerCounterClass(eval::SisRegistry* reg) {
-  reg->defineClass("Counter")
+  reg->defineClass("Counter", "A class that counts things")
     .field("__native", eval::Value{}) // placeholder; constructor fills this in
+    .docs("The constructor takes an optional number, defaults to 0.")
     .constructor([](std::shared_ptr<eval::Instance> inst, std::vector<eval::Value>& args) {
       double initial = args.empty() ? 0.0 : requireNum(args[0], "Counter()");
 
@@ -151,15 +152,15 @@ static void registerCounterClass(eval::SisRegistry* reg) {
       // a double. Then put both the address and a "keep-alive" NativeFunction
       // (which holds a copy of the shared_ptr) into the array.
       auto* box = new std::shared_ptr<NativeCounter>(native);
-      auto handle = std::make_shared<std::vector<eval::Value>>();
+      auto handle = std::make_shared<eval::InternalArray>();
 
       // Element 0: the raw address as a double (used to get the pointer back)
-      handle->emplace_back(static_cast<double>(reinterpret_cast<uintptr_t>(box)));
+      handle->emplaceBack(static_cast<double>(reinterpret_cast<uintptr_t>(box)));
 
       // Element 1: a NativeFunction whose closure captures native this keeps
       // the shared_ptr alive as long as the array lives, and when the array
       // is destroyed (instance GC'd) the shared_ptr ref-count drops.
-      handle->emplace_back(eval::NativeFunction{.name = "__counter_keepalive", .fn = [native, box](std::vector<eval::Value>&) -> eval::Value {
+      handle->emplaceBack(eval::NativeFunction{.name = "__counter_keepalive", .fn = [native, box](std::vector<eval::Value>&) -> eval::Value {
                                                   // Also clean up the box when this lambda is finally destroyed.
                                                   // The lambda itself keeps `native` alive via capture, and `box`
                                                   // is deleted here on first (and only) call, or on destruction.
@@ -170,27 +171,31 @@ static void registerCounterClass(eval::SisRegistry* reg) {
 
       (*inst->fields)["__native"] = eval::Value(handle);
     })
+    .docs("Increment the counter by 1.")
     .method("increment",
             [](std::shared_ptr<eval::Instance> inst, std::vector<eval::Value>&) -> eval::Value {
               getCounter(inst)->increment();
               return eval::Value{};
             })
+    .docs("Add a number to the counter.")
     .method("add",
             [](std::shared_ptr<eval::Instance> inst, std::vector<eval::Value>& args) -> eval::Value {
               if (args.size() != 1) throw std::runtime_error("Counter.add() expects 1 argument");
               getCounter(inst)->add(requireNum(args[0], "Counter.add"));
               return eval::Value{};
             })
+    .docs("Get the current value of the counter.")
     .method("value", [](std::shared_ptr<eval::Instance> inst, std::vector<eval::Value>&) -> eval::Value { return {getCounter(inst)->value()}; })
+    .docs("Reset the counter to 0.")
     .method("reset", [](std::shared_ptr<eval::Instance> inst, std::vector<eval::Value>&) -> eval::Value { return {getCounter(inst)->reset()}; });
 }
 
 // Entry point called by the evaluator when the .so is loaded.
 extern "C" void sis_module_init(eval::SisRegistry* reg) {
   // Free functions land directly in scope, callable without any prefix.
-  reg->defineFn("add", fnAdd);
-  reg->defineFn("clamp", fnClamp);
-  reg->defineFn("counter_sum", fnCounterSum);
+  reg->defineFn("add", fnAdd, "add(a, b) -> a + b");
+  reg->defineFn("clamp", fnClamp, "clamp(v, lo, hi) -> min(max(v, lo), hi)");
+  reg->defineFn("counter_sum", fnCounterSum, "counter_sum(arr) -> sum(arr)");
 
   // Class registration after this, `new Counter(n)` works in SiS.
   registerCounterClass(reg);
