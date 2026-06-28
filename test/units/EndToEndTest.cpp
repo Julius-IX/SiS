@@ -447,6 +447,21 @@ namespace { // Namespacing
     EXPECT_THROW(run("includes/bare_new_fails.sis"), std::runtime_error);
   }
 
+  TEST_P(E2E, AliasWorks) {
+    auto out = run("includes/alias_works.sis");
+    EXPECT_EQ(out[0], "0.1");
+    EXPECT_EQ(out[1], "3");
+    EXPECT_EQ(out[2], "library");
+  }
+
+  TEST_P(E2E, AliasThrowsOnDefaultNameUsage) {
+    EXPECT_THROW(run("includes/alias_prevent_default_name.sis"), std::runtime_error);
+  }
+
+  TEST_P(E2E, AliasNestingThrows) {
+    EXPECT_THROW(run("includes/nested_namespacing.sis"), std::runtime_error);
+  }
+
 } // namespace
 
 namespace { // Error and edge cases
