@@ -38,6 +38,9 @@ namespace lex {
       advanceState();
     } else {
       const TokenType& tok_type = table.at('\0');
+      if (tok_type == SLASH && isThisLineDocComment()) {
+        return parseDocComment(); // ['/', '/', '/'] 0 = current_char, 1 = next_char, 2 = next_next_char
+      }
 
       if (tok_type == ILLEGAL) {
         tvp.second = std::string{this->m_state.current_char};
@@ -47,6 +50,41 @@ namespace lex {
     }
 
     return tvp;
+  }
+
+  // ['/', '/', '/'] 0 = current_char, 1 = next_char, 2 = next_next_char
+  TypeValuePair Lexer::parseDocComment() {
+    advanceState(); // consume '/' (idx 0)
+    advanceState(); // consume '/' (idx 1)
+    advanceState(); // consume '/' (idx 2)
+    uint32_t start_pos = this->m_state.pos;
+    uint32_t line = this->m_state.line;
+    std::string comment_str;
+
+    while (stateIsNotAtEof()) {
+      // Stop BEFORE consuming the newline peek at it
+      if (this->m_state.current_char == '\n') {
+        comment_str += this->m_input.substr(start_pos, this->m_state.pos - start_pos);
+
+        // peek ahead: is the next line also a doc comment?
+        // current_char='\n', peekChar()='/', peekChar(1)='/', peekChar(2)='/'
+        if (peekChar() == '/' && peekChar(1) == '/' && peekChar(2) == '/') {
+          comment_str += '\n';
+          advanceState(); // consume '\n'
+          advanceState(); // consume '/' 1
+          advanceState(); // consume '/' 2
+          advanceState(); // consume '/' 3
+          line = this->m_state.line;
+          start_pos = this->m_state.pos;
+        } else {
+          // Leave current_char on '\n' fillBuffer() will advance past it
+          return {DOC_COMMENT, comment_str};
+        }
+      }
+
+      advanceState();
+    }
+    return {DOC_COMMENT, comment_str};
   }
 
   void Lexer::advanceState() {
@@ -75,14 +113,18 @@ namespace lex {
     const char& cc = this->m_state.current_char;
 
     const char& next_char = peekChar();
-    if (cc == '/' && (next_char == '*' || next_char == '/')) {
+    const char& next_next_char = peekChar(1);
+
+    if (cc == '/' && (next_char == '*' || next_char == '/') && next_next_char != '/') {
       skipComment(cc, next_char);
     }
 
     while (stateIsNotAtEof() && isSpace(cc)) {
       advanceState();
       const char& next_char = peekChar();
-      if (cc == '/' && (next_char == '*' || next_char == '/')) {
+      const char& next_next_char = peekChar(1);
+
+      if (cc == '/' && (next_char == '*' || next_char == '/') && next_next_char != '/') {
         skipComment(cc, next_char);
       }
     }
