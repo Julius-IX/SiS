@@ -138,36 +138,82 @@ class NativeRegex {
 };
 
 SIS_MODULE_INIT(reg) {
-  reg->defineFn("match",    fnMatch);
-  reg->defineFn("search",   fnSearch);
-  reg->defineFn("find_all", fnFindAll);
-  reg->defineFn("replace",  fnReplace);
-  reg->defineFn("split",    fnSplit);
+  reg->defineFn("match", fnMatch,
+      "@brief Tests whether a string matches a regex pattern in full.\n"
+      "@param pattern The ECMAScript regex pattern.\n"
+      "@param s The string to test.\n"
+      "@return An array where [0] is the full match and [1..n] are capture groups, or null if no match."
+  );
+  reg->defineFn("search", fnSearch,
+      "@brief Searches for the first occurrence of a pattern anywhere in a string.\n"
+      "@param pattern The ECMAScript regex pattern.\n"
+      "@param s The string to search.\n"
+      "@return An array where [0] is the full match and [1..n] are capture groups, or null if no match."
+  );
+  reg->defineFn("find_all", fnFindAll,
+      "@brief Finds all non-overlapping matches of a pattern in a string.\n"
+      "@param pattern The ECMAScript regex pattern.\n"
+      "@param s The string to search.\n"
+      "@return An array of match arrays, each in the same format as search()."
+  );
+  reg->defineFn("replace", fnReplace,
+      "@brief Replaces all matches of a pattern in a string with a replacement.\n"
+      "@param pattern The ECMAScript regex pattern.\n"
+      "@param s The string to modify.\n"
+      "@param replacement The replacement string. Supports back-references (e.g. $1).\n"
+      "@return The resulting string with all matches replaced."
+  );
+  reg->defineFn("split", fnSplit,
+      "@brief Splits a string by a regex pattern delimiter.\n"
+      "@param pattern The ECMAScript regex pattern to split on.\n"
+      "@param s The string to split.\n"
+      "@return An array of substrings between matches of the pattern."
+  );
 
   // clang-format off
-  SIS_NATIVE_CLASS_BEGIN(reg, "Regex", NativeRegex)
+  SIS_NATIVE_CLASS_BEGIN(reg, "Regex", NativeRegex, "@brief A compiled regular expression object for repeated matching operations.")
+    .docs("@brief Compiles a regex pattern with optional flags.\n"
+          "@param pattern The ECMAScript regex pattern to compile.\n"
+          "@param flags Optional flags string. Supported: 'i' (case-insensitive), 'm' (multiline).\n"
+          "@throws If the pattern is invalid.")
     .constructor([](std::shared_ptr<eval::Instance> inst, std::vector<eval::Value>& args) {
       if (args.empty()) throw std::runtime_error("Regex(): expected at least 1 argument [pattern, flags?]");
       std::string pattern = requireStr(args[0], "Regex()");
       std::string flags   = args.size() >= 2 ? requireStr(args[1], "Regex()") : "";
       SIS_NATIVE_CTOR(NativeRegex, inst, native_var, pattern, flags);
     })
+    .docs("@brief Tests whether the entire string matches this pattern.\n"
+          "@param s The string to test.\n"
+          "@return An array where [0] is the full match and [1..n] are capture groups, or null if no match.")
     .NATIVE_METHOD("match", inst, args, {
       if (args.size() != 1) throw std::runtime_error("Regex.match(): expected 1 argument [s]");
       return SIS_GET_NATIVE(NativeRegex, inst)->match(requireStr(args[0], "Regex.match"));
     })
+    .docs("@brief Searches for the first occurrence of this pattern anywhere in a string.\n"
+          "@param s The string to search.\n"
+          "@return An array where [0] is the full match and [1..n] are capture groups, or null if no match.")
     .NATIVE_METHOD("search", inst, args, {
       if (args.size() != 1) throw std::runtime_error("Regex.search(): expected 1 argument [s]");
       return SIS_GET_NATIVE(NativeRegex, inst)->search(requireStr(args[0], "Regex.search"));
     })
+    .docs("@brief Finds all non-overlapping matches of this pattern in a string.\n"
+          "@param s The string to search.\n"
+          "@return An array of match arrays, each in the same format as search().")
     .NATIVE_METHOD("find_all", inst, args, {
       if (args.size() != 1) throw std::runtime_error("Regex.find_all(): expected 1 argument [s]");
       return SIS_GET_NATIVE(NativeRegex, inst)->findAll(requireStr(args[0], "Regex.find_all"));
     })
+    .docs("@brief Replaces all matches of this pattern in a string with a replacement.\n"
+          "@param s The string to modify.\n"
+          "@param replacement The replacement string. Supports back-references (e.g. $1).\n"
+          "@return The resulting string with all matches replaced.")
     .NATIVE_METHOD("replace", inst, args, {
       if (args.size() != 2) throw std::runtime_error("Regex.replace(): expected 2 arguments [s, replacement]");
       return SIS_GET_NATIVE(NativeRegex, inst)->replace(requireStr(args[0], "Regex.replace"), requireStr(args[1], "Regex.replace"));
     })
+    .docs("@brief Splits a string by this pattern.\n"
+          "@param s The string to split.\n"
+          "@return An array of substrings between matches of the pattern.")
     .NATIVE_METHOD("split", inst, args, {
       if (args.size() != 1) throw std::runtime_error("Regex.split(): expected 1 argument [s]");
       return SIS_GET_NATIVE(NativeRegex, inst)->split(requireStr(args[0], "Regex.split"));

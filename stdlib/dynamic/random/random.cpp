@@ -68,10 +68,38 @@ FN_SIGNATURE(fnSample, args) {
 }
 
 SIS_MODULE_INIT(reg) {
-  reg->defineFn("seed",    fnSeed);
-  reg->defineFn("rand",    fnRand);
-  reg->defineFn("randint", fnRandInt);
-  reg->defineFn("choice",  fnChoice);
-  reg->defineFn("shuffle", fnShuffle);
-  reg->defineFn("sample",  fnSample);
+  reg->defineFn("seed", fnSeed,
+      "@brief Seeds the random number generator.\n"
+      "@param n An integer seed value.\n"
+      "@note Seeding with the same value produces the same sequence of random numbers."
+  );
+  reg->defineFn("rand", fnRand,
+      "@brief Returns a random floating-point number in the range [0.0, 1.0).\n"
+      "@return A uniformly distributed random number."
+  );
+  reg->defineFn("randint", fnRandInt,
+      "@brief Returns a random integer in the inclusive range [lo, hi].\n"
+      "@param lo The lower bound (inclusive).\n"
+      "@param hi The upper bound (inclusive).\n"
+      "@return A uniformly distributed random integer.\n"
+      "@throws If lo is greater than hi."
+  );
+  reg->defineFn("choice", fnChoice,
+      "@brief Returns a random element from an array.\n"
+      "@param list A non-empty array to pick from.\n"
+      "@return A randomly selected element.\n"
+      "@throws If the array is empty."
+  );
+  reg->defineFn("shuffle", fnShuffle,
+      "@brief Shuffles an array in place using a uniform random permutation.\n"
+      "@param list The array to shuffle.\n"
+      "@return The same array, shuffled."
+  );
+  reg->defineFn("sample", fnSample,
+      "@brief Returns n randomly selected elements from an array without replacement.\n"
+      "@param list The source array.\n"
+      "@param n The number of elements to sample.\n"
+      "@return A new array of n elements drawn from list.\n"
+      "@throws If n exceeds the size of list."
+  );
 }

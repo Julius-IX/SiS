@@ -88,10 +88,32 @@ FN_SIGNATURE(fnPlatform, args) {
 }
 
 SIS_MODULE_INIT(reg) {
-  reg->defineFn("env", fnEnv);
-  reg->defineFn("args", fnArgs);
-  reg->defineFn("cwd", fnCwd);
-  reg->defineFn("exit", fnExit);
-  reg->defineFn("exec", fnExec);
-  reg->defineFn("platform", fnPlatform);
+  reg->defineFn("env", fnEnv,
+      "@brief Reads an environment variable by name.\n"
+      "@param key The name of the environment variable.\n"
+      "@return The value as a string, or null if the variable is not set."
+  );
+  reg->defineFn("args", fnArgs,
+      "@brief Returns the command-line arguments passed to the interpreter.\n"
+      "@return An array of strings, where index 0 is the executable path."
+  );
+  reg->defineFn("cwd", fnCwd,
+      "@brief Returns the current working directory.\n"
+      "@return The current working directory as an absolute path string."
+  );
+  reg->defineFn("exit", fnExit,
+      "@brief Terminates the process with the given exit code.\n"
+      "@param code Optional exit code. Defaults to 0.\n"
+      "@note This function does not return."
+  );
+  reg->defineFn("exec", fnExec,
+      "@brief Executes a shell command and captures its stdout output.\n"
+      "@param command The shell command to run.\n"
+      "@return The stdout output of the command as a string.\n"
+      "@throws If the command cannot be started."
+  );
+  reg->defineFn("platform", fnPlatform,
+      "@brief Returns a string identifying the current operating system.\n"
+      "@return One of: \"windows\", \"macos\", \"linux\", \"freebsd\", \"unix\", or \"unknown\"."
+  );
 }
