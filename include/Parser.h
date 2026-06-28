@@ -2,17 +2,22 @@
 
 #include <Lexer.h>
 #include <ParserNodeTypes.h>
+#include <Program.h>
 
 #include <deque>
 #include <expected>
 #include <filesystem>
 #include <functional>
+#include <future>
 #include <optional>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace par {
   typedef struct ParserState {
-    std::unique_ptr<lex::Lexer> lexer;
+    lex::TokenStream tokens;
+    size_t cursor = 0;
+    std::unordered_map<size_t, std::string> line_cache;
     std::unique_ptr<Block> block;
     std::vector<Path> includes;
     bool past_include_zone = false;
@@ -30,7 +35,8 @@ namespace par {
     Parser();
     ~Parser() = default;
 
-    bool parseRoot(const Path& path);
+    void setParallel(bool parallel) { m_parallel = parallel; }
+    std::optional<Program> parseRoot(const Path& path);
     bool parse(State* state);
 
     const Block& peekRoot() const { return *m_states.at(m_load_order.front()).block; }
@@ -45,10 +51,34 @@ namespace par {
       m_load_order.push_back(path);
     }
 
+    State& getStateMut(const Path& path) { return m_states.at(path); }
+
     private:
     std::vector<Path> m_load_order;
     std::deque<Path> m_include_stack;
     std::unordered_map<Path, State> m_states;
+    bool m_parallel = false;
+
+    struct ParseResult {
+      std::unique_ptr<Block> block;
+      std::unordered_map<size_t, std::string> line_cache;
+      std::vector<std::string> raw_includes; // unresolved, in source order
+    };
+
+    struct ParallelContext {
+      std::unordered_map<Path, std::future<ParseResult>> futures;
+      std::unordered_set<Path> scheduled;
+      std::unordered_set<Path> ordered;
+    };
+
+    static ParseResult lexAndParseFile(const std::string& source, const Path& path);
+    std::optional<Program> parseRootParallel();
+
+    // parseRootParallel helpers -- each owns one responsibility
+    void pScheduleFile(ParallelContext& ctx, const Path& path, std::string source);
+    void pCommitNative(ParallelContext& ctx, const Path& dep);
+    bool pProcessFuture(ParallelContext& ctx, const Path& current_path);
+    bool pTryCommit(ParallelContext& ctx, const Path& current_path);
 
     void initRootState(const Path& full_root_path, const Path& original_path);
     void parseCurrentFile(const Path& current_path);
@@ -56,8 +86,8 @@ namespace par {
 
     static lex::Token advance(State* state);
     static bool match(State* state, lex::TokenType type);
-    static bool check(lex::Lexer* lexer, lex::TokenType type);
-    static bool isAtEnd(lex::Lexer* lexer);
+    static bool check(const State* state, lex::TokenType type);
+    static bool isAtEnd(const State* state);
     bool expect(State* state, lex::TokenType type, std::string_view err_msg) const;
 
     std::expected<std::optional<Path>, std::string> checkForInclude(const Path& path);

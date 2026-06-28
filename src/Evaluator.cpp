@@ -1,17 +1,20 @@
 #include <Evaluator.h>
 #include <NativeFunctions.h>
 #include <Token.h>
+#include <Logging.h>
+
 #include <algorithm>
 #include <cmath>
 #include <iostream>
 #include <print>
 #include <ranges>
-#include <spdlog/fmt/fmt.h>
 #include <stdexcept>
 
 #ifdef _WIN32
 #include <windows.h>
 #endif
+
+#include <spdlog/fmt/fmt.h>
 
 namespace eval {
   static bool isAssignmentOperator(lex::TokenType type) {
@@ -199,15 +202,13 @@ namespace eval {
     return lib_env;
   }
 
-  Value Evaluator::run(const par::Parser& parser) {
+  Value Evaluator::run(const par::Program& program) {
     Value last{};
-    for (const Path& path : parser.loadOrder()) {
-      const par::State& state = parser.getState(path);
+    for (const Path& path : program.load_order) {
+      const par::ParsedFile& file = program.files.at(path);
       m_current_eval_file = &path;
 
-      bool is_dynamic = path.extension() == ".so" || path.extension() == ".dll" || path.extension() == ".dylib";
-
-      std::shared_ptr<Environment> file_env = is_dynamic ? loadDynamicLib(path, state.includes) : loadFile(path, *state.block, state.includes, &last);
+      std::shared_ptr<Environment> file_env = file.is_dynamic ? loadDynamicLib(path, file.includes) : loadFile(path, *file.ast, file.includes, &last);
 
       mergeIntoEnv(file_env, m_global);
     }

@@ -16,7 +16,7 @@
 #endif
 
 // WARN: May change at any time, temporary solution is the best permanent solution
-static void panic(const std::string_view msg) { throw std::runtime_error(msg.data()); }
+void panic(const std::string_view msg) { throw std::runtime_error(msg.data()); }
 
 namespace par { // Hooks
   static std::optional<std::string> readFileToString(const Path& path) {
@@ -37,7 +37,10 @@ namespace par { // Hooks
       fmted_msg += "\n";
     }
 
-    std::string line_content = state->lexer->getLineContent(token.line);
+    std::string line_content;
+    if (auto it = state->line_cache.find(token.line); it != state->line_cache.end()) {
+      line_content = it->second;
+    }
     while (!line_content.empty() && (line_content.back() == '\n' || line_content.back() == '\r')) {
       line_content.pop_back();
     }
@@ -141,14 +144,25 @@ namespace par { // Helpers
     return node;
   }
 
-  bool Parser::isAtEnd(lex::Lexer* lexer) { return check(lexer, lex::TokenType::SIS_EOF); }
+  static lex::Token makeSyntheticEof() { return lex::Token{.type = lex::TokenType::SIS_EOF, .value = {}, .line = 0, .column = 0}; }
 
-  bool Parser::check(lex::Lexer* lexer, lex::TokenType type) { return lexer->peekToken().type == type; }
+  static const lex::Token& peekAt(const State* state) {
+    if (state->cursor >= state->tokens.size()) {
+      static const lex::Token eof = makeSyntheticEof();
+      return eof;
+    }
+    return state->tokens[state->cursor];
+  }
+
+  bool Parser::isAtEnd(const State* state) { return check(state, lex::TokenType::SIS_EOF); }
+
+  bool Parser::check(const State* state, lex::TokenType type) { return peekAt(state).type == type; }
 
   // advance: unconditionally consume and return the next token. For when you
   // already know what it is and just need to move past it.
   lex::Token Parser::advance(State* state) {
-    lex::Token token = state->lexer->nextToken();
+    lex::Token token = peekAt(state);
+    if (state->cursor < state->tokens.size()) ++state->cursor;
     state->last_token = token;
     return token;
   }
@@ -156,18 +170,20 @@ namespace par { // Helpers
   // match: if the next token is `type`, consume it and return true.
   // Otherwise leave it alone and return false.
   bool Parser::match(State* state, lex::TokenType type) {
-    if (!check(state->lexer.get(), type)) return false;
-    state->last_token = state->lexer->nextToken();
+    if (!check(state, type)) return false;
+    state->last_token = peekAt(state);
+    if (state->cursor < state->tokens.size()) ++state->cursor;
     return true;
   }
 
   // expect: consumes the next token if it matches `type`, panics + returns false otherwise.
   bool Parser::expect(State* state, lex::TokenType type, std::string_view err_msg) const {
-    if (state->lexer->peekToken().type != type) {
-      panic(m_hooks.format_error(state, state->lexer->peekToken(), err_msg));
+    if (peekAt(state).type != type) {
+      panic(m_hooks.format_error(state, peekAt(state), err_msg));
       return false;
     }
-    state->last_token = state->lexer->nextToken();
+    state->last_token = peekAt(state);
+    if (state->cursor < state->tokens.size()) ++state->cursor;
     return true;
   }
 
@@ -190,7 +206,10 @@ namespace par { // Include resolving
       panic(fmt::format("Could not open root source file '{}'", original_path.string()));
       return;
     }
-    m_states[full_root_path] = State{.lexer = std::make_unique<lex::Lexer>(source.value(), full_root_path), .last_token = {}};
+    lex::Lexer lexer(source.value(), full_root_path);
+    lex::TokenStream tokens = lexer.tokenize();
+    auto line_cache = lexer.takeLineCache();
+    m_states[full_root_path] = State{.tokens = std::move(tokens), .line_cache = std::move(line_cache), .last_token = {}};
   }
 
   void Parser::parseCurrentFile(const Path& current_path) {
@@ -213,7 +232,9 @@ namespace par { // Include resolving
     // and let the evaluator handle them via loadDynamicLib.
     auto ext = include_path.extension();
     if (ext == ".so" || ext == ".dll" || ext == ".dylib") {
-      m_states[include_path] = State{.lexer = nullptr, .block = std::make_unique<Block>(std::vector<std::unique_ptr<Node>>()), .last_token = {}};
+      lex::TokenStream sentinel;
+      sentinel.push_back(makeSyntheticEof());
+      m_states[include_path] = State{.tokens = std::move(sentinel), .block = std::make_unique<Block>(std::vector<std::unique_ptr<Node>>()), .last_token = {}};
       return true;
     }
 
@@ -222,23 +243,27 @@ namespace par { // Include resolving
       panic(fmt::format("Could not open included source file '{}'", include_path.string()));
       return false;
     }
-    m_states[include_path] = State{.lexer = std::make_unique<lex::Lexer>(source.value(), include_path), .last_token = {}};
+    lex::Lexer lexer(source.value(), include_path);
+    lex::TokenStream tokens = lexer.tokenize();
+    auto line_cache = lexer.takeLineCache();
+    m_states[include_path] = State{.tokens = std::move(tokens), .line_cache = std::move(line_cache), .last_token = {}};
     return true;
   }
 
-  bool Parser::parseRoot(const Path& path) {
+  std::optional<Program> Parser::parseRoot(const Path& path) {
     Path full_root_path = resolveRootDirectory(path);
     LOG_DEBUG_FLUSH("Full root path: {}", full_root_path.string());
 
     initRootState(full_root_path, path);
 
     m_include_stack.push_back(full_root_path);
-    while (!m_include_stack.empty()) { // NOLINT
+
+    if (m_parallel) return parseRootParallel();
+
+    while (!m_include_stack.empty()) {
       Path current_path = m_include_stack.back();
       m_include_stack.pop_back();
 
-      // Native modules have no source to parse sentinel block already set in
-      // loadIncludeSource, just record them in load order for the evaluator.
       auto ext = current_path.extension();
       if (ext == ".so" || ext == ".dll" || ext == ".dylib") {
         m_load_order.push_back(current_path);
@@ -265,7 +290,6 @@ namespace par { // Include resolving
       }
 
       if (m_states.contains(resolved)) {
-        // already loaded, dep recorded in checkForInclude, keep going
         m_include_stack.push_back(current_path);
         continue;
       }
@@ -275,45 +299,56 @@ namespace par { // Include resolving
       m_include_stack.push_back(resolved);
     }
 
-    for (auto& [p, state] : m_states) {
-      if (!state.block) return false;
+    Program program;
+    for (const Path& p : m_load_order) {
+      State& state = m_states[p];
+      auto ext = p.extension();
+      bool is_dynamic = (ext == ".so" || ext == ".dll" || ext == ".dylib");
+      if (!state.block && !is_dynamic) return std::nullopt;
+      program.files[p] = ParsedFile{
+        .tokens = {},
+        .ast = std::move(state.block),
+        .includes = std::move(state.includes),
+        .is_dynamic = is_dynamic,
+      };
+      program.load_order.push_back(p);
     }
-    return true;
+    return program;
   }
 
   std::expected<std::optional<Path>, std::string> Parser::checkForInclude(const Path& path) {
-    lex::Lexer* lexer = m_states[path].lexer.get();
+    State& state = m_states[path];
 
-    if (!check(lexer, lex::TokenType::INCLUDE)) {
-      m_states[path].past_include_zone = true;
+    if (!check(&state, lex::TokenType::INCLUDE)) {
+      state.past_include_zone = true;
       return std::nullopt;
     }
 
-    if (m_states[path].past_include_zone) {
-      return std::unexpected(m_hooks.format_error(&m_states[path], m_states[path].last_token, "includes must appear at the top of the file"));
+    if (state.past_include_zone) {
+      return std::unexpected(m_hooks.format_error(&state, state.last_token, "includes must appear at the top of the file"));
     }
 
-    advance(&m_states[path]);
+    advance(&state);
 
-    if (!match(&m_states[path], lex::TokenType::STRING)) {
-      return std::unexpected(m_hooks.format_error(&m_states[path], m_states[path].last_token, "Expected string literal path after 'include'"));
+    if (!match(&state, lex::TokenType::STRING)) {
+      return std::unexpected(m_hooks.format_error(&state, state.last_token, "Expected string literal path after 'include'"));
     }
 
-    std::optional<Path> include_path = getFromVariant<std::string>(m_states[path].last_token).value();
+    std::optional<Path> include_path = getFromVariant<std::string>(state.last_token).value();
     if (!include_path) {
-      return std::unexpected(m_hooks.format_error(&m_states[path], m_states[path].last_token, "Failed to get path from 'include'"));
+      return std::unexpected(m_hooks.format_error(&state, state.last_token, "Failed to get path from 'include'"));
     }
 
-    if (!match(&m_states[path], lex::TokenType::SEMICOLON)) {
-      return std::unexpected(m_hooks.format_error(&m_states[path], m_states[path].last_token, "Expected ';' after 'include' expression"));
+    if (!match(&state, lex::TokenType::SEMICOLON)) {
+      return std::unexpected(m_hooks.format_error(&state, state.last_token, "Expected ';' after 'include' expression"));
     }
 
     include_path = m_hooks.resolve_file(path.parent_path(), include_path.value());
     if (!include_path) {
-      return std::unexpected(m_hooks.format_error(&m_states[path], m_states[path].last_token, "Failed to resolve include path"));
+      return std::unexpected(m_hooks.format_error(&state, state.last_token, "Failed to resolve include path"));
     }
 
-    m_states[path].includes.push_back(include_path.value());
+    state.includes.push_back(include_path.value());
     return include_path;
   }
 
@@ -322,7 +357,7 @@ namespace par { // Include resolving
 namespace par { // Base parsing loop functions
   bool Parser::parse(State* state) {
     std::vector<std::unique_ptr<Node>> statements;
-    while (!isAtEnd(state->lexer.get())) {
+    while (!isAtEnd(state)) {
       std::unique_ptr<Node> stmt = parseStatement(state);
       if (stmt == nullptr) return false;
       statements.push_back(std::move(stmt));
@@ -412,8 +447,7 @@ namespace par { // Base parsing loop functions
   }
 
   std::unique_ptr<Node> Parser::parseAtom(State* state) {
-    lex::Lexer* lexer = state->lexer.get();
-    lex::Token tok = lexer->peekToken();
+    lex::Token tok = peekAt(state);
 
     switch (tok.type) {
       case lex::TokenType::NUM: {
@@ -474,8 +508,8 @@ namespace par { // Base parsing loop functions
         // Track the next auto-assigned numeric key for unkeyed entries.
         // Keyed entries don't advance this counter, matching Lua semantics:
         // [10: "x", "y", "z"] gives "y" key 0 and "z" key 1, not 11 and 12.
-        while (!check(state->lexer.get(), lex::TokenType::R_BRACK)) {
-          if (check(state->lexer.get(), lex::TokenType::SIS_EOF)) {
+        while (!check(state, lex::TokenType::R_BRACK)) {
+          if (check(state, lex::TokenType::SIS_EOF)) {
             panic("Unterminated array literal, expected ']'");
             return nullptr;
           }
@@ -665,7 +699,7 @@ namespace par { // Base parsing loop functions
     std::unique_ptr<Node> left = parseAtom(state);
     if (left == nullptr) return nullptr;
 
-    while (bindingPower(state->lexer->peekToken().type) >= min_prec) {
+    while (bindingPower(peekAt(state).type) >= min_prec) {
       left = parseContinuation(state, std::move(left));
       if (left == nullptr) return nullptr;
     }
@@ -678,7 +712,7 @@ namespace par { // Base parsing loop functions
   // `terminator` (doesn't consume, it's caller is responsible for that).
   std::optional<std::vector<std::unique_ptr<Node>>> Parser::parseExpressionList(State* state, lex::TokenType terminator) {
     std::vector<std::unique_ptr<Node>> list;
-    if (check(state->lexer.get(), terminator)) return list; // empty list
+    if (check(state, terminator)) return list; // empty list
 
     while (true) {
       std::unique_ptr<Node> expr = parseExpression(state, 1);
@@ -697,7 +731,7 @@ namespace par { // Complex parsing structures
   // Keyword-led statements get their own function. Anything else
   // is an expression used as a statement (x = 5; / foo();).
   std::unique_ptr<Node> Parser::parseStatement(State* state) {
-    lex::TokenType next = state->lexer->peekToken().type;
+    lex::TokenType next = peekAt(state).type;
 
     switch (next) {
       case lex::TokenType::L_BRACE: return parseBlock(state);
@@ -732,10 +766,10 @@ namespace par { // Complex parsing structures
   }
 
   std::unique_ptr<Node> Parser::parseBlock(State* state) {
-    lex::Token brace_tok = state->lexer->peekToken();
+    lex::Token brace_tok = peekAt(state);
     if (!expect(state, lex::TokenType::L_BRACE, "Expected '{'")) return nullptr;
     std::vector<std::unique_ptr<Node>> stmts;
-    while (!check(state->lexer.get(), lex::TokenType::R_BRACE) && !isAtEnd(state->lexer.get())) {
+    while (!check(state, lex::TokenType::R_BRACE) && !isAtEnd(state)) {
       auto stmt = parseStatement(state);
       if (stmt == nullptr) return nullptr;
       stmts.push_back(std::move(stmt));
@@ -758,7 +792,7 @@ namespace par { // Complex parsing structures
     std::unique_ptr<Node> else_branch;
     if (match(state, lex::TokenType::ELSE)) {
       // else if or else block
-      if (check(state->lexer.get(), lex::TokenType::IF)) {
+      if (check(state, lex::TokenType::IF)) {
         else_branch = parseIf(state);
       } else {
         else_branch = parseBlock(state);
@@ -820,7 +854,7 @@ namespace par { // Complex parsing structures
   std::unique_ptr<Node> Parser::parseReturn(State* state) {
     lex::Token return_tok = advance(state); // consume 'return'
     std::unique_ptr<Node> value;
-    if (!check(state->lexer.get(), lex::TokenType::SEMICOLON)) {
+    if (!check(state, lex::TokenType::SEMICOLON)) {
       value = parseExpression(state, 1);
       if (value == nullptr) return nullptr;
     }
@@ -836,7 +870,7 @@ namespace par { // Complex parsing structures
   std::optional<std::vector<std::string>> Parser::parseParamList(State* state) {
     if (!expect(state, lex::TokenType::L_PAREN, "Expected '(' after 'fn'")) return std::nullopt;
     std::vector<std::string> params;
-    while (!check(state->lexer.get(), lex::TokenType::R_PAREN) && !isAtEnd(state->lexer.get())) {
+    while (!check(state, lex::TokenType::R_PAREN) && !isAtEnd(state)) {
       lex::Token param_tok = advance(state);
       if (param_tok.type != lex::TokenType::IDENT) {
         panic(m_hooks.format_error(state, param_tok, "Expected parameter name"));
@@ -929,9 +963,9 @@ namespace par { // Complex parsing structures
   std::unique_ptr<Node> Parser::parseThisOrSuper(State* state, bool is_super) {
     lex::Token self_tok = advance(state); // consume this/super
 
-    if (!check(state->lexer.get(), lex::TokenType::ARROW)) {
+    if (!check(state, lex::TokenType::ARROW)) {
       if (is_super) {
-        panic(m_hooks.format_error(state, state->lexer->peekToken(), "Expected '->' after 'super'"));
+        panic(m_hooks.format_error(state, peekAt(state), "Expected '->' after 'super'"));
         return nullptr;
       }
       // Bare `this` with no following `->`: return a Self node directly so
@@ -970,21 +1004,21 @@ namespace par { // Complex parsing structures
     if (!expect(state, lex::TokenType::L_PAREN, "Expected '(' after 'for'")) return nullptr;
 
     std::unique_ptr<Node> init;
-    if (!check(state->lexer.get(), lex::TokenType::SEMICOLON)) {
-      init = check(state->lexer.get(), lex::TokenType::PIN) ? parseVarDeclNoSemicolon(state) : parseExpression(state, 1);
+    if (!check(state, lex::TokenType::SEMICOLON)) {
+      init = check(state, lex::TokenType::PIN) ? parseVarDeclNoSemicolon(state) : parseExpression(state, 1);
       if (init == nullptr) return nullptr;
     }
     if (!expect(state, lex::TokenType::SEMICOLON, "Expected ';' after for-loop initializer")) return nullptr;
 
     std::unique_ptr<Node> condition;
-    if (!check(state->lexer.get(), lex::TokenType::SEMICOLON)) {
+    if (!check(state, lex::TokenType::SEMICOLON)) {
       condition = parseExpression(state, 1);
       if (condition == nullptr) return nullptr;
     }
     if (!expect(state, lex::TokenType::SEMICOLON, "Expected ';' after for-loop condition")) return nullptr;
 
     std::unique_ptr<Node> increment;
-    if (!check(state->lexer.get(), lex::TokenType::R_PAREN)) {
+    if (!check(state, lex::TokenType::R_PAREN)) {
       increment = parseExpression(state, 1);
       if (increment == nullptr) return nullptr;
     }
@@ -1006,7 +1040,7 @@ namespace par { // Complex parsing structures
 
     std::vector<SwitchCase> cases;
     bool seen_default = false;
-    while (!check(state->lexer.get(), lex::TokenType::R_BRACE) && !isAtEnd(state->lexer.get())) {
+    while (!check(state, lex::TokenType::R_BRACE) && !isAtEnd(state)) {
       SwitchCase c;
       if (match(state, lex::TokenType::CASE)) {
         c.value = parseExpression(state, 1);
@@ -1018,13 +1052,12 @@ namespace par { // Complex parsing structures
         }
         seen_default = true;
       } else {
-        panic(m_hooks.format_error(state, state->lexer->peekToken(), "Expected 'case' or 'default' in switch body"));
+        panic(m_hooks.format_error(state, peekAt(state), "Expected 'case' or 'default' in switch body"));
         return nullptr;
       }
       if (!expect(state, lex::TokenType::COLON, "Expected ':' after case label")) return nullptr;
 
-      while (!check(state->lexer.get(), lex::TokenType::CASE) && !check(state->lexer.get(), lex::TokenType::DEFAULT) && !check(state->lexer.get(), lex::TokenType::R_BRACE) &&
-             !isAtEnd(state->lexer.get())) {
+      while (!check(state, lex::TokenType::CASE) && !check(state, lex::TokenType::DEFAULT) && !check(state, lex::TokenType::R_BRACE) && !isAtEnd(state)) {
         auto stmt = parseStatement(state);
         if (stmt == nullptr) return nullptr;
         c.body.push_back(std::move(stmt));
@@ -1064,7 +1097,7 @@ namespace par { // Complex parsing structures
   std::optional<std::vector<std::string>> Parser::parseClassMethodParams(State* state) {
     if (!expect(state, lex::TokenType::L_PAREN, "Expected '(' after method name")) return std::nullopt;
     std::vector<std::string> params;
-    while (!check(state->lexer.get(), lex::TokenType::R_PAREN) && !isAtEnd(state->lexer.get())) {
+    while (!check(state, lex::TokenType::R_PAREN) && !isAtEnd(state)) {
       lex::Token param_tok = advance(state);
       if (param_tok.type != lex::TokenType::IDENT) {
         panic(m_hooks.format_error(state, param_tok, "Expected parameter name"));
@@ -1142,20 +1175,20 @@ namespace par { // Complex parsing structures
                               std::vector<std::unique_ptr<VarDecl>>* out_fields,
                               std::vector<std::unique_ptr<FnLiteral>>* out_methods,
                               std::vector<std::string>* out_method_names) {
-    while (!check(state->lexer.get(), lex::TokenType::R_BRACE) && !isAtEnd(state->lexer.get())) {
-      if (check(state->lexer.get(), lex::TokenType::PIN)) {
+    while (!check(state, lex::TokenType::R_BRACE) && !isAtEnd(state)) {
+      if (check(state, lex::TokenType::PIN)) {
         auto field_node = parseClassField(state);
         if (field_node == nullptr) return false;
         out_fields->push_back(std::move(field_node));
 
-      } else if (check(state->lexer.get(), lex::TokenType::FN)) {
+      } else if (check(state, lex::TokenType::FN)) {
         std::string method_name;
         auto method_node = parseClassMethod(state, &method_name);
         if (method_node == nullptr) return false;
         out_method_names->push_back(std::move(method_name));
         out_methods->push_back(std::move(method_node));
       } else {
-        panic(m_hooks.format_error(state, state->lexer->peekToken(), "Expected 'pin' or 'fn' in class body"));
+        panic(m_hooks.format_error(state, peekAt(state), "Expected 'pin' or 'fn' in class body"));
         return false;
       }
     }

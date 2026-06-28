@@ -13,10 +13,12 @@ class TestParser : public par::Parser {
     m_hooks.resolve_file = [](const Path&, const Path&) -> std::optional<Path> { return std::nullopt; };
 
     Path dummy("<test>");
-    par::State state{
-      .lexer = std::make_unique<lex::Lexer>(source),
-      .last_token = {},
-    };
+    lex::Lexer lexer(source);
+    lex::TokenStream tokens = lexer.tokenize();
+    auto line_cache = lexer.takeLineCache();
+    par::State state;
+    state.tokens = std::move(tokens);
+    state.line_cache = std::move(line_cache);
     bool ok = parse(&state);
     if (ok) registerTestState(dummy, std::move(state));
     return ok;

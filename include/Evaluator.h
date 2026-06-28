@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Environment.h>
-#include <Parser.h>
+#include <Program.h>
 #include <ParserNodeTypes.h>
 #include <SisRegistry.h>
 #include <Value.h>
@@ -42,7 +42,9 @@ namespace eval {
     // in the global environment. Returns the value of the last statement,
     // mostly useful for REPL style usage, the return value doesn't matter for
     // running a script for its side effects.
-    Value run(const par::Parser& parser);
+    Value run(const par::Program& program);
+
+    std::shared_ptr<Environment> globalEnv() const { return m_global; }
 
     private:
     const Path* m_current_eval_file;

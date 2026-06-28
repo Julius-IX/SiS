@@ -1,6 +1,7 @@
 #include <SisDynamicLibMacros.h>
 
 #include <algorithm>
+#include <print>
 
 FN_SIGNATURE(upper, args) {
   std::string str = requireStr(args[0], "upper");
@@ -109,6 +110,8 @@ FN_SIGNATURE(replace, args) {
 }
 
 FN_SIGNATURE(split, args) {
+  if (args.size() < 2) throw std::runtime_error("split() expected 2 arguments [string, delimiter], got " + std::to_string(args.size()));
+
   std::string str = requireStr(args[0], "split");
   std::string delim = requireStr(args[1], "split");
 
@@ -117,7 +120,7 @@ FN_SIGNATURE(split, args) {
   size_t start = 0;
   size_t pos = 0;
 
-  eval::Array out = eval::Array();
+  auto out = std::make_shared<eval::InternalArray>();
   while ((pos = str.find(delim, start)) != std::string::npos) {
     out->emplaceBack(str.substr(start, pos - start));
     start = pos + delim.size();
