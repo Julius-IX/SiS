@@ -214,7 +214,8 @@ namespace eval {
           (*fields)[name] = val;
         }
         auto ns = std::make_shared<Instance>(Instance{.klass = nullptr, .fields = fields});
-        m_global->define(path.stem().string(), Value(ns));
+        const std::string ns_name = file.alias.empty() ? path.stem().string() : file.alias;
+        m_global->define(ns_name, Value(ns));
 
         // Remove this file's classes from the global registry so they're only
         // reachable via the namespace, not as bare names.

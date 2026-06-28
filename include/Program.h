@@ -12,6 +12,7 @@ namespace par {
     std::unique_ptr<Block> ast;
     std::vector<Path> includes;
     bool is_dynamic = false;
+    std::string alias;
   };
 
   struct Program {

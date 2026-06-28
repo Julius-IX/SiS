@@ -58,11 +58,13 @@ namespace par {
     std::deque<Path> m_include_stack;
     std::unordered_map<Path, State> m_states;
     bool m_parallel = false;
+    std::unordered_map<Path, std::string> m_aliases;
 
     struct ParseResult {
       std::unique_ptr<Block> block;
       std::unordered_map<size_t, std::string> line_cache;
       std::vector<std::string> raw_includes; // unresolved, in source order
+      std::unordered_map<std::string, std::string> raw_aliases;
     };
 
     struct ParallelContext {

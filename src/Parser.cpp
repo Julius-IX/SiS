@@ -311,6 +311,7 @@ namespace par { // Include resolving
         .ast = std::move(state.block),
         .includes = std::move(state.includes),
         .is_dynamic = is_dynamic,
+        .alias = m_aliases.contains(p) ? m_aliases.at(p) : "",
       };
       program.load_order.push_back(p);
     }
@@ -341,6 +342,20 @@ namespace par { // Include resolving
       return std::unexpected(m_hooks.format_error(&state, state.last_token, "Failed to get path from 'include'"));
     }
 
+    // Optional: as <name>
+    std::string alias;
+    if (match(&state, lex::TokenType::AS)) {
+      lex::Token alias_tok = advance(&state);
+      if (alias_tok.type != lex::TokenType::IDENT) {
+        return std::unexpected(m_hooks.format_error(&state, alias_tok, "Expected identifier after 'as'"));
+      }
+      auto alias_name = getFromVariant<std::string>(state.last_token);
+      if (!alias_name) {
+        return std::unexpected(m_hooks.format_error(&state, alias_tok, "Empty alias name after 'as'"));
+      }
+      alias = std::move(*alias_name);
+    }
+
     if (!match(&state, lex::TokenType::SEMICOLON)) {
       return std::unexpected(m_hooks.format_error(&state, state.last_token, "Expected ';' after 'include' expression"));
     }
@@ -350,6 +365,7 @@ namespace par { // Include resolving
       return std::unexpected(m_hooks.format_error(&state, state.last_token, "Failed to resolve include path"));
     }
 
+    if (!alias.empty()) m_aliases[include_path.value()] = std::move(alias);
     state.includes.push_back(include_path.value());
     return include_path;
   }
