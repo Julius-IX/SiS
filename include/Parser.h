@@ -103,6 +103,7 @@ namespace par {
     std::optional<std::vector<std::string>> parseParamList(State* state);
 
     // Statement parsing one function per distinct statement shape
+    std::unique_ptr<Node> parseDocComment(State* state);
     std::unique_ptr<Node> parseStatement(State* state);
     std::unique_ptr<Node> parseBlock(State* state);
     std::unique_ptr<Node> parseIf(State* state);
