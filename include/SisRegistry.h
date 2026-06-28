@@ -28,9 +28,10 @@ namespace eval {
     // instance (fields already set to defaults by evalNewExpr) and the
     // user-supplied constructor arguments. Mutate inst->fields directly
     // to initialize the instance.
-    NativeClassBuilder& constructor(std::function<void(std::shared_ptr<Instance>, std::vector<Value>&)> ctor) {
+    NativeClassBuilder& constructor(std::function<void(std::shared_ptr<Instance>, std::vector<Value>&)> ctor, std::string docs_string = "") {
       klass->native_methods["constructor"] = NativeFunction{
         .name = "constructor",
+        .docs = std::move(docs_string),
         .fn   = [ctor](std::vector<Value>& args) -> Value {
           // args[0] is the instance injected by evalNewExpr
           auto inst = std::get<std::shared_ptr<Instance>>(args[0].data);
@@ -44,9 +45,10 @@ namespace eval {
 
     // Register a named method. `fn` receives the instance as first arg
     // (already unwrapped to shared_ptr<Instance>) and user args as the rest.
-    NativeClassBuilder& method(const char* name, std::function<Value(std::shared_ptr<Instance>, std::vector<Value>&)> fn) {
+    NativeClassBuilder& method(const char* name, std::function<Value(std::shared_ptr<Instance>, std::vector<Value>&)> fn, std::string docs_string = "") {
       klass->native_methods[name] = NativeFunction{
         .name = name,
+        .docs = std::move(docs_string),
         .fn   = [fn](std::vector<Value>& args) -> Value {
           auto inst = std::get<std::shared_ptr<Instance>>(args[0].data);
           std::vector<Value> method_args(args.begin() + 1, args.end());
@@ -79,9 +81,10 @@ namespace eval {
 
     // Register a free function directly into scope callable by name
     // like any built-in (print, len, etc.)
-    void defineFn(const char* name, std::function<Value(std::vector<Value>&)> fn) {
+    void defineFn(const char* name, std::function<Value(std::vector<Value>&)> fn, std::string docs_string = "") {
       env->define(name, Value(NativeFunction{
         .name = std::string(name),
+        .docs = std::move(docs_string),
         .fn   = std::move(fn)
       }));
     }
@@ -91,9 +94,10 @@ namespace eval {
     // The class is inserted into both the env (so `ClassName` resolves
     // as a Value) and the evaluator's m_classes map (so `new ClassName()`
     // resolves correctly).
-    NativeClassBuilder defineClass(const char* name) {
+    NativeClassBuilder defineClass(const char* name, std::string docs_string = "") {
       auto klass = std::make_shared<Class>();
       klass->name = name;
+      klass->docs = std::move(docs_string);
       klass->declaration = nullptr; // native class, no AST node
       classes[name] = klass;
       env->define(name, Value(klass));
