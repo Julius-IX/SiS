@@ -54,9 +54,7 @@ namespace lex {
 
   // ['/', '/', '/'] 0 = current_char, 1 = next_char, 2 = next_next_char
   TypeValuePair Lexer::parseDocComment() {
-    advanceState(); // consume '/' (idx 0)
-    advanceState(); // consume '/' (idx 1)
-    advanceState(); // consume '/' (idx 2)
+    advanceState(3); // consume '///'
     uint32_t start_pos = this->m_state.pos;
     uint32_t line = this->m_state.line;
     std::string comment_str;
@@ -70,10 +68,7 @@ namespace lex {
         // current_char='\n', peekChar()='/', peekChar(1)='/', peekChar(2)='/'
         if (peekChar() == '/' && peekChar(1) == '/' && peekChar(2) == '/') {
           comment_str += '\n';
-          advanceState(); // consume '\n'
-          advanceState(); // consume '/' 1
-          advanceState(); // consume '/' 2
-          advanceState(); // consume '/' 3
+          advanceState(4); // consume '\n///'
           line = this->m_state.line;
           start_pos = this->m_state.pos;
         } else {
@@ -148,8 +143,7 @@ namespace lex {
        * no need to wrap in if block
        * advanceState() prevents going past m_input.size();
        */
-      advanceState();
-      advanceState();
+      advanceState(2);
     }
   }
 

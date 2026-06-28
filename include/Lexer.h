@@ -148,7 +148,13 @@ namespace lex {
     }
 
     void fillBuffer();
-    void advanceState(); // TODO: add multiplier
+    void advanceState();
+    void advanceState(uint32_t multiplier) {
+      assert(multiplier > 0 && "multiplier must be greater than 0");
+      for (uint32_t i = 0; i < multiplier; ++i) {
+        advanceState();
+      }
+    }
     void consumeSpace();
     void skipComment(const char& current_char, const char& next_char);
 
