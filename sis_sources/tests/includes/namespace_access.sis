@@ -1,0 +1,3 @@
+include "library.sis";
+print(library.LIB_VERSION);
+print(str(library.libraryAdd(10, 5)));

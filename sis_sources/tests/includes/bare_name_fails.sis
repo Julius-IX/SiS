@@ -1,0 +1,2 @@
+include "library.sis";
+print(LIB_VERSION);
