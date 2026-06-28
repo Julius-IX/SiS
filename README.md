@@ -1,17 +1,7 @@
-Shit Script (SiS)
+SiS (SiS interprets Scripts)
 <!-- (/.__.)/ \(.__.\) -->
+<!-- Between you and me the original name of SiS was "Shit Script" -->
 
 ## TODO
-- [ ] Add proper README
-- [X] Stop being lazy and add proper Tests
-- [X] Add base standard libraries
-- [X] Add more passable flags
 - [ ] Make lsp server
 - [ ] Add example project
-
-## Dependencies
-
-#### Development / Test Dependencies  
-- **[Google Test](https://github.com/google/googletest)** (BSD-3-Clause License)
-
-See [external/LICENSES](external/LICENSES) for full license texts.
