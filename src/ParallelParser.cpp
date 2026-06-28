@@ -233,6 +233,7 @@ namespace par {
     }
 
     Program program;
+    program.root_path = root;
     for (const Path& p : m_load_order) {
       State& state    = m_states[p];
       auto   p_ext    = p.extension();

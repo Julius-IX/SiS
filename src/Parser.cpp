@@ -300,6 +300,7 @@ namespace par { // Include resolving
     }
 
     Program program;
+    program.root_path = full_root_path;
     for (const Path& p : m_load_order) {
       State& state = m_states[p];
       auto ext = p.extension();
@@ -313,6 +314,7 @@ namespace par { // Include resolving
       };
       program.load_order.push_back(p);
     }
+
     return program;
   }
 

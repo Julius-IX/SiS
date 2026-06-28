@@ -195,13 +195,28 @@ namespace eval {
 
   Value Evaluator::run(const par::Program& program) {
     Value last{};
-    for (const Path& path : program.load_order) {
+    for (size_t i = 0; i < program.load_order.size(); ++i) {
+      const Path& path = program.load_order[i];
       const par::ParsedFile& file = program.files.at(path);
       m_current_eval_file = &path;
 
       std::shared_ptr<Environment> file_env = file.is_dynamic ? loadDynamicLib(path, file.includes) : loadFile(path, *file.ast, file.includes, &last);
 
-      mergeIntoEnv(file_env, m_global);
+      if (path == program.root_path) {
+        // Entry point: flat-merge into global, same as before.
+        mergeIntoEnv(file_env, m_global);
+      } else {
+        // Non-entry file: wrap its environment snapshot as a namespace Instance
+        // (klass == nullptr, pure field bag) and define it in global under the
+        // file's stem. Both scripted and dynamic files already return an
+        // Environment so no branching needed here.
+        auto fields = std::make_shared<std::unordered_map<std::string, Value>>();
+        for (auto& [name, val] : file_env->snapshot()) {
+          (*fields)[name] = val;
+        }
+        auto ns = std::make_shared<Instance>(Instance{.klass = nullptr, .fields = fields});
+        m_global->define(path.stem().string(), Value(ns));
+      }
     }
     return last;
   }
