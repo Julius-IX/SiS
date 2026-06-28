@@ -7,10 +7,6 @@
 #   ./build_stdlib.sh --all            # native + Windows
 #   ./build_stdlib.sh --install /path  # native + install to /path
 #   ./build_stdlib.sh --all --install /path/to/sis
-#
-# The script never touches toolchains/windows.cmake — that's for the main
-# interpreter binary. The stdlib has its own simpler cross setup via
-# CMAKE_TOOLCHAIN_FILE pointed at a minimal MinGW toolchain (see below).
 
 set -euo pipefail
 
