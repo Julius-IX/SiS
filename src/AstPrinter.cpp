@@ -2,7 +2,7 @@
 
 #include <print>
 #include <string>
-#include <spdlog/fmt/fmt.h>
+#include <fmt/core.h>
 
 namespace par { // Tree-drawing (debugging only don't expect direct access to this or it to be maintained correctly)
   namespace {

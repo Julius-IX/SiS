@@ -8,8 +8,8 @@
 
 #include <string>
 
-#include <linenoise.h>
-#include <spdlog/fmt/fmt.h>
+#include <fmt/core.h>
+#include <replxx.hxx>
 
 class Repl {
   public:
@@ -44,14 +44,16 @@ class Repl {
   }
 
   static void loop(eval::Evaluator& eval) {
+    replxx::Replxx rx;
     std::string input;
     while (true) {
       const char* prompt = input.empty() ? ">> " : ".. ";
-      char* raw = linenoise(prompt);
-      if (!raw) break; // Ctrl+D || Ctlr+C
+      static replxx::Replxx rx;
+
+      char const* raw = rx.input(prompt);
+      if (!raw) break;
       std::string line(raw);
-      linenoiseFree(raw);
-      if (!line.empty() && input.empty()) linenoiseHistoryAdd(line.c_str());
+      if (!line.empty() && input.empty()) rx.history_add(line);
       if (!input.empty()) input += '\n';
       input += line;
       if (!isComplete(input)) continue;

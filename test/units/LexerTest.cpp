@@ -2,7 +2,7 @@
 #include <gtest/gtest.h>
 
 #include <Lexer.h>
-#include <spdlog/fmt/fmt.h>
+#include <fmt/core.h>
 
 #include <algorithm>
 

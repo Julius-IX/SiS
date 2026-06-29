@@ -13,7 +13,7 @@
 #include <windows.h>
 #endif
 
-#include <spdlog/fmt/fmt.h>
+#include <fmt/core.h>
 
 namespace eval {
   static bool isAssignmentOperator(lex::TokenType type) {

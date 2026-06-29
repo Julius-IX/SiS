@@ -5,7 +5,7 @@
 
 #include <gtest/gtest.h>
 
-#include <spdlog/fmt/fmt.h>
+#include <fmt/core.h>
 
 class TestEval : public par::Parser {
   std::unique_ptr<par::Block> m_block;

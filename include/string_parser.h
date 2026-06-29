@@ -6,7 +6,7 @@
 #include <optional>
 #include <string>
 
-#include <spdlog/fmt/fmt.h>
+#include <fmt/core.h>
 
 class StringParser : public par::Parser {
   public:

@@ -2,7 +2,7 @@
 
 #include <cstdint>
 #include <filesystem>
-#include <spdlog/fmt/fmt.h>
+#include <fmt/core.h>
 #include <string>
 #include <unordered_map>
 #include <variant>

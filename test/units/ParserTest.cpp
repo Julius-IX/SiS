@@ -2,7 +2,7 @@
 #include <ParserNodeTypes.h>
 #include <gtest/gtest.h>
 
-#include <spdlog/fmt/fmt.h>
+#include <fmt/core.h>
 
 class TestParser : public par::Parser {
   public:
