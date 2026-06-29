@@ -2,7 +2,7 @@
 
 The `time` library provides functions for getting the current time, pausing execution, and working with dates.
 
-```sis
+```c
 include "time";
 ```
 
@@ -14,7 +14,7 @@ include "time";
 
 Returns the current Unix timestamp: the number of seconds since 1 January 1970 00:00:00 UTC.
 
-```sis
+```c
 pin ts = time.now(); // e.g. 1735689600.123
 ```
 
@@ -26,7 +26,7 @@ pin ts = time.now(); // e.g. 1735689600.123
 
 Pauses execution for `seconds` seconds. Fractional values are accepted.
 
-```sis
+```c
 time.sleep(1);    // pause for 1 second
 time.sleep(0.5);  // pause for 500 milliseconds
 ```
@@ -41,7 +41,7 @@ time.sleep(0.5);  // pause for 500 milliseconds
 
 Returns the CPU time consumed by the program so far, in seconds. This measures processor time, not wall-clock time, so it is useful for benchmarking code rather than measuring elapsed real time.
 
-```sis
+```c
 pin start = time.clock();
 // ... work ...
 pin elapsed = time.clock() - start;
@@ -56,7 +56,7 @@ print("CPU time: " + elapsed);
 
 `DateTime` represents a point in time, decomposed into local date and time components.
 
-```sis
+```c
 pin dt = new time.DateTime();          // current time
 pin dt = new time.DateTime(1735689600); // from a Unix timestamp
 ```
@@ -71,7 +71,7 @@ If `timestamp` is omitted, the constructor uses the current time.
 
 Returns the four-digit year.
 
-```sis
+```c
 dt.year(); // e.g. 2025
 ```
 
@@ -113,7 +113,7 @@ Common pattern codes:
 | `%S` | Second, zero-padded        | `00`     |
 | `%A` | Full weekday name          | `Monday` |
 
-```sis
+```c
 dt.format("%Y-%m-%d %H:%M:%S"); // "2025-01-15 09:05:00"
 ```
 
@@ -127,7 +127,7 @@ dt.format("%Y-%m-%d %H:%M:%S"); // "2025-01-15 09:05:00"
 
 Returns the Unix timestamp this `DateTime` was constructed from.
 
-```sis
+```c
 dt.to_timestamp(); // e.g. 1735689600
 ```
 
@@ -139,7 +139,7 @@ dt.to_timestamp(); // e.g. 1735689600
 
 **Measure elapsed wall time:**
 
-```sis
+```c
 include "time";
 
 pin start = time.now();
@@ -150,7 +150,7 @@ print("Elapsed: " + elapsed + "s");
 
 **Format the current date:**
 
-```sis
+```c
 include "time";
 
 pin dt = new time.DateTime();
@@ -159,7 +159,7 @@ print(dt.format("%A, %d %B %Y")); // e.g. "Wednesday, 15 January 2025"
 
 **Reconstruct a DateTime from a stored timestamp:**
 
-```sis
+```c
 include "time";
 
 pin ts = time.now();

@@ -2,7 +2,7 @@
 
 The `math` library provides common mathematical functions and constants.
 
-```sis
+```c
 include "math";
 ```
 
@@ -19,7 +19,7 @@ All functions accept and return `num` values. Angles are in radians.
 | `INF`  | Infinity               | Positive infinity        |
 | `NAN`  | NaN                    | Not a number             |
 
-```sis
+```c
 print(math.PI);  // 3.141592653589793
 print(math.INF); // Infinity
 ```
@@ -32,7 +32,7 @@ print(math.INF); // Infinity
 
 Returns the absolute value of `n`.
 
-```sis
+```c
 math.abs(-5); // 5
 ```
 
@@ -40,7 +40,7 @@ math.abs(-5); // 5
 
 Rounds `n` down to the nearest integer.
 
-```sis
+```c
 math.floor(3.9); // 3
 ```
 
@@ -48,7 +48,7 @@ math.floor(3.9); // 3
 
 Rounds `n` up to the nearest integer.
 
-```sis
+```c
 math.ceil(3.1); // 4
 ```
 
@@ -56,7 +56,7 @@ math.ceil(3.1); // 4
 
 Rounds `n` to the nearest integer. Ties round away from zero.
 
-```sis
+```c
 math.round(2.5); // 3
 ```
 
@@ -64,7 +64,7 @@ math.round(2.5); // 3
 
 Constrains `value` to the range `[min, max]`.
 
-```sis
+```c
 math.clamp(15, 0, 10); // 10
 math.clamp(-5, 0, 10); // 0
 math.clamp(7, 0, 10);  // 7
@@ -78,7 +78,7 @@ math.clamp(7, 0, 10);  // 7
 
 Returns the square root of `n`. `n` must be non-negative.
 
-```sis
+```c
 math.sqrt(9); // 3
 ```
 
@@ -86,7 +86,7 @@ math.sqrt(9); // 3
 
 Returns the cube root of `n`.
 
-```sis
+```c
 math.cbrt(27); // 3
 ```
 
@@ -94,7 +94,7 @@ math.cbrt(27); // 3
 
 Raises `base` to the power of `exp`.
 
-```sis
+```c
 math.pow(2, 10); // 1024
 ```
 
@@ -114,7 +114,7 @@ Returns the base-2 logarithm of `n`. `n` must be positive.
 
 Returns the base-10 logarithm of `n`. `n` must be positive.
 
-```sis
+```c
 math.log(math.E); // 1
 math.log2(8);     // 3
 math.log10(1000); // 3
@@ -143,7 +143,7 @@ Returns the arc sine, arc cosine, or arc tangent of `n`, in radians.
 
 Returns the angle in radians between the positive x-axis and the point `(x, y)`. The result is in `[-PI, PI]`. Use `atan2` instead of `atan` when you need the correct quadrant.
 
-```sis
+```c
 math.atan2(1, 1); // PI/4
 ```
 
@@ -159,7 +159,7 @@ Returns the smaller of `a` and `b`.
 
 Returns the larger of `a` and `b`.
 
-```sis
+```c
 math.min(3, 7); // 3
 math.max(3, 7); // 7
 ```
@@ -168,7 +168,7 @@ math.max(3, 7); // 7
 
 ## Example
 
-```sis
+```c
 include "math";
 
 pin hypotenuse = fn(a, b) {

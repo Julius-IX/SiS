@@ -2,7 +2,7 @@
 
 The `random` library provides functions for generating random numbers and selecting random elements from arrays. It uses a Mersenne Twister (MT19937) generator seeded from hardware entropy at startup.
 
-```sis
+```c
 include "random";
 ```
 
@@ -14,7 +14,7 @@ include "random";
 
 Seeds the random number generator with the integer `n`. The same seed always produces the same sequence of values, which is useful for reproducible results in tests.
 
-```sis
+```c
 random.seed(42);
 ```
 
@@ -26,7 +26,7 @@ random.seed(42);
 
 Returns a random floating-point number in `[0.0, 1.0)`.
 
-```sis
+```c
 pin n = random.rand(); // e.g. 0.7341...
 ```
 
@@ -38,7 +38,7 @@ pin n = random.rand(); // e.g. 0.7341...
 
 Returns a random integer in the inclusive range `[lo, hi]`.
 
-```sis
+```c
 pin roll = random.randint(1, 6); // simulates a die roll
 ```
 
@@ -52,7 +52,7 @@ pin roll = random.randint(1, 6); // simulates a die roll
 
 Returns a uniformly random element from `list`.
 
-```sis
+```c
 pin suits = ["hearts", "diamonds", "clubs", "spades"];
 pin suit = random.choice(suits);
 ```
@@ -67,7 +67,7 @@ pin suit = random.choice(suits);
 
 Shuffles `list` in place using a uniform random permutation and returns the same array.
 
-```sis
+```c
 pin deck = [1, 2, 3, 4, 5];
 random.shuffle(deck);
 print(deck); // order is now random
@@ -83,7 +83,7 @@ print(deck); // order is now random
 
 Returns a new array of `n` elements drawn from `list` without replacement.
 
-```sis
+```c
 pin pool = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 pin picks = random.sample(pool, 3); // e.g. [7, 2, 9]
 ```
@@ -96,7 +96,7 @@ pin picks = random.sample(pool, 3); // e.g. [7, 2, 9]
 
 ## Example
 
-```sis
+```c
 include "random";
 
 random.seed(1);

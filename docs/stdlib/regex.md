@@ -2,7 +2,7 @@
 
 The `regex` library provides regular expression matching, searching, and replacement. All patterns use ECMAScript syntax.
 
-```sis
+```c
 include "regex";
 ```
 
@@ -30,7 +30,7 @@ Use these functions for one-off operations. If you apply the same pattern repeat
 
 Tests whether `s` matches `pattern` in its entirety. The pattern must cover the whole string.
 
-```sis
+```c
 pin m = regex.match("\\d{4}", "2025");
 print(m[0]); // "2025"
 
@@ -45,7 +45,7 @@ regex.match("\\d{4}", "abc"); // null
 
 Finds the first occurrence of `pattern` anywhere in `s`.
 
-```sis
+```c
 pin m = regex.search("\\d+", "order 99 placed");
 print(m[0]); // "99"
 ```
@@ -58,7 +58,7 @@ print(m[0]); // "99"
 
 Finds all non-overlapping matches of `pattern` in `s`.
 
-```sis
+```c
 pin matches = regex.find_all("\\d+", "a1 b22 c333");
 print(matches[0][0]); // "1"
 print(matches[1][0]); // "22"
@@ -73,7 +73,7 @@ print(matches[2][0]); // "333"
 
 Replaces all matches of `pattern` in `s` with `replacement`. The replacement string supports back-references such as `$1` for the first capture group.
 
-```sis
+```c
 regex.replace("\\s+", "too   many   spaces", " ");
 // "too many spaces"
 ```
@@ -86,7 +86,7 @@ regex.replace("\\s+", "too   many   spaces", " ");
 
 Splits `s` on every match of `pattern`.
 
-```sis
+```c
 regex.split("\\s*,\\s*", "a, b,  c");
 // ["a", "b", "c"]
 ```
@@ -99,7 +99,7 @@ regex.split("\\s*,\\s*", "a, b,  c");
 
 Compile a pattern once and reuse it across multiple calls. This is more efficient than the free functions when you apply the same pattern in a loop.
 
-```sis
+```c
 pin re = new regex.Regex("(\\w+)@(\\w+\\.\\w+)", "i");
 ```
 
@@ -140,7 +140,7 @@ Same behavior as the free `split` function, using the compiled pattern.
 
 ## Example
 
-```sis
+```c
 include "regex";
 
 pin log = "2025-01-15 ERROR something went wrong";

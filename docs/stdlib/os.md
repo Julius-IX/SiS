@@ -2,7 +2,7 @@
 
 The `os` library provides access to the operating system: environment variables, command-line arguments, the working directory, shell execution, and process control.
 
-```sis
+```c
 include "os";
 ```
 
@@ -14,7 +14,7 @@ include "os";
 
 Reads the environment variable named `key`.
 
-```sis
+```c
 pin home = os.env("HOME");
 ```
 
@@ -26,7 +26,7 @@ pin home = os.env("HOME");
 
 Returns the command-line arguments passed to the interpreter.
 
-```sis
+```c
 pin argv = os.args();
 print(argv[0]); // path to the interpreter
 ```
@@ -39,7 +39,7 @@ print(argv[0]); // path to the interpreter
 
 Returns the current working directory as an absolute path.
 
-```sis
+```c
 print(os.cwd()); // /home/user/project
 ```
 
@@ -51,7 +51,7 @@ print(os.cwd()); // /home/user/project
 
 Returns a string identifying the current operating system.
 
-```sis
+```c
 print(os.platform()); // "linux"
 ```
 
@@ -63,7 +63,7 @@ print(os.platform()); // "linux"
 
 Runs `command` in a shell and captures its standard output.
 
-```sis
+```c
 pin result = os.exec("echo hello");
 print(result); // "hello\n"
 ```
@@ -80,7 +80,7 @@ print(result); // "hello\n"
 
 Terminates the process with the given exit code. `exit` does not return.
 
-```sis
+```c
 os.exit(0);  // success
 os.exit(1);  // failure
 ```
@@ -91,7 +91,7 @@ os.exit(1);  // failure
 
 ## Example
 
-```sis
+```c
 include "os";
 
 if (os.platform() == "windows") {

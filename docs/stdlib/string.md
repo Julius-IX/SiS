@@ -2,7 +2,7 @@
 
 The `string` library provides functions for transforming, searching, and formatting strings.
 
-```sis
+```c
 include "string";
 ```
 
@@ -16,7 +16,7 @@ All functions treat strings as sequences of bytes. They do not perform Unicode-a
 
 Converts every character in `s` to uppercase.
 
-```sis
+```c
 string.upper("hello"); // "HELLO"
 ```
 
@@ -24,7 +24,7 @@ string.upper("hello"); // "HELLO"
 
 Converts every character in `s` to lowercase.
 
-```sis
+```c
 string.lower("HELLO"); // "hello"
 ```
 
@@ -36,7 +36,7 @@ string.lower("HELLO"); // "hello"
 
 Removes leading and trailing whitespace from `s`.
 
-```sis
+```c
 string.trim("  hello  "); // "hello"
 ```
 
@@ -56,7 +56,7 @@ Removes trailing whitespace only.
 
 Returns `true` if `s` contains `sub`.
 
-```sis
+```c
 string.contains("hello world", "world"); // true
 ```
 
@@ -64,7 +64,7 @@ string.contains("hello world", "world"); // true
 
 Returns `true` if `s` begins with `prefix`.
 
-```sis
+```c
 string.starts_with("hello", "he"); // true
 ```
 
@@ -72,7 +72,7 @@ string.starts_with("hello", "he"); // true
 
 Returns `true` if `s` ends with `suffix`.
 
-```sis
+```c
 string.ends_with("hello", "lo"); // true
 ```
 
@@ -80,7 +80,7 @@ string.ends_with("hello", "lo"); // true
 
 Returns the zero-based index of the first occurrence of `sub` in `s`.
 
-```sis
+```c
 string.find("hello", "ll"); // 2
 string.find("hello", "z");  // -1
 ```
@@ -95,7 +95,7 @@ string.find("hello", "z");  // -1
 
 Extracts a substring starting at index `start`. If `len` is provided, at most `len` characters are returned.
 
-```sis
+```c
 string.substr("hello world", 6);    // "world"
 string.substr("hello world", 6, 3); // "wor"
 ```
@@ -106,7 +106,7 @@ string.substr("hello world", 6, 3); // "wor"
 
 Replaces every occurrence of `from` in `s` with `to`.
 
-```sis
+```c
 string.replace("aabbcc", "b", "x"); // "aaxxcc"
 ```
 
@@ -120,7 +120,7 @@ string.replace("aabbcc", "b", "x"); // "aaxxcc"
 
 Splits `s` into an array of substrings, cutting at each occurrence of `delimiter`.
 
-```sis
+```c
 string.split("a,b,c", ","); // ["a", "b", "c"]
 ```
 
@@ -130,7 +130,7 @@ string.split("a,b,c", ","); // ["a", "b", "c"]
 
 Joins an array of strings into a single string, inserting `delimiter` between each element.
 
-```sis
+```c
 string.join(["a", "b", "c"], "-"); // "a-b-c"
 ```
 
@@ -144,14 +144,14 @@ string.join(["a", "b", "c"], "-"); // "a-b-c"
 
 Replaces each `{}` placeholder in `template` with the next argument, in order.
 
-```sis
+```c
 string.format("Hello, {}! You are {} years old.", "Alice", 30);
 // "Hello, Alice! You are 30 years old."
 ```
 
 Use `{{` and `}}` to include a literal brace in the output.
 
-```sis
+```c
 string.format("{{{}}}",  "x"); // "{x}"
 ```
 
@@ -161,7 +161,7 @@ string.format("{{{}}}",  "x"); // "{x}"
 
 ## Example
 
-```sis
+```c
 include "string";
 
 pin csv = "alice,30,engineer";
