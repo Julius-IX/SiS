@@ -1,4 +1,6 @@
 # SiS (SiS interprets Scripts)
+<!-- (/.__.)/ \(.__.\) -->
+<!-- Between you and me the original name of SiS was "Shit Script" -->
 
 SiS is a lightweight scripting language with a C-like syntax, first-class functions, classes, and an extremely minimal standard library of C++ native extensions.
 
