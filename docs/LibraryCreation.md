@@ -18,7 +18,7 @@ For a deeper dive into the workings keep reading. For clarity no convenience mac
 ##### Entry Point
 First the library needs to make itself known to SiS by providing an entry point:
 
-```Cpp
+```c
 extern "C" void sis_module_init(eval::SisRegistry* reg) {
   // This will contain all the links to the functions, classes and variables.
 }
@@ -28,7 +28,7 @@ This is the main handle for registering all exposed functions, classes and varia
 
 `eval::SisRegistry` has three functions:
 
-```Cpp
+```c
 void defineVariable(const std::string& name, eval::Value value);
 void defineFn(const char* name, std::function<Value(std::vector<Value>&)> fn, std::string docs_string = "");
 NativeClassBuilder defineClass(const char* name, std::string docs_string = "");
@@ -44,7 +44,7 @@ It is suggested to rely on the implicit conversions for basic return types. Plea
 `defineVariable` is mainly used to expose global variables to SiS, but keep in mind that SiS does not enforce immutability on them.
 Example of variable registration:
 
-```Cpp
+```c
 extern "C" void sis_module_init(eval::SisRegistry* reg) {
   reg->defineVariable("PI", M_PI);
 }
@@ -62,7 +62,7 @@ Arguments passed from SiS are provided in a single `std::vector` which are unpac
 
 Example of a simple native function:
 
-```Cpp
+```c
 static eval::Value add(std::vector<eval::Value>& args) {
   if (args.size() != 2) throw std::runtime_error("add() expects 2 arguments");
 
@@ -97,7 +97,7 @@ Native classes let you back a SiS class with a real C++ object. The general patt
 
 `defineClass` returns a `NativeClassBuilder` with the following API, all methods return `*this` to allow chaining:
 
-```Cpp
+```c
 NativeClassBuilder& docs(std::string text);
 NativeClassBuilder& constructor(std::function<void(std::shared_ptr<Instance>, std::vector<Value>&)> ctor);
 NativeClassBuilder& method(const char* name, std::function<Value(std::shared_ptr<Instance>, std::vector<Value>&)> fn);
@@ -114,7 +114,7 @@ The approach is to store a `shared_ptr` to the C++ object inside a special `__na
 
 In full, without any convenience macros:
 
-```Cpp
+```c
 .constructor([](std::shared_ptr<eval::Instance> inst, std::vector<eval::Value>& args) {
   double initial = args.empty() ? 0.0 : /* extract from args */;
 
@@ -144,7 +144,7 @@ In full, without any convenience macros:
 
 Recovering the pointer in a method works by reversing the process:
 
-```Cpp
+```c
 static std::shared_ptr<NativeCounter> getCounter(const std::shared_ptr<eval::Instance>& inst) {
   auto it = inst->fields->find("__native");
   if (it == inst->fields->end())
@@ -166,7 +166,7 @@ This boilerplate is exactly what `SIS_NATIVE_CTOR` and `SIS_GET_NATIVE` from [Si
 
 ##### Full Example
 
-```Cpp
+```c
 class NativeCounter {
   public:
   explicit NativeCounter(double initial) : m_value(initial) {}
@@ -225,7 +225,7 @@ print(c.value()); // 0
 
 Default field values can be registered with `.field()`. These are set on every new instance before the constructor runs, the same as AST-declared fields. The `__native` field in the example above is registered this way as a `null` placeholder that the constructor then overwrites.
 
-```Cpp
+```c
 .field("label", eval::Value{std::string("default")})
 ```
 
@@ -235,7 +235,7 @@ Fields are readable and writable from SiS like any other instance field.
 
 Documentation strings are optional throughout. `defineFn` and `defineClass` accept one as their last argument. For methods and constructors on a `NativeClassBuilder`, a `.docs()` call placed **before** the item it describes buffers the string and stamps it onto the next `.constructor()` or `.method()` call.
 
-```Cpp
+```c
 reg->defineFn("add", fnAdd,
     "@brief Adds two numbers.\n"
     "@param a The first number.\n"
@@ -257,7 +257,7 @@ reg->defineClass("Counter", "@brief A simple counter class.")
 
 Documentation strings are stored at runtime and accessible from SiS via the `__docs__` field on any function, method, or class value:
 
-```Cpp
+```c
 print(Counter.__docs__);
 print(Counter.increment.__docs__);
 ```
@@ -281,7 +281,7 @@ But more importantly because it looks nice.
 | `requireClass(val, ctx)`      | `std::shared_ptr<eval::Class>`    |
 | `requireInstance(val, ctx)`   | `std::shared_ptr<eval::Instance>` |
 
-```Cpp
+```c
 double x = requireNum(args[0], "myFn");
 std::string s = requireStr(args[1], "myFn");
 ```

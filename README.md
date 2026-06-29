@@ -6,7 +6,7 @@ SiS is a lightweight scripting language with a C-like syntax, first-class functi
 
 ## Quick Look
 
-```Cpp
+```c
 include "math";
 include "string" as str;
 
@@ -66,7 +66,7 @@ Set `$SIS_PATH` to the directory where SiS is installed. The interpreter looks f
 
 Import libraries with `include`. Omit the file extension for standard library modules.
 
-```cpp
+```c
 include "math";
 print(math.sqrt(144)); // 12
 ```
@@ -89,7 +89,7 @@ Full documentation for each library is in [docs/stdlib/](docs/stdlib/).
 
 SiS loads native extensions from shared libraries (`.so` / `.dll`). Write your extension in C++, implement `sis_module_init`, and drop the compiled library into `$SIS_PATH/lib/dynamic/`.
 
-```cpp
+```c
 #include <SisDynamicLibMacros.h>
 
 FN_SIGNATURE(fnAdd, args) {
@@ -110,7 +110,7 @@ g++ -std=c++23 -shared -fPIC \
     -o $SIS_PATH/lib/dynamic/mylib.so
 ```
 
-```Cpp
+```c
 include "mylib";
 print(mylib.add(1, 2)); // 3
 ```

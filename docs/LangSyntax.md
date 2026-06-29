@@ -24,7 +24,7 @@ Most syntax is similar to C, mostly omitting typing and other more complex featu
 
 Comments are C-styled, `//` for single-line and `/*` and `*/` for multi-line.
 
-```Cpp
+```c
 // This is a comment
 pin x = 10; // Inline comment
 ```
@@ -32,7 +32,7 @@ pin x = 10; // Inline comment
 Doc comments use `///` and must appear directly before a named `fn` or `class` declaration. They attach documentation to that declaration.
 The comment content is directly accessible as a string by using the `.__doc__` property.
 
-```Cpp
+```c
 /// Adds two numbers together.
 fn add(a, b) {
     return a + b;
@@ -72,7 +72,7 @@ All numbers are floating-point (`double` internally). There is no separate integ
 
 Use `pin` to declare a variable. All variables are mutable after declaration.
 
-```Cpp
+```c
 pin x = 10;
 pin name = "Alice";
 pin nothing; // Initializes to null
@@ -80,7 +80,7 @@ pin nothing; // Initializes to null
 
 Reassignment does not use `pin`.
 
-```Cpp
+```c
 pin x = 5;
 x = 20; // x is now 20
 x += 3; // x is now 23
@@ -88,7 +88,7 @@ x += 3; // x is now 23
 
 Variable scope is lexical. A variable declared inside a block is not accessible outside it.
 
-```Cpp
+```c
 fn foo() {
     pin inner = 42;
 }
@@ -113,7 +113,7 @@ Division by zero throws a runtime error.
 
 `+` also concatenates strings. If either operand is a string, both sides are converted to strings and joined.
 
-```Cpp
+```c
 pin result = "Score: " + 42; // "Score: 42"
 ```
 
@@ -157,7 +157,7 @@ Arrays, classes, and instances compare by identity (same object in memory), not 
 
 Ternary operations are structured as `condition ? if_true : if_false`.
 
-```Cpp
+```c
 pin label = score > 50 ? "pass" : "fail";
 ```
 
@@ -167,7 +167,7 @@ pin label = score > 50 ? "pass" : "fail";
 
 ### if / else
 
-```Cpp
+```c
 if (x > 0) {
     print("positive");
 } else if (x < 0) {
@@ -181,7 +181,7 @@ The condition must be wrapped in parentheses. Braces are required.
 
 ### while
 
-```Cpp
+```c
 pin i = 0;
 while (i < 5) {
     print(i);
@@ -193,7 +193,7 @@ while (i < 5) {
 
 The `for` loop has three optional clauses: initializer, condition, and increment.
 
-```Cpp
+```c
 for (pin i = 0; i < 10; i += 1) {
     print(i);
 }
@@ -201,7 +201,7 @@ for (pin i = 0; i < 10; i += 1) {
 
 All three clauses are optional. Omitting the condition makes the loop run forever until a `break`.
 
-```Cpp
+```c
 for (;;) {
     // runs forever
 }
@@ -211,7 +211,7 @@ for (;;) {
 
 `switch` compares a subject against a series of `case` values. Cases fall through by default, so use `break` to stop after a match.
 
-```Cpp
+```c
 switch (status) {
     case 0:
         print("idle");
@@ -231,7 +231,7 @@ switch (status) {
 
 `break` exits the nearest enclosing loop or switch. `continue` skips the rest of the current iteration and moves to the next.
 
-```Cpp
+```c
 for (pin i = 0; i < 10; i += 1) {
     if (i == 5) { break; }
     if (i % 2 == 0) { continue; }
@@ -247,7 +247,7 @@ for (pin i = 0; i < 10; i += 1) {
 
 Functions are first-class values. You can assign them to variables or pass them as arguments.
 
-```Cpp
+```c
 pin square = fn(x) { return x * x; };
 print(square(5)); // 25
 ```
@@ -255,7 +255,7 @@ print(square(5)); // 25
 
 Named functions are syntax sugar for anonymous functions. Internally they are treated the same way as `pin name = fn(args) { /* body */ };`.
 
-```Cpp
+```c
 fn greet(name) {
     return "Hello, " + name + "!";
 }
@@ -267,7 +267,7 @@ print(greet("Alice")); // Hello, Alice!
 
 Functions capture the scope they are defined in.
 
-```Cpp
+```c
 fn makeCounter() {
     pin count = 0;
     return fn() {
@@ -294,7 +294,7 @@ Arrays are ordered key-value stores. They can act as lists, dictionaries, or a m
 
 ### List syntax
 
-```Cpp
+```c
 pin fruits = ["apple", "banana", "cherry"];
 print(fruits[0]); // apple
 fruits[1] = "blueberry";
@@ -304,14 +304,14 @@ Unkeyed elements get auto-assigned numeric keys starting at `0`.
 
 ### Dictionary syntax
 
-```Cpp
+```c
 pin person = ["name": "Alice", "age": 30];
 print(person["name"]); // Alice
 ```
 
 ### Mixed syntax
 
-```Cpp
+```c
 pin data = [10, 20, "key": 99, 30];
 // Numeric keys: 0 -> 10, 1 -> 20, 2 -> 30
 // String key:   "key" -> 99
@@ -321,7 +321,7 @@ Numeric auto-keys only count unkeyed entries. Keyed entries do not advance the c
 
 ### Nested arrays
 
-```Cpp
+```c
 pin matrix = [[1, 2], [3, 4]];
 print(matrix[0][1]); // 2
 ```
@@ -330,7 +330,7 @@ print(matrix[0][1]); // 2
 
 Arrays have reference semantics. Assigning an array to a new variable creates an alias, not a copy.
 
-```Cpp
+```c
 pin a = [1, 2, 3];
 pin b = a;
 b[0] = 99;
@@ -343,7 +343,7 @@ print(a[0]); // 99 -- same array
 
 ### Declaration
 
-```Cpp
+```c
 class Animal {
     pin name = null;
     pin sound = "...";
@@ -362,7 +362,7 @@ Fields are declared with `pin` inside the class body. Methods are declared with 
 
 ### Instantiation
 
-```Cpp
+```c
 pin a = new Animal("Cat");
 a.speak(); // Cat says ...
 ```
@@ -374,7 +374,7 @@ Use `new ClassName(args)` to create an instance. Access fields and methods with 
 Inside a method, use `this->field` to access fields and `this->method()` to call other methods on the same instance.
 Using `this.field` is not valid and will throw an error, the `->` operator is mandatory.
 
-```Cpp
+```c
 fn greet() {
     return "Hi, I am " + this->name;
 }
@@ -384,7 +384,7 @@ fn greet() {
 
 ### Inheritance
 
-```Cpp
+```c
 class Dog extends Animal {
     fn constructor(name) {
         super->constructor(name);
@@ -407,7 +407,7 @@ Field defaults from the parent class are applied before the child's constructor 
 
 Use `include` to load another file. Include statements must appear at the top of the file, before any other code.
 
-```Cpp
+```c
 include "utils.sis";           // loads utils.sis as `utils` namespace
 include "helpers.sis" as hlp;  // loads helpers.sis as `hlp` namespace
 ```
@@ -418,7 +418,7 @@ For example, if `utils.sis` defines `fn add(a, b)`, you call it as `utils.add(1,
 For classes in a namespace, use `new namespace.ClassName()`.
 Nested access to namespaces is not supported.
 
-```Cpp
+```c
 include "math";
 pin v = new math.Vector(1, 2);
 ```
@@ -443,7 +443,7 @@ The following standard libraries are available:
 | `string` | `string`          | String manipulation utilities            |
 | `time`   | `time`            | Date, time, and timing utilities         |
 
-```Cpp
+```c
 include "math";
 print(math.sqrt(16)); // 4
 ```
@@ -461,7 +461,7 @@ These functions are available everywhere without any import.
 
 Prints all arguments to stdout, separated by spaces, followed by a newline.
 
-```Cpp
+```c
 print("hello", "world"); // hello world
 print(42);               // 42
 ```
@@ -470,7 +470,7 @@ print(42);               // 42
 
 Returns the length of a string or array.
 
-```Cpp
+```c
 len("hello");       // 5
 len([1, 2, 3]);     // 3
 ```
@@ -479,7 +479,7 @@ len([1, 2, 3]);     // 3
 
 Returns the type name of a value as a string.
 
-```Cpp
+```c
 type(42);       // "num"
 type("hello");  // "string"
 type(null);     // "null"
@@ -490,7 +490,7 @@ type([]);       // "array"
 
 Converts a value to its string representation.
 
-```Cpp
+```c
 str(3.14);  // "3.14"
 str(true);  // "true"
 str(null);  // "null"
@@ -500,7 +500,7 @@ str(null);  // "null"
 
 Converts a string, bool, or number to a number. Throws if the conversion fails.
 
-```Cpp
+```c
 num("42");   // 42
 num(true);   // 1
 num(false);  // 0
@@ -510,7 +510,7 @@ num(false);  // 0
 
 Appends a value to an array and returns the array. The new element gets the next available numeric key.
 
-```Cpp
+```c
 pin arr = [1, 2];
 push(arr, 3); // arr is now [1, 2, 3]
 ```
@@ -519,7 +519,7 @@ push(arr, 3); // arr is now [1, 2, 3]
 
 Removes and returns the last element of an array. Throws if the array is empty.
 
-```Cpp
+```c
 pin arr = [1, 2, 3];
 pin last = pop(arr); // last = 3, arr = [1, 2]
 ```
@@ -528,7 +528,7 @@ pin last = pop(arr); // last = 3, arr = [1, 2]
 
 Reads a line of input from stdin. If a prompt string is provided, it is printed first with no newline.
 
-```Cpp
+```c
 pin name = read("Enter your name: ");
 print("Hello, " + name);
 ```
@@ -548,7 +548,7 @@ Each returns a `bool`.
 | `isClass(v)`    | a class                          |
 | `isInstance(v)` | a class instance                 |
 
-```Cpp
+```c
 isNum(42);       // true
 isString(42);    // false
 isNull(null);    // true
