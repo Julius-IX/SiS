@@ -155,6 +155,7 @@ namespace par {
   // fn(x, y) { ... } body is always a Block
   struct FnLiteral final : Node {
     static constexpr NodeType TYPE = NodeType::FN_LITERAL;
+    std::string docs;
     std::vector<std::string> params;
     std::unique_ptr<Node> body;
     FnLiteral(std::vector<std::string> params, std::unique_ptr<Node> body)
@@ -248,6 +249,7 @@ namespace par {
   struct ClassDecl final : Node {
     static constexpr NodeType TYPE = NodeType::CLASS_DECL;
     std::string name;
+    std::string docs;
     std::string parent_name; // empty if no extends
     std::vector<std::unique_ptr<VarDecl>> fields;
     std::vector<std::unique_ptr<FnLiteral>> methods;

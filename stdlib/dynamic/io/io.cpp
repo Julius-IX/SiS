@@ -199,44 +199,111 @@ class File {
 };
 
 SIS_MODULE_INIT(reg) {
-  reg->defineFn("makeFile", makeFile);
-  reg->defineFn("readFile", readFile);
-  reg->defineFn("writeToFile", writeToFile);
-  reg->defineFn("appendToFile", appendToFile);
-  reg->defineFn("doesFileExist", doesFileExist);
-  reg->defineFn("deleteFile", deleteFile);
-  reg->defineFn("mkdir", mkdir);
-  reg->defineFn("listDir", listDir);
-  reg->defineFn("isFile", isFile);
-  reg->defineFn("isDir", isDir);
+  reg->defineFn("makeFile",
+                makeFile,
+                "@brief Creates an empty file at the given path.\n"
+                "@param path Path to the file to create.\n"
+                "@return true on success.\n"
+                "@note Equivalent to the `touch` command. Does not fail if the file already exists.");
+  reg->defineFn("readFile",
+                readFile,
+                "@brief Reads the entire contents of a file into a string.\n"
+                "@param path Path to the file.\n"
+                "@return The file contents as a string.\n"
+                "@throws If the file does not exist or cannot be opened.");
+  reg->defineFn("writeToFile",
+                writeToFile,
+                "@brief Overwrites a file with the given content.\n"
+                "@param path Path to the file.\n"
+                "@param content String content to write.\n"
+                "@return true on success.\n"
+                "@throws If the file cannot be opened for writing.");
+  reg->defineFn("appendToFile",
+                appendToFile,
+                "@brief Appends content to the end of a file.\n"
+                "@param path Path to the file.\n"
+                "@param content String content to append.\n"
+                "@return true on success.\n"
+                "@throws If the file cannot be opened.");
+  reg->defineFn("doesFileExist",
+                doesFileExist,
+                "@brief Checks whether a file or directory exists at the given path.\n"
+                "@param path Path to check.\n"
+                "@return true if the path exists, false otherwise.");
+  reg->defineFn("deleteFile",
+                deleteFile,
+                "@brief Deletes the file at the given path.\n"
+                "@param path Path to the file to delete.\n"
+                "@return true if the file was deleted, false if it did not exist.");
+  reg->defineFn("mkdir",
+                mkdir,
+                "@brief Creates a directory and any missing parent directories.\n"
+                "@param path Path of the directory to create.\n"
+                "@return true if the directory was created, false if it already existed.");
+  reg->defineFn("listDir",
+                listDir,
+                "@brief Lists the entries in a directory.\n"
+                "@param path Path to the directory.\n"
+                "@return An array of path strings for each entry in the directory.\n"
+                "@throws If the path does not exist or is not a directory.");
+  reg->defineFn("isFile",
+                isFile,
+                "@brief Checks whether the given path points to a regular file.\n"
+                "@param path Path to check.\n"
+                "@return true if path is a regular file, false otherwise.");
+  reg->defineFn("isDir",
+                isDir,
+                "@brief Checks whether the given path points to a directory.\n"
+                "@param path Path to check.\n"
+                "@return true if path is a directory, false otherwise.");
 
   // clang-format off
-  SIS_NATIVE_CLASS_BEGIN(reg, "File", File).constructor([](std::shared_ptr<eval::Instance> inst, std::vector<eval::Value>& args) {
+  SIS_NATIVE_CLASS_BEGIN(reg, "File", File, "@brief A handle to an open file supporting read, write, and line-by-line iteration.")
+    .docs("@brief Opens the file at the given path for reading and writing.\n"
+          "@param path Path to the file to open.\n"
+          "@throws If the file does not exist or cannot be opened.")
+    .constructor([](std::shared_ptr<eval::Instance> inst, std::vector<eval::Value>& args) {
     std::string path = requireStr(args[0], "File()");
     SIS_NATIVE_CTOR(File, inst, native_var, path);
     })
+    .docs("@brief Reads the entire file contents from the beginning.\n"
+          "@return The file contents as a string.")
     .NATIVE_METHOD("read", inst, args, {
         if (args.size() > 1) throw std::runtime_error("File.read(): expected 0 arguments, got " + std::to_string(args.size()));
         return {SIS_GET_NATIVE(File, inst)->read()};
     })
+    .docs("@brief Overwrites the file with the given content, starting from the beginning.\n"
+          "@param content String content to write.\n"
+          "@return true on success.")
     .NATIVE_METHOD("write", inst, args, {
       if (args.size() < 1 && args.size() < 2) throw std::runtime_error("File.write(): expected 1 argument, got " + std::to_string(args.size()));
       std::string content = requireStr(args[0], "File.write");
       return {SIS_GET_NATIVE(File, inst)->write(content)};
     })
+    .docs("@brief Reads the next unread line from the file.\n"
+          "@return The next line as a string, without a trailing newline.\n"
+          "@note Use hasLines() to check if lines remain before calling.")
     .NATIVE_METHOD("readLine", inst, args, {
       if (args.size() > 1) throw std::runtime_error("File.readLine(): expected 0 arguments, got " + std::to_string(args.size()));
       return {SIS_GET_NATIVE(File, inst)->readLine()};
     })
+    .docs("@brief Appends content to the end of the file.\n"
+          "@param content String content to append.\n"
+          "@return true on success.")
     .NATIVE_METHOD("append", inst, args, {
       if (args.size() < 1 && args.size() < 2) throw std::runtime_error("File.append(): expected 1 argument, got " + std::to_string(args.size()));
       std::string content = requireStr(args[0], "File.append");
       return {SIS_GET_NATIVE(File, inst)->append(content)};
     })
+    .docs("@brief Closes the file handle.\n"
+          "@return true on success.\n"
+          "@note The file is also closed automatically when the instance is garbage collected.")
     .NATIVE_METHOD("close", inst, args, {
       if (args.size() > 1) throw std::runtime_error("File.close(): expected 0 arguments, got " + std::to_string(args.size()));
       return {SIS_GET_NATIVE(File, inst)->close()};
     })
+    .docs("@brief Checks whether there are unread lines remaining in the file.\n"
+          "@return true if at least one line remains, false otherwise.")
     .NATIVE_METHOD("hasLines", inst, args, {
       if (args.size() > 1) throw std::runtime_error("File.hasLines(): expected 0 arguments, got " + std::to_string(args.size()));
       return {SIS_GET_NATIVE(File, inst)->hasLines()};

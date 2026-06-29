@@ -9,7 +9,7 @@
 namespace eval {
   // A scope: maps variable names to values, with an optional parent scope to
   // fall back to when a name isn't found locally. That fallback chain is what
-  // gives you lexical scoping, a block or function body gets its own
+  // gives lexical scoping, a block or function body gets its own
   // Environment whose parent is the scope it was created inside.
   //
   // Held via shared_ptr because closures need to keep their defining
@@ -28,14 +28,8 @@ namespace eval {
 
     [[nodiscard]] std::unordered_map<std::string, Value> snapshot() const { return m_values; }
 
-    // Introduces a new variable in THIS scope. Used by VarDecl and for
-    // binding function parameters. Always creates/overwrites locally, never
-    // touches a parent scope, that's what assign() is for.
     void define(const std::string& name, Value value) { m_values[name] = std::move(value); }
 
-    // Updates an EXISTING variable, searching up the parent chain until it's
-    // found. Returns false if the name was never declared anywhere in the
-    // chain, callers should treat that as an "undefined variable" error.
     bool assign(const std::string& name, Value value) {
       if (m_values.contains(name)) {
         m_values[name] = std::move(value);

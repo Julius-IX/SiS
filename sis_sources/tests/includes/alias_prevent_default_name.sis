@@ -1,0 +1,5 @@
+include "library.sis" as lib;
+
+pin alias_instance = new lib.LibraryClass();
+print(alias_instance.name);
+pin instance = new library.LibraryClass();

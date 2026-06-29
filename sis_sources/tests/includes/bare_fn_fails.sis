@@ -1,0 +1,2 @@
+include "library.sis";
+print(libraryAdd(1, 2));

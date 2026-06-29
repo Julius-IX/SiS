@@ -14,18 +14,13 @@ set(gtest_force_shared_crt OFF)
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE) 
 FetchContent_MakeAvailable(googletest)
 
-# cxxopts
+# linenoise
 FetchContent_Declare(
-        cxxopts
-        GIT_REPOSITORY https://github.com/jarro2783/cxxopts.git
-        GIT_TAG 44380e5 # v3.3.1 
+        linenoise
+        GIT_REPOSITORY https://github.com/antirez/linenoise.git
+        GIT_TAG 97d2850
 )
-FetchContent_MakeAvailable(cxxopts)
+FetchContent_MakeAvailable(linenoise)
 
-# spdlog
-FetchContent_Declare(
-        spdlog
-        GIT_REPOSITORY git@github.com:gabime/spdlog.git
-        GIT_TAG v1.17.0
-)
-FetchContent_MakeAvailable(spdlog)
+add_library(linenoise_lib STATIC ${linenoise_SOURCE_DIR}/linenoise.c)
+target_include_directories(linenoise_lib PUBLIC ${linenoise_SOURCE_DIR})

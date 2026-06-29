@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Environment.h>
-#include <Parser.h>
+#include <Program.h>
 #include <ParserNodeTypes.h>
 #include <SisRegistry.h>
 #include <Value.h>
@@ -42,7 +42,9 @@ namespace eval {
     // in the global environment. Returns the value of the last statement,
     // mostly useful for REPL style usage, the return value doesn't matter for
     // running a script for its side effects.
-    Value run(const par::Parser& parser);
+    Value run(const par::Program& program);
+
+    std::shared_ptr<Environment> globalEnv() const { return m_global; }
 
     private:
     const Path* m_current_eval_file;
@@ -89,8 +91,8 @@ namespace eval {
     Value cmpDouble(const par::Binary* node, const double* l, const double* r);
     Value applyCompoundOp(const par::Node* node, lex::TokenType op, const Value& current, const Value& rhs);
 
-    std::shared_ptr<Environment> loadFile(const Path& path, const par::Block& block, const std::vector<Path>& deps, Value* out_last);
-    std::shared_ptr<Environment> loadDynamicLib(const Path& path, const std::vector<Path>& deps);
+    std::shared_ptr<Environment> loadFile(const Path& path, const par::Block& block, Value* out_last);
+    std::shared_ptr<Environment> loadDynamicLib(const Path& path);
     static void mergeIntoEnv(const std::shared_ptr<Environment>& src, const std::shared_ptr<Environment>& dst);
 
     Value evaluate(const par::Node* node, const std::shared_ptr<Environment>& env);

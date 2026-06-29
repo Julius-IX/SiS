@@ -6,6 +6,7 @@
 #include <string>
 #include <unordered_map>
 #include <variant>
+#include <vector>
 
 using Path = std::filesystem::path;
 
@@ -54,6 +55,8 @@ namespace lex {
     SEMICOLON,
     ARROW,
 
+    AS,
+    DOC_COMMENT,
     COMMENT,
   } TokenType;
   // clang-format on
@@ -69,12 +72,11 @@ namespace lex {
     size_t column;
     size_t length;
 
-    [[nodiscard]] bool equivalent(const Token& other) const {
-      return this->type == other.type && this->value == other.value;
-    }
+    [[nodiscard]] bool equivalent(const Token& other) const { return this->type == other.type && this->value == other.value; }
 
     auto operator<=>(const Token&) const = delete;
     bool operator==(const Token& other) const {
+      // clang-format off
       return 
         this->type == other.type &&
         this->value == other.value &&
@@ -82,10 +84,17 @@ namespace lex {
         this->line == other.line &&
         this->column == other.column &&
         this->length == other.length;
+      // clang-format on
     }
   } Token;
 
+  // A fully materialized token sequence produced by Lexer::tokenize().
+  // Owning, contiguous, and EOF-terminated (last element always has type SIS_EOF).
+  // This is the handoff type between the lexing and parsing stages.
+  using TokenStream = std::vector<Token>;
+
   inline TokenType lookupIdentifier(const std::string& identifier) {
+    // clang-format off
     static std::unordered_map<std::string, TokenType> keywords = {
       {"true", TRUE}, {"false", FALSE},   {"null", SIS_NULL},
 
@@ -93,8 +102,9 @@ namespace lex {
       {"case", CASE}, {"return", RETURN}, {"break", BREAK},     {"continue", CONTINUE}, {"default", DEFAULT},
 
       {"fn", FN},     {"pin", PIN},       {"class", CLASS},     {"extends", EXTENDS},   {"new", NEW},
-      {"this", THIS}, {"super", SUPER},   {"include", INCLUDE},
+      {"this", THIS}, {"super", SUPER},   {"include", INCLUDE}, {"as", AS}
     };
+    // clang-format on
 
     auto keyword_it = keywords.find(identifier);
     if (keyword_it != keywords.end()) {
@@ -172,6 +182,8 @@ namespace lex {
       case SEMICOLON: return "SEMICOLON";
       case ARROW: return "ARROW";
 
+      case AS: return "AS";
+      case DOC_COMMENT: return "DOC_COMMENT";
       case COMMENT: return "COMMENT";
 
       default: return fmt::format("Invalid Token Type received: {}", static_cast<int>(token.type));

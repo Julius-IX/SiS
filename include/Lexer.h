@@ -1,6 +1,5 @@
 #pragma once
 
-#include <Logging.h>
 #include <Token.h>
 #include <cassert>
 #include <string>
@@ -17,7 +16,6 @@ namespace lex {
 
     void append(const Token& token) {
       if (count > CAPACITY) {
-        LOG_ERROR("TokenBuffer overflow");
         throw std::logic_error("TokenBuffer overflow");
       }
 
@@ -27,7 +25,6 @@ namespace lex {
 
     Token pop() {
       if (count < 0) {
-        LOG_ERROR("TokenBuffer overflow");
         throw std::logic_error("TokenBuffer underflow");
       }
 
@@ -68,6 +65,11 @@ namespace lex {
       if (!this->m_input.empty()) this->m_state.current_char = this->m_input[0];
 
       m_state.current_char = m_input.size() > 0 ? m_input[0] : '\0';
+      if (m_input.size() >= 2 && m_input[0] == '#' && m_input[1] == '!') {
+        while (m_state.pos < m_input.size() && m_input[m_state.pos] != '\n') {
+          advanceState();
+        }
+      }
       for (size_t i = 0; i < TokenBuffer::CAPACITY; ++i) {
         fillBuffer();
       }
@@ -77,8 +79,19 @@ namespace lex {
     [[nodiscard]] Token nextToken();
     [[nodiscard]] const Token& peekToken(const unsigned short index = 1) const noexcept { return m_buffer.peek(index); }
 
+    [[nodiscard]] TokenStream tokenize();
+
+    [[nodiscard]] std::unordered_map<size_t, std::string> takeLineCache() { return std::move(m_line_cache); }
+
     void newInput(std::string input) {
       reset();
+
+      if (m_input.size() >= 2 && m_input[0] == '#' && m_input[1] == '!') {
+        while (m_state.pos < m_input.size() && m_input[m_state.pos] != '\n') {
+          advanceState();
+        }
+      }
+
       this->m_input = std::move(input);
       if (!this->m_input.empty()) this->m_state.current_char = this->m_input[0];
 
@@ -133,6 +146,12 @@ namespace lex {
 
     void fillBuffer();
     void advanceState();
+    void advanceState(uint32_t multiplier) {
+      assert(multiplier > 0 && "multiplier must be greater than 0");
+      for (uint32_t i = 0; i < multiplier; ++i) {
+        advanceState();
+      }
+    }
     void consumeSpace();
     void skipComment(const char& current_char, const char& next_char);
 
@@ -150,6 +169,11 @@ namespace lex {
 
     [[nodiscard]] TypeValuePair parseComment(const char* next_char);
     [[nodiscard]] TypeValuePair parseString();
+    [[nodiscard]] TypeValuePair parseDocComment();
+
+    [[nodiscard]] bool isThisLineDocComment() {
+      return m_state.current_char == '/' && peekChar() == '/' && peekChar(1) == '/';
+    }
   };
 
   [[nodiscard]] static bool isNum(const char& c /* NOLINT */) noexcept { return (c >= '0' && c <= '9'); }

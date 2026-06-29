@@ -5,10 +5,9 @@
 namespace lex {
   DoubleSymbolTable Lexer::s_symbol_table = initSymbolTable();
 
-  /* the keys in 'table' can either consist of one or two chars
-   * '\0' will represent the key to the default TokenType of the first char
-   * if said char is not followed by a second character that could be part of the token
-   */
+  // the keys in 'table' can either consist of one or two chars
+  // '\0' will represent the key to the default TokenType of the first char
+  // if said char is not followed by a second character that could be part of the token
   DoubleSymbolTable Lexer::initSymbolTable() {
     DoubleSymbolTable table;
 
@@ -38,6 +37,9 @@ namespace lex {
       advanceState();
     } else {
       const TokenType& tok_type = table.at('\0');
+      if (tok_type == SLASH && isThisLineDocComment()) {
+        return parseDocComment(); // ['/', '/', '/'] 0 = current_char, 1 = next_char, 2 = next_next_char
+      }
 
       if (tok_type == ILLEGAL) {
         tvp.second = std::string{this->m_state.current_char};
@@ -47,6 +49,36 @@ namespace lex {
     }
 
     return tvp;
+  }
+
+  // ['/', '/', '/'] 0 = current_char, 1 = next_char, 2 = next_next_char
+  TypeValuePair Lexer::parseDocComment() {
+    advanceState(3); // consume '///'
+    uint32_t start_pos = this->m_state.pos;
+    uint32_t line = this->m_state.line;
+    std::string comment_str;
+
+    while (stateIsNotAtEof()) {
+      // Stop BEFORE consuming the newline peek at it
+      if (this->m_state.current_char == '\n') {
+        comment_str += this->m_input.substr(start_pos, this->m_state.pos - start_pos);
+
+        // peek ahead: is the next line also a doc comment?
+        // current_char='\n', peekChar()='/', peekChar(1)='/', peekChar(2)='/'
+        if (peekChar() == '/' && peekChar(1) == '/' && peekChar(2) == '/') {
+          comment_str += '\n';
+          advanceState(4); // consume '\n///'
+          line = this->m_state.line;
+          start_pos = this->m_state.pos;
+        } else {
+          // Leave current_char on '\n' fillBuffer() will advance past it
+          return {DOC_COMMENT, comment_str};
+        }
+      }
+
+      advanceState();
+    }
+    return {DOC_COMMENT, comment_str};
   }
 
   void Lexer::advanceState() {
@@ -75,14 +107,18 @@ namespace lex {
     const char& cc = this->m_state.current_char;
 
     const char& next_char = peekChar();
-    if (cc == '/' && (next_char == '*' || next_char == '/')) {
+    const char& next_next_char = peekChar(1);
+
+    if (cc == '/' && (next_char == '*' || next_char == '/') && next_next_char != '/') {
       skipComment(cc, next_char);
     }
 
     while (stateIsNotAtEof() && isSpace(cc)) {
       advanceState();
       const char& next_char = peekChar();
-      if (cc == '/' && (next_char == '*' || next_char == '/')) {
+      const char& next_next_char = peekChar(1);
+
+      if (cc == '/' && (next_char == '*' || next_char == '/') && next_next_char != '/') {
         skipComment(cc, next_char);
       }
     }
@@ -102,18 +138,15 @@ namespace lex {
         current_next_pair[1] = peekChar();
       }
 
-      /* Two more times to get rid of block comment terminator
-       * no need to wrap in if block
-       * advanceState() prevents going past m_input.size();
-       */
-      advanceState();
-      advanceState();
+      // Two more times to get rid of block comment terminator
+      // no need to wrap in if block
+      // advanceState() prevents going past m_input.size();
+      advanceState(2);
     }
   }
 
-  /* default offset is 0 and grabs the char after the current one
-   * offset of 1 will grab the char after that etc etc
-   */
+  // default offset is 0 and grabs the char after the current one
+  // offset of 1 will grab the char after that etc etc
   char Lexer::peekChar(uint32_t offset) const noexcept {
     if ((this->m_state.next_pos + offset) >= this->m_input.length()) {
       return '\0';
@@ -121,7 +154,6 @@ namespace lex {
     return this->m_input[this->m_state.next_pos + offset];
   }
 
-  /* incoming segfault */
   TypeValuePair Lexer::parseNum() {
     const size_t start_index = this->m_state.pos;
     TypeValuePair tvp{ILLEGAL, {}};
@@ -167,7 +199,6 @@ namespace lex {
     return tvp;
   }
 
-  /* incoming segfault */
   TypeValuePair Lexer::parseIdent() {
     const size_t start_index = this->m_state.pos;
     TypeValuePair tvp{ILLEGAL, "FAILED TO PARSE IDENTIFIER"};
@@ -336,5 +367,15 @@ namespace lex {
     Token token = m_buffer.pop();
     fillBuffer();
     return token;
+  }
+
+  TokenStream Lexer::tokenize() {
+    TokenStream tokens;
+    Token tok;
+    do {
+      tok = nextToken();
+      tokens.push_back(tok);
+    } while (tok.type != TokenType::SIS_EOF);
+    return tokens;
   }
 } // namespace lex

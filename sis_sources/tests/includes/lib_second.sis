@@ -1,0 +1,3 @@
+include "library.sis" as lib;
+
+pin VERSION = "2";

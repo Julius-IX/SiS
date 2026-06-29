@@ -1,17 +1,19 @@
 #include <Evaluator.h>
 #include <NativeFunctions.h>
 #include <Token.h>
+
 #include <algorithm>
 #include <cmath>
 #include <iostream>
 #include <print>
 #include <ranges>
-#include <spdlog/fmt/fmt.h>
 #include <stdexcept>
 
 #ifdef _WIN32
 #include <windows.h>
 #endif
+
+#include <spdlog/fmt/fmt.h>
 
 namespace eval {
   static bool isAssignmentOperator(lex::TokenType type) {
@@ -30,7 +32,7 @@ namespace eval {
   // When m_call_stack is non-empty, appends a call trace so the error shows
   // not just WHERE something blew up but also the chain of calls that got
   // there. Frames are printed innermost-first (most recent call at the top),
-  // which matches every mainstream language's stack trace convention.
+  // this is to match every mainstream language's stack trace convention.
   void Evaluator::throwKnownScopeErr(const par::Node* node, std::string msg) {
     std::string full;
     if (node == nullptr) {
@@ -92,17 +94,6 @@ namespace eval {
       a.data);
   }
 
-  // ---------------------------------------------------------------------
-  // Built-in functions
-  //
-  // This is the single place to register a native function: build a
-  // NativeFunction and env->define() it into the global scope. Every
-  // built-in receives already-evaluated arguments as a vector<Value>& and
-  // returns a Value, exactly the same calling convention evalCall uses for
-  // user-defined functions, so from the language's point of view there's no
-  // visible difference between print(...) and a function someone wrote
-  // themselves.
-  // ---------------------------------------------------------------------
   void Evaluator::registerBuiltins(const std::shared_ptr<Environment>& env) {
     for (const auto& [name, fn] : native_functions) {
       env->define(name, Value(fn));
@@ -120,17 +111,12 @@ namespace eval {
     }
   }
 
-  std::shared_ptr<Environment> Evaluator::loadFile(const Path& path, const par::Block& block, const std::vector<Path>& deps, Value* out_last) {
-    LOG_DEBUG_FLUSH("loading .sis file");
+  std::shared_ptr<Environment> Evaluator::loadFile(const Path& path, const par::Block& block, Value* out_last) {
     if (auto it = m_file_cache.find(path); it != m_file_cache.end()) {
       return it->second;
     }
 
     auto file_env = std::make_shared<Environment>(m_global);
-
-    for (const Path& dep : deps) {
-      if (auto it = m_file_cache.find(dep); it != m_file_cache.end()) mergeIntoEnv(it->second, file_env);
-    }
 
     Value last{};
     for (const auto& stmt : block.statements) {
@@ -142,15 +128,10 @@ namespace eval {
     return file_env;
   }
 
-  std::shared_ptr<Environment> Evaluator::loadDynamicLib(const Path& path, const std::vector<Path>& deps) {
-    LOG_DEBUG_FLUSH("loading dynamic lib");
+  std::shared_ptr<Environment> Evaluator::loadDynamicLib(const Path& path) {
     if (auto it = m_file_cache.find(path); it != m_file_cache.end()) return it->second;
 
     auto lib_env = std::make_shared<Environment>(m_global);
-
-    for (const Path& dep : deps) {
-      if (auto it = m_file_cache.find(dep); it != m_file_cache.end()) mergeIntoEnv(it->second, lib_env);
-    }
 
 #ifdef __unix__
     void* handle = dlopen(path.c_str(), RTLD_LAZY | RTLD_GLOBAL);
@@ -199,17 +180,37 @@ namespace eval {
     return lib_env;
   }
 
-  Value Evaluator::run(const par::Parser& parser) {
+  Value Evaluator::run(const par::Program& program) {
     Value last{};
-    for (const Path& path : parser.loadOrder()) {
-      const par::State& state = parser.getState(path);
+    for (const Path& path : program.load_order) {
+      const par::ParsedFile& file = program.files.at(path);
       m_current_eval_file = &path;
 
-      bool is_dynamic = path.extension() == ".so" || path.extension() == ".dll" || path.extension() == ".dylib";
+      std::shared_ptr<Environment> file_env = file.is_dynamic ? loadDynamicLib(path) : loadFile(path, *file.ast, &last);
 
-      std::shared_ptr<Environment> file_env = is_dynamic ? loadDynamicLib(path, state.includes) : loadFile(path, *state.block, state.includes, &last);
+      if (path == program.root_path) {
+        mergeIntoEnv(file_env, m_global);
+      } else {
+        // Non-entry file: wrap its environment snapshot as a namespace Instance
+        // (klass == nullptr, pure field bag) and define it in global under the
+        // file's stem. Both scripted and dynamic files already return an
+        // Environment so no branching needed here.
+        auto fields = std::make_shared<std::unordered_map<std::string, Value>>();
+        for (auto& [name, val] : file_env->snapshot()) {
+          (*fields)[name] = val;
+        }
+        auto ns = std::make_shared<Instance>(Instance{.klass = nullptr, .fields = fields});
+        const std::string ns_name = file.alias.empty() ? path.stem().string() : file.alias;
+        m_global->define(ns_name, Value(ns));
 
-      mergeIntoEnv(file_env, m_global);
+        // Remove this file's classes from the global registry so they're only
+        // reachable via the namespace, not as bare names.
+        for (auto& [name, val] : *fields) {
+          if (std::holds_alternative<std::shared_ptr<Class>>(val.data)) {
+            m_classes.erase(name);
+          }
+        }
+      }
     }
     return last;
   }
@@ -422,18 +423,7 @@ namespace eval {
     }
   }
 
-  // Handles =, +=, -=, *=, /=, %=. Two kinds of targets:
-  //   - Identifier:   plain variable, resolved/updated through `env`.
-  //   - MemberAccess: instance.field = ... via '.' syntax, OR this->field =
-  //                   ... (super->field = ... is rejected, same as in most
-  //                   languages, you can write to your own fields but
-  //                   "assigning into the parent" doesn't mean anything
-  //                   since fields aren't per-class, they're per-instance,
-  //                   this->field and super->field refer to the SAME
-  //                   storage slot, only method lookup differs). Both forms
-  //                   mutate the instance's own field map directly, they're
-  //                   told apart by whether the MemberAccess's object child
-  //                   is a Self node.
+  // Handles =, +=, -=, *=, /=, %=
   Value Evaluator::evalAssignment(const par::Binary* node, const std::shared_ptr<Environment>& env) {
     // Plain identifier target, e.g. x = 5; x += 1;
     if (node->left->type == par::NodeType::IDENTIFIER) {
@@ -482,7 +472,8 @@ namespace eval {
       } else {
         auto it = inst_ptr->get()->fields->find(member->field);
         if (it == inst_ptr->get()->fields->end()) {
-          throwKnownScopeErr(node, "Undefined field '" + member->field + "' on instance of " + inst_ptr->get()->klass->name);
+          const std::string type_name = inst_ptr->get()->klass ? inst_ptr->get()->klass->name : "<namespace>";
+          throwKnownScopeErr(node, "Undefined field '" + member->field + "' on instance of " + type_name);
         }
         Value rhs = evaluate(node->right.get(), env);
         new_value = applyCompoundOp(node, node->operation, it->second, rhs);
@@ -577,7 +568,7 @@ namespace eval {
     return result;
   }
 
-  // Fall-through switch: once a matching case is found (or the default case
+  // Fall-through switch C-style: once a matching case is found (or the default case
   // is reached with no earlier match), every statement from there to the end
   // of the switch runs, across case boundaries, until a BreakSignal escapes
   // (an explicit `break;`) or the cases run out. valuesEqual is the same
@@ -658,7 +649,7 @@ namespace eval {
 
   // Records which source file each FnLiteral node was declared in. This is
   // the other half of the file-tracking
-  // FIX: when callFunction later executes
+  // when callFunction later executes
   // the body, it looks up the declaration here to switch m_current_eval_file
   // to the right file, so errors inside the function report the correct source
   // even if the call site is in a different file.
@@ -770,7 +761,7 @@ namespace eval {
   // instance's own runtime class.
   //
   // Resolution order: fields → AST methods → native methods.
-  // Fields always win over methods, same as before. AST methods are checked
+  // Fields always win over methods. AST methods are checked
   // before native methods so that a .sis subclass can override a native
   // method simply by declaring a method with the same name.
   //
@@ -794,11 +785,34 @@ namespace eval {
       throwKnownScopeErr(node, "String has no member '" + field + "'");
     }
 
+    if (const auto* named_fn = std::get_if<Function>(&object.data)) {
+      if (field == "__docs__") {
+        return {named_fn->declaration->docs};
+      }
+      throwKnownScopeErr(node, "Function has no member '" + field + "'");
+    }
+    
+    if (const auto* native_fn = std::get_if<NativeFunction>(&object.data)) {
+      if (field == "__docs__") {
+        return {native_fn->docs};
+      }
+      throwKnownScopeErr(node, "Native function has no member '" + field + "'");
+    }
+
     if (const auto* instance = std::get_if<std::shared_ptr<Instance>>(&object.data)) {
       // Fields take priority over methods.
       auto field_it = instance->get()->fields->find(field);
       if (field_it != instance->get()->fields->end()) {
         return field_it->second;
+      }
+      if (field == "__docs__") {
+        return {instance->get()->klass->docs};
+      }
+
+      // Namespace instances (klass == nullptr) are pure field bags.
+      // If the field wasn't found above, there's nothing more to search.
+      if (instance->get()->klass == nullptr) {
+        throwKnownScopeErr(node, "Namespace has no member '" + field + "'");
       }
 
       std::shared_ptr<Class> lookup_class = search_class ? search_class : instance->get()->klass;
@@ -888,6 +902,7 @@ namespace eval {
     auto klass = std::make_shared<Class>();
     klass->name = node->name;
     klass->declaration = node;
+    klass->docs = node->docs;
 
     if (!node->parent_name.empty()) {
       auto parent_it = m_classes.find(node->parent_name);
@@ -929,11 +944,40 @@ namespace eval {
   // constructor exists anywhere in the chain, construction succeeds with
   // only field defaults applied.
   Value Evaluator::evalNewExpr(const par::NewExpr* node, const std::shared_ptr<Environment>& env) {
-    auto class_it = m_classes.find(node->class_name);
-    if (class_it == m_classes.end()) {
-      throwKnownScopeErr(node, "Unknown class '" + node->class_name + "'");
+    std::shared_ptr<Class> klass;
+
+    const std::string& raw = node->class_name;
+    auto dot = raw.find('.');
+    if (dot == std::string::npos) {
+      // Bare name: existing path.
+      auto it = m_classes.find(raw);
+      if (it == m_classes.end()) {
+        throwKnownScopeErr(node, "Unknown class '" + raw + "'");
+      }
+      klass = it->second;
+    } else {
+      // Qualified name: resolve namespace Instance, then read the Class value from its fields.
+      std::string ns_name = raw.substr(0, dot);
+      std::string class_name = raw.substr(dot + 1);
+
+      auto ns_val = m_global->get(ns_name);
+      if (!ns_val) {
+        throwKnownScopeErr(node, "Unknown namespace '" + ns_name + "' in 'new " + raw + "'");
+      }
+      const auto* ns_inst = std::get_if<std::shared_ptr<Instance>>(&ns_val->data);
+      if (ns_inst == nullptr) {
+        throwKnownScopeErr(node, "'" + ns_name + "' is not a namespace");
+      }
+      auto field_it = (*ns_inst)->fields->find(class_name);
+      if (field_it == (*ns_inst)->fields->end()) {
+        throwKnownScopeErr(node, "Namespace '" + ns_name + "' has no member '" + class_name + "'");
+      }
+      const auto* class_val = std::get_if<std::shared_ptr<Class>>(&field_it->second.data);
+      if (class_val == nullptr) {
+        throwKnownScopeErr(node, "'" + raw + "' is not a class");
+      }
+      klass = *class_val;
     }
-    std::shared_ptr<Class> klass = class_it->second;
 
     auto fields = std::make_shared<std::unordered_map<std::string, Value>>();
     auto instance = std::make_shared<Instance>(Instance{.klass = klass, .fields = fields});

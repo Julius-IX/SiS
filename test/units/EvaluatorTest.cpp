@@ -1,30 +1,45 @@
 #include <Evaluator.h>
 #include <Parser.h>
+#include <Program.h>
 #include <Value.h>
+
 #include <gtest/gtest.h>
 
 #include <spdlog/fmt/fmt.h>
 
 class TestEval : public par::Parser {
+  std::unique_ptr<par::Block> m_block;
+
   public:
   bool parseSource(const std::string& source) {
     m_hooks.read_file = [](const Path&) -> std::optional<std::string> { return std::nullopt; };
     m_hooks.format_error = [](par::State*, const lex::Token& token, std::string_view msg) -> std::string { return fmt::format("{}:{}: {}", token.line, token.column, msg); };
     m_hooks.resolve_file = [](const Path&, const Path&) -> std::optional<Path> { return std::nullopt; };
 
-    Path dummy("<test>");
-    par::State state{
-      .lexer = std::make_unique<lex::Lexer>(source),
-      .last_token = {},
-    };
+    lex::Lexer lexer(source);
+    lex::TokenStream tokens = lexer.tokenize();
+    auto line_cache = lexer.takeLineCache();
+    par::State state;
+    state.tokens = std::move(tokens);
+    state.line_cache = std::move(line_cache);
     bool ok = parse(&state);
-    if (ok) registerTestState(dummy, std::move(state));
+    if (ok) m_block = std::move(state.block);
     return ok;
   }
 
   eval::Value run() {
+    if (!m_block) throw std::runtime_error("No program parsed");
+    Path dummy("<test>");
+    par::Program program;
+    program.load_order.push_back(dummy);
+    program.files[dummy] = par::ParsedFile{
+      .tokens = {},
+      .ast = std::move(m_block),
+      .includes = {},
+      .is_dynamic = false,
+    };
     eval::Evaluator ev;
-    return ev.run(*this);
+    return ev.run(program);
   }
 };
 
