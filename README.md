@@ -6,7 +6,7 @@ SiS is a lightweight scripting language with a C-like syntax, first-class functi
 
 ## Quick Look
 
-```sis
+```Cpp
 include "math";
 include "string" as str;
 
@@ -66,7 +66,7 @@ Set `$SIS_PATH` to the directory where SiS is installed. The interpreter looks f
 
 Import libraries with `include`. Omit the file extension for standard library modules.
 
-```sis
+```cpp
 include "math";
 print(math.sqrt(144)); // 12
 ```
@@ -110,7 +110,7 @@ g++ -std=c++23 -shared -fPIC \
     -o $SIS_PATH/lib/dynamic/mylib.so
 ```
 
-```sis
+```Cpp
 include "mylib";
 print(mylib.add(1, 2)); // 3
 ```
