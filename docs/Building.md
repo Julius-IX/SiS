@@ -6,25 +6,20 @@ Most compilers and modern windows machines should be supported due to minimal de
 
 #### Main SiS Binary
 
-The main SiS binary makes use of a basic CMakePresets.json file to build both native and cross-compiled binaries.
+The main SiS binary makes use of a basic CMakePresets.json file, to build both native and cross-compiled binaries.
 
 ##### Presets
-- **`debug`**
-  - Build the binary in debug mode with no optimizations.
+- **debug**, Build the binary in debug mode with no optimizations.
 
-- **`tdebug`**
-  - Build the binary and tests in debug mode, then automatically run the tests.
+- **tdebug**, Build the binary and tests in debug mode, then automatically run the tests.
 
-- **`release`**
-  - Build the binary in release mode with `-O3` optimizations.
+- **release**, Build the binary in release mode with `-O3` optimizations.
 
-- **`trelease`**
-  - Build the binary and tests in release mode, then automatically run the tests with `-O3` optimizations.
+- **trelease**, Build the binary and tests in release mode, then automatically run the tests with `-O3` optimizations.
 
-- **`windows`**
-  - Cross-compile the binary from Linux for Windows in release mode with `-O3` optimizations (requires MinGw).
+- **windows**, Cross-compile the binary from Linux for Windows in release mode with `-O3` optimizations (requires MinGw).
 
-Example Normal Build:
+Example of a native build:
 ```bash
 git clone https://gitlab.com/Salad.sh/SiS.git
 cd SiS
@@ -32,9 +27,9 @@ cmake --preset release
 cmake --build --preset trelease 
 ```
 
-Example Cross-Compiled Build:
+Example of a cross-compiled build:
 ```bash
-sudo pacman -S mingw-w64-gcc # Use appropriate package manager for your distro
+sudo pacman -S mingw-w64-gcc # Use the appropriate package manager for your distro.
 git clone https://gitlab.com/Salad.sh/SiS.git
 cd SiS
 cmake --preset windows 
@@ -43,8 +38,8 @@ cmake --build --preset windows
 #### Building C++ Native Libraries
 
 SiS supports linking Dynamic Libraries for more complex or performance-critical applications.
-A base set of libraries are located in the [/stdlib/](../stdlib/) directory.
-To quickly build all available libraries you can use the [/stdlib/build_stdlib.sh](../stdlib/build_stdlib.sh) script.
+The base set of libraries are located in the [/stdlib/](../stdlib/) directory.
+Building the base set of libraries is as simple as running the [/stdlib/build_stdlib.sh](../stdlib/build_stdlib.sh) script.
 ``` bash
 ./build_stdlib.sh                  # native platform only
 ./build_stdlib.sh --windows        # cross-compile for Windows (requires MinGW)
@@ -53,8 +48,10 @@ To quickly build all available libraries you can use the [/stdlib/build_stdlib.s
 ./build_stdlib.sh --all --install /path/to/sis
 
 ```
+To build custom libraries you can either
+- Use the provided CMakeLists.txt in the [/stdlib/](../stdlib/).
+- Create your own.
 
-To build custom libraries you can either use the provided CMakeLists.txt in the [/stdlib/](../stdlib/) directory or create your own.
 The provided CMakeLists.txt assumes the following layout:
 
 ```
@@ -66,14 +63,15 @@ stdlib/
         └── demo.cpp
 ```
 Each dynamic library has their own entry in [/stdlib/dynamic/](../stdlib/dynamic/) directory. The main entry file should have the same name as their dedicated directory.
-An optional CMakeLists.txt file can be used to add additional dependencies or define more complex build configurations.
+Optionally a CMakeLists.txt file can be used to add additional dependencies or define more complex build configurations. Which is placed at the root of the library directory.
+For an example CMakeLists.txt please refer to this [file](../stdlib/demo/CMakeLists.txt).
 
-For libraries with minimal SiS code you will need to set up your own CMakeLists.txt file.
-To be able to link to the SiS binary you will need to include
+If instead you opt to create your own dedicated git repository for your library, you will need the following header files:
 - [SisRegistry.h](../include/SisRegistry.h)
 - [Environment.h](../include/Environment.h)
 - [Value.h](../include/Value.h)
 - [SisDynamicLibMacros.h](../include/SisDynamicLibMacros.h) (optional but recommended)
 
+Including the above header files is mandatory for linking to the SiS binary.
 See [LibraryCreation.md](../docs/DynamicLibs.md) for more information on how make dynamic libraries for SiS.
 
