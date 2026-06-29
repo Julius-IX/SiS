@@ -1,56 +1,68 @@
 ### Library Creation
 
-SiS supports two main types of libraries, SiS language or dynamic libraries (.so/.dll built in C++).
+This document covers API details for creating dynamic libraries for SiS in C++.
+It does not explain how to make native SiS language libraries, as those are directly used as normal source code when placed in a dedicated path.
 SiS language libraries are placed in `$SIS_PATH/managed/` and dynamic libraries under `$SIS_PATH/dynamic/`.
+For SiS language based libraries refer to [LangSyntax.md](LangSyntax.md) to learn basic syntax.
 
-This text will focus on explaining the creation of dynamic libraries in C++.
-For SiS based libraries you simply write scripts in SiS and place them in the appropriate directory for them to function (see [LangSyntax.md](LangSyntax.md) to learn how to start writing SiS native libraries).
+---
 
-#### Starting Out
+### Starting Out
 
-The first step is to decide if you want to use the existing set up provided in the [/stdlib/](../stdlib/) directory or create your own.
-If you do not want to set up an entire new git repository you can simply clone SiS and use the provided CMakeLists.txt files to build your library (see [Building.md](Building.md) for more information).
+The first step is to decide if you want to use the existing set up provided in the [/stdlib/](../stdlib/) directory, or create your own.
+For details on how to build either one refer to [Building.md](Building.md).
 
-But if you instead do intend to create your own library you will need to download and include these SiS headers:
-- [SisRegistry.h](../include/SisRegistry.h)
-- [Environment.h](../include/Environment.h)
-- [Value.h](../include/Value.h)
-- [SisDynamicLibMacros.h](../include/SisDynamicLibMacros.h) (optional but recommended)
-
-For a quick example of how to use the SiS API see [/stdlib/demo/stdlib.cpp](../stdlib/demo/stdlib.cpp) or [/stdlib/demo/stdlib_macrofied.cpp](../stdlib/demo/stdlib_macrofied.cpp) (for a simplified version using the helper macros).
-For a deeper dive into the workings keep reading. For clarity we will not be using any of the helper macros from [SisDynamicLibMacros.h](../include/SisDynamicLibMacros.h) in the examples.
+A minimal example project can be found in [/stdlib/demo/stdlib.cpp](../stdlib/demo/stdlib.cpp) or [/stdlib/demo/stdlib_macrofied.cpp](../stdlib/demo/stdlib_macrofied.cpp) (for a simplified version using the helper macros).
+For a deeper dive into the workings keep reading. For clarity no convenience macros will be used from, [SisDynamicLibMacros.h](../include/SisDynamicLibMacros.h), in the examples.
 
 ##### Entry Point
-First we need to write the entry point to the library.
+First the library needs to make itself known to SiS by providing an entry point:
 
-```C++
+```Cpp
 extern "C" void sis_module_init(eval::SisRegistry* reg) {
   // This will contain all the links to the functions, classes and variables.
 }
 ```
-The function **must** match this exact signature as this is the symbol that SiS will look for. We now have access to the `eval::SisRegistry` which is the handle for registering all exposed functions, classes and variables.
+The function **must** match this exact signature as this is the symbol that SiS will look for. The `sis_module_init` function gives access to the `eval::SisRegistry` variable.
+This is the main handle for registering all exposed functions, classes and variables.
+
 `eval::SisRegistry` has three functions:
 
-```C++
+```Cpp
 void defineVariable(const std::string& name, eval::Value value);
 void defineFn(const char* name, std::function<Value(std::vector<Value>&)> fn, std::string docs_string = "");
 NativeClassBuilder defineClass(const char* name, std::string docs_string = "");
 ```
-
-`eval::Value` is the main runtime type used to represent all values in SiS.
-It holds a variant of the following types: `std::variant<std::monostate, double, bool, std::string, Array, Function, NativeFunction, std::shared_ptr<Class>, std::shared_ptr<Instance>>`.
+All three functions take as their first argument the name of the exposed value. The main communication type between C++ and SiS is `eval::Value`. This is the main runtime type used to represent all values in SiS.
+`eval::Value` holds a variant of the following types: `std::variant<std::monostate, double, bool, std::string, Array, Function, NativeFunction, std::shared_ptr<Class>, std::shared_ptr<Instance>>`.
 It is suggested to rely on the implicit conversions for basic return types. Please refer to [/include/Value.h](../include/Value.h) for more detailed definitions of complex types.
 
-##### Exposing Values
+--- 
+
+#### Exposing Values
 
 `defineVariable` is mainly used to expose global variables to SiS, but keep in mind that SiS does not enforce immutability on them.
+Example of variable registration:
 
-Native functions require an exact signature: `static eval::Value name(std::vector<eval::Value>& args)`.
-Arguments passed from SiS are provided in a single `std::vector` which you unpack and validate manually.
+```Cpp
+extern "C" void sis_module_init(eval::SisRegistry* reg) {
+  reg->defineVariable("PI", M_PI);
+}
+```
+This now gives access to the variable `PI` from SiS:
+
+```C
+include "my_lib" as ml;
+
+print(ml.PI);
+```
+
+Native free functions require an exact signature: `static eval::Value name(std::vector<eval::Value>& args)`.
+Arguments passed from SiS are provided in a single `std::vector` which are unpack and validate manually.
 
 Example of a simple native function:
 
-```C++
+```Cpp
 static eval::Value add(std::vector<eval::Value>& args) {
   if (args.size() != 2) throw std::runtime_error("add() expects 2 arguments");
 
@@ -67,7 +79,12 @@ extern "C" void sis_module_init(eval::SisRegistry* reg) {
   reg->defineFn("add", add, "Optional documentation string");
 }
 ```
+Usage from SiS:
+```C
+include "my_lib" as ml;
 
+print(ml.add(1, 2));
+```
 To avoid the repeated manual variant access and error checking, `SisDynamicLibMacros.h` provides helper functions with the general signature `inline type requireType(const eval::Value& val, const char* ctx)`. See the [Type Helpers](#type-helpers) section below.
 
 #### Defining a Native Class
@@ -80,7 +97,7 @@ Native classes let you back a SiS class with a real C++ object. The general patt
 
 `defineClass` returns a `NativeClassBuilder` with the following API, all methods return `*this` to allow chaining:
 
-```C++
+```Cpp
 NativeClassBuilder& docs(std::string text);
 NativeClassBuilder& constructor(std::function<void(std::shared_ptr<Instance>, std::vector<Value>&)> ctor);
 NativeClassBuilder& method(const char* name, std::function<Value(std::shared_ptr<Instance>, std::vector<Value>&)> fn);
@@ -97,7 +114,7 @@ The approach is to store a `shared_ptr` to the C++ object inside a special `__na
 
 In full, without any convenience macros:
 
-```C++
+```Cpp
 .constructor([](std::shared_ptr<eval::Instance> inst, std::vector<eval::Value>& args) {
   double initial = args.empty() ? 0.0 : /* extract from args */;
 
@@ -127,7 +144,7 @@ In full, without any convenience macros:
 
 Recovering the pointer in a method works by reversing the process:
 
-```C++
+```Cpp
 static std::shared_ptr<NativeCounter> getCounter(const std::shared_ptr<eval::Instance>& inst) {
   auto it = inst->fields->find("__native");
   if (it == inst->fields->end())
@@ -149,7 +166,7 @@ This boilerplate is exactly what `SIS_NATIVE_CTOR` and `SIS_GET_NATIVE` from [Si
 
 ##### Full Example
 
-```C++
+```Cpp
 class NativeCounter {
   public:
   explicit NativeCounter(double initial) : m_value(initial) {}
@@ -193,10 +210,10 @@ extern "C" void sis_module_init(eval::SisRegistry* reg) {
 
 This can then be used in SiS as:
 
-```
-include "mycounter" as cnt;
+```C
+include "my_counter" as mc;
 
-pin c = new cnt.Counter(5);
+pin c = new mc.Counter(5);
 c.increment();
 c.add(10);
 print(c.value()); // 16
@@ -208,7 +225,7 @@ print(c.value()); // 0
 
 Default field values can be registered with `.field()`. These are set on every new instance before the constructor runs, the same as AST-declared fields. The `__native` field in the example above is registered this way as a `null` placeholder that the constructor then overwrites.
 
-```C++
+```Cpp
 .field("label", eval::Value{std::string("default")})
 ```
 
@@ -218,7 +235,7 @@ Fields are readable and writable from SiS like any other instance field.
 
 Documentation strings are optional throughout. `defineFn` and `defineClass` accept one as their last argument. For methods and constructors on a `NativeClassBuilder`, a `.docs()` call placed **before** the item it describes buffers the string and stamps it onto the next `.constructor()` or `.method()` call.
 
-```C++
+```Cpp
 reg->defineFn("add", fnAdd,
     "@brief Adds two numbers.\n"
     "@param a The first number.\n"
@@ -240,7 +257,7 @@ reg->defineClass("Counter", "@brief A simple counter class.")
 
 Documentation strings are stored at runtime and accessible from SiS via the `__docs__` field on any function, method, or class value:
 
-```
+```Cpp
 print(Counter.__docs__);
 print(Counter.increment.__docs__);
 ```
@@ -264,7 +281,7 @@ But more importantly because it looks nice.
 | `requireClass(val, ctx)`      | `std::shared_ptr<eval::Class>`    |
 | `requireInstance(val, ctx)`   | `std::shared_ptr<eval::Instance>` |
 
-```C++
+```Cpp
 double x = requireNum(args[0], "myFn");
 std::string s = requireStr(args[1], "myFn");
 ```
