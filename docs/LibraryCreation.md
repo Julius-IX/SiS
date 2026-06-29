@@ -2,7 +2,7 @@
 
 This document covers API details for creating dynamic libraries for SiS in C++.
 It does not explain how to make native SiS language libraries, as those are directly used as normal source code when placed in a dedicated path.
-SiS language libraries are placed in `$SIS_PATH/managed/` and dynamic libraries under `$SIS_PATH/dynamic/`.
+SiS language libraries are placed in `$SIS_PATH/lib/managed/` and dynamic libraries under `$SIS_PATH/lib/dynamic/`.
 For SiS language based libraries refer to [LangSyntax.md](LangSyntax.md) to learn basic syntax.
 
 ---
