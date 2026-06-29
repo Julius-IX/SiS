@@ -14,18 +14,16 @@ set(gtest_force_shared_crt OFF)
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE) 
 FetchContent_MakeAvailable(googletest)
 
-# linenoise
 FetchContent_Declare(
-        linenoise
-        GIT_REPOSITORY https://github.com/antirez/linenoise.git
-        GIT_TAG 97d2850
+    replxx
+    GIT_REPOSITORY https://github.com/AmokHuginnsson/replxx.git
+    GIT_TAG master
 )
-FetchContent_MakeAvailable(linenoise)
 
-add_library(linenoise_lib STATIC ${linenoise_SOURCE_DIR}/linenoise.c)
-target_include_directories(linenoise_lib PUBLIC ${linenoise_SOURCE_DIR})
+set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 
-include(FetchContent)
+FetchContent_MakeAvailable(replxx)
 
 FetchContent_Declare(
     fmt

@@ -47,7 +47,7 @@ endif()
 
 target_link_libraries(SiS PRIVATE
     SiSlib
-    linenoise_lib
+    replxx 
 )
 
 # Test that shit
