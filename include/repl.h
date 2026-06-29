@@ -9,7 +9,7 @@
 #include <string>
 
 #include <linenoise.h>
-#include <spdlog/fmt/fmt.h>
+#include <fmt/core.h>
 
 class Repl {
   public:

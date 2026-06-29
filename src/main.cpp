@@ -6,7 +6,7 @@
 
 #include <string>
 
-#include <spdlog/fmt/fmt.h>
+#include <fmt/core.h>
 
 constexpr std::string VERSION = "SiS 1.0.0";
 

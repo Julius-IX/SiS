@@ -1,6 +1,6 @@
 #include <Value.h>
 #include <algorithm>
-#include <spdlog/fmt/fmt.h>
+#include <fmt/core.h>
 
 namespace eval {
   bool Value::isTruthy() const {
